@@ -1,0 +1,17 @@
+{
+  "scripts": {
+    "migrate": "tsx scripts/inAppMigrationRunner.ts all-tenants",
+    "upload-migrations": "tsx scripts/uploadTenantMigrationsToDb.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.1",
+    "@types/pg": "^8.15.4",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.1",
+    "typescript": "^5.8.3"
+  }
+}
