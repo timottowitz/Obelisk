@@ -182,6 +182,20 @@ Deno.serve(async (req) => {
         ])
         .select()
         .single();
+
+      const { data: members, error: membersError } = await supabase.schema("org_2ycgcrzpztj0emidxp0u3iztcqy")
+        .from("members")
+        .insert({
+          user_id: data.id,
+          role: "owner",
+          permissions: ["read", "write"],
+          mfa_enabled: false,
+          created_at: new Date(event.data.created_at).toISOString(),
+          updated_at: new Date(event.data.updated_at).toISOString(),
+        })
+        .select()
+        .single();
+        
       if (error) {
         console.error("Error creating organization:", error);
         return new Response(JSON.stringify({ error: error.message }), {

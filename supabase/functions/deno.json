@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "@azure/storage-blob": "npm:@azure/storage-blob@^12.17.0"
+  },
+  "tasks": {
+    "dev": "supabase functions serve"
+  }
+} 

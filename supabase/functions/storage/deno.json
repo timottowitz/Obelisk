@@ -1,0 +1,11 @@
+{
+  "imports": {
+    "@azure/storage-blob": "npm:@azure/storage-blob@^12.17.0",
+    "@hono/hono": "jsr:@hono/hono",
+    "@hono/hono/cors": "jsr:@hono/hono/cors",
+    "@supabase/functions-js": "jsr:@supabase/functions-js"
+  },
+  "tasks": {
+    "dev": "deno run --allow-net --allow-env index.ts"
+  }
+} 

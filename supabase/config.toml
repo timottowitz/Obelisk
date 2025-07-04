@@ -278,9 +278,8 @@ enabled = false
 
 # Use Clerk as a third-party provider alongside Supabase Auth.
 [auth.third_party.clerk]
-enabled = false
-# Obtain from https://clerk.com/setup/supabase
-# domain = "example.clerk.accounts.dev"
+enabled = true
+domain = "pretty-werewolf-52.clerk.accounts.dev"
 
 [edge_runtime]
 enabled = true
@@ -327,7 +326,7 @@ entrypoint = "./functions/clerk-webhook/index.ts"
 
 [functions.call-recordings]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/call-recordings/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
@@ -335,3 +334,15 @@ entrypoint = "./functions/call-recordings/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/call-recordings/*.html" ]
+
+[functions.storage]
+enabled = true
+verify_jwt = false
+import_map = "./functions/storage/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/storage/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/storage/*.html" ]
+
