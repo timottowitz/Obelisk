@@ -21,8 +21,6 @@ export const extractUserAndOrgId: MiddlewareHandler = async (
     return c.json({ error: "Token missing" }, 401);
   }
 
-  console.log("token", token);
-
   try {
     const payload = JSON.parse(atob(token.split(".")[1]));
     const userId = payload["sub"];
@@ -35,12 +33,8 @@ export const extractUserAndOrgId: MiddlewareHandler = async (
     c.set("userId", userId);
     c.set("orgId", orgId);
 
-    console.log("userId", userId);
-    console.log("orgId", orgId);
-
     await next();
   } catch (error) {
-    console.log("error", error);
     return c.json({ error: "Invalid token" }, 401);
   }
 };
