@@ -70,6 +70,14 @@ export const navItems: NavItem[] = [
     ]
   },
   {
+    title: 'Call Recordings',
+    url: '/dashboard/callcaps',
+    icon: 'callcaps',
+    isActive: false,
+    shortcut: ['c', 'r'],
+    items: []
+  },
+  {
     title: 'Legal Research',
     url: '#',
     icon: 'help',

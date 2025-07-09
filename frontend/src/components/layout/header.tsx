@@ -10,15 +10,14 @@ import { ModeToggle } from './ThemeToggle/theme-toggle';
 import * as NavigationMenu from '@radix-ui/react-navigation-menu';
 
 export default function Header() {
-  const notifications = 3; // Could be passed as prop or from context
+  const notifications = 3;
 
   return (
     <header className='flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12'>
-      {/* Left section - Sidebar trigger + Org/Navigation switcher */}
       <div className='flex items-center gap-2 px-4'>
         <SidebarTrigger className='-ml-1' />
         <Separator orientation='vertical' className='mr-2 h-4' />
-        
+
         <div className='flex items-center gap-1'>
           <NavigationMenu.Root>
             <NavigationMenu.List className='flex items-center gap-1 md:gap-2 lg:gap-4 xl:gap-6'>
@@ -67,9 +66,7 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Right section - Notifications + User menu */}
       <div className='flex items-center gap-2 px-4'>
-        {/* Notifications */}
         <Button
           variant='ghost'
           size='icon'
@@ -85,7 +82,7 @@ export default function Header() {
             </Badge>
           )}
         </Button>
-        
+
         <UserNav />
         <ModeToggle />
         <ThemeSelector />
