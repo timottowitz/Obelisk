@@ -31,6 +31,8 @@ function formatDuration(milliseconds: number): string {
   }
 }
 
+
+
 // Helper to generate markdown report
 function generateMarkdownReport(
   recording: any,
@@ -184,16 +186,19 @@ app.use(
   })
 );
 
-// Middleware for user and org extraction
-app.use("/call-recordings", extractUserAndOrgId);
-app.use("/call-recordings/:id/process", extractUserAndOrgId);
+  app.use("/call-recordings", extractUserAndOrgId);
+  app.use("/call-recordings/:id/process", extractUserAndOrgId);
+  app.use("/call-recordings/:id/video", extractUserAndOrgId);
+  app.use("/call-recordings/:id/share", extractUserAndOrgId);
+  app.use("/call-recordings/:id/shares", extractUserAndOrgId);
+  app.use("/call-recordings/upload", extractUserAndOrgId);
+  app.use("/call-recordings/organization-members", extractUserAndOrgId);
+  app.use("/call-recordings/accessible", extractUserAndOrgId);
 
-// Handle OPTIONS requests for all routes
 app.options("*", (c) => {
   return c.text("", 200);
 });
 
-// Main route for /call-recordings
 app.get("/call-recordings", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
@@ -252,19 +257,17 @@ app.get("/call-recordings", async (c) => {
     const startDate = url.searchParams.get("startDate") || undefined;
     const endDate = url.searchParams.get("endDate") || undefined;
 
-    // Check if requesting a specific recording by ID
     const pathParts = url.pathname.split("/");
     const recordingId = pathParts[pathParts.length - 1];
     const table = `call_recordings`;
 
     if (recordingId && recordingId !== "call-recordings") {
-      // Get single recording
       const { data: recording, error } = await supabase
         .schema(schema)
-        .from(table)
+        .from("accessible_recordings")
         .select("*")
-        .eq("member_id", member.data?.id)
         .eq("id", recordingId)
+        .or(`member_id.eq.${member.data?.id},shared_with_member_id.eq.${member.data?.id}`)
         .single();
       if (error || !recording) {
         return c.json({ error: "Recording not found" }, 404);
@@ -272,11 +275,12 @@ app.get("/call-recordings", async (c) => {
       return c.json({ recording }, 200);
     }
 
+    // Query to get both owned and shared recordings
     let query = supabase
       .schema(schema)
-      .from(table)
+      .from("accessible_recordings")
       .select("*", { count: "exact" })
-      .eq("member_id", member.data?.id);
+      .or(`member_id.eq.${member.data?.id},shared_with_member_id.eq.${member.data?.id}`);
     if (search) {
       query = query.or(`title.ilike.%${search}%,participants.cs.{${search}}`);
     }
@@ -481,6 +485,246 @@ app.post("/call-recordings", async (c) => {
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
+
+      // Upload to Azure Blob Storage
+      const uploadResult = await azureStorage.uploadVideo(
+        user.data?.id,
+        recording.id,
+        bytes,
+        mimeType
+      );
+
+      // Update recording with Azure URLs
+      const { error: updateError } = await supabase
+        .schema(schema)
+        .from(recordingsTable)
+        .update({
+          azure_video_url: uploadResult.blobUrl,
+          azure_video_blob_name: uploadResult.blobName,
+          file_size: bytes.length,
+          status: "uploaded",
+        })
+        .eq("id", recording.id);
+
+      if (updateError) {
+        console.error(
+          "Failed to update recording with Azure URLs:",
+          updateError
+        );
+      }
+
+      // Add to processing queue for transcription
+      const { error: queueError } = await supabase
+        .schema(schema)
+        .from(queueTable)
+        .insert({
+          recording_id: recording.id,
+          task_type: "transcribe",
+          status: "pending",
+        });
+
+      if (queueError) {
+        console.error("Failed to add to processing queue:", queueError);
+      }
+
+      return c.json(
+        {
+          success: true,
+          recording: {
+            id: recording.id,
+            title: recording.title,
+            status: "uploaded",
+            azure_video_url: uploadResult.blobUrl,
+            duration: recording.duration,
+            start_time: recording.start_time,
+            end_time: recording.end_time,
+          },
+        },
+        200
+      );
+    } catch (uploadError: any) {
+      console.log("uploadError", uploadError);
+      // Update recording status to failed
+      await supabase
+        .schema(schema)
+        .from(recordingsTable)
+        .update({
+          status: "failed",
+          processing_error: uploadError.message,
+        })
+        .eq("id", recording.id);
+
+      return c.json(
+        { error: "Failed to upload to Azure", details: uploadError.message },
+        500
+      );
+    }
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Upload recording route with multipart form data
+app.post("/call-recordings/upload", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
+
+    const org = await supabase
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+    if (org.error) {
+      console.log(org);
+      return c.json({ error: "Organization not found" }, 404);
+    }
+    const schema = org.data?.schema_name.toLowerCase();
+    if (!schema) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+
+    const user = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+    if (user.error) {
+      return c.json({ error: "User not found" }, 404);
+    }
+    const member = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("*")
+      .eq("user_id", user.data?.id)
+      .eq("organization_id", org.data?.id)
+      .single();
+    if (member.error) {
+      return c.json({ error: "Member not found" }, 404);
+    }
+
+    // Parse multipart form data
+    const formData = await c.req.formData();
+    const file = formData.get("file") as File;
+    const metadataString = formData.get("metadata") as string;
+
+    if (!file || !metadataString) {
+      return c.json({
+        error: "Missing required fields: file and metadata"
+      }, 400);
+    }
+
+    let metadata;
+    try {
+      metadata = JSON.parse(metadataString);
+    } catch (parseError) {
+      return c.json({
+        error: "Invalid metadata JSON format"
+      }, 400);
+    }
+
+    const {
+      mimeType,
+      duration,
+      startTime,
+      endTime,
+      title,
+      participants,
+    } = metadata;
+
+    if (!mimeType || !duration || !startTime || !title) {
+      return c.json(
+        {
+          error:
+            "Missing required metadata fields: mimeType, duration, startTime, title",
+        },
+        400
+      );
+    }
+
+    const recordingsTable = `call_recordings`;
+    const settingsTable = `user_settings`;
+    const queueTable = `processing_queue`;
+
+    // Get user's Azure credentials from settings, fallback to environment variables
+    const { data: settings, error: settingsError } = await supabase
+      .schema(schema)
+      .from(settingsTable)
+      .select("azure_connection_string")
+      .eq("member_id", member.data?.id)
+      .single();
+
+    // Use user settings if available, otherwise use environment variables
+    let azureConnectionString = settings?.azure_connection_string;
+    if (!azureConnectionString) {
+      azureConnectionString = Deno.env.get("AZURE_CONNECTION_STRING");
+    }
+
+    if (!azureConnectionString) {
+      return c.json(
+        {
+          error:
+            "Azure storage not configured. Please add your Azure connection string in settings or configure AZURE_CONNECTION_STRING environment variable.",
+        },
+        400
+      );
+    }
+
+    // Parse Azure connection string
+    const connectionString = azureConnectionString;
+    const accountName = connectionString.match(/AccountName=([^;]+)/)?.[1];
+    const accountKey = connectionString.match(/AccountKey=([^;]+)/)?.[1];
+
+    if (!accountName || !accountKey) {
+      return c.json({ error: "Invalid Azure connection string format" }, 400);
+    }
+
+    // Create recording record in database
+    const { data: recording, error: insertError } = await supabase
+      .schema(schema)
+      .from(recordingsTable)
+      .insert({
+        member_id: member.data?.id,
+        title,
+        start_time: startTime,
+        end_time: endTime,
+        duration,
+        participants: participants || [],
+        mime_type: mimeType,
+        status: "uploading",
+        has_video: true,
+        has_audio: true,
+      })
+      .select()
+      .single();
+
+    if (insertError || !recording) {
+      console.log("insertError", insertError);
+      return c.json(
+        { error: "Failed to create recording record", details: insertError },
+        500
+      );
+    }
+
+    try {
+      // Initialize Azure Blob Storage
+      const azureStorage = new AzureBlobStorageService({
+        accountName,
+        accountKey,
+        containerName: "callcaps-recordings",
+      });
+
+      // Convert File to ArrayBuffer
+      const fileArrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(fileArrayBuffer);
 
       // Upload to Azure Blob Storage
       const uploadResult = await azureStorage.uploadVideo(
@@ -772,7 +1016,9 @@ app.post("/call-recordings/:id/process", async (c) => {
         4. Risk analysis and compliance notes
         5. Follow-up tasks
         
-        Format your response as JSON with the following structure:
+        IMPORTANT: Return ONLY a valid JSON object. Do not wrap your response in markdown code blocks or any other formatting. Your response should start with { and end with }.
+        
+        Use exactly this JSON structure:
         {
           "summary": "Brief executive summary",
           "keyPoints": ["point 1", "point 2"],
@@ -823,6 +1069,9 @@ app.post("/call-recordings/:id/process", async (c) => {
         try {
           analysis = JSON.parse(analysisText);
         } catch (parseError) {
+          console.error('JSON parsing error:', parseError);
+          console.error('Raw analysis text:', analysisText);
+          
           // Fallback if JSON parsing fails
           analysis = {
             summary: analysisText,
@@ -950,6 +1199,754 @@ app.post("/call-recordings/:id/process", async (c) => {
         500
       );
     }
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Video proxy endpoint to serve videos with proper CORS
+app.get("/call-recordings/:id/video", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const recordingId = c.req.param("id");
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
+
+    const org = await supabase
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+    if (org.error) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+    const schema = org.data?.schema_name.toLowerCase();
+    if (!schema) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+
+    const user = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+    if (user.error) {
+      return c.json({ error: "User not found" }, 404);
+    }
+    const member = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("*")
+      .eq("user_id", user.data?.id)
+      .eq("organization_id", org.data?.id)
+      .single();
+    if (member.error) {
+      return c.json({ error: "Member not found" }, 404);
+    }
+
+    // Get recording details (including shared recordings)
+    const { data: recording, error: recordingError } = await supabase
+      .schema(schema)
+      .from("accessible_recordings")
+      .select("*")
+      .eq("id", recordingId)
+      .or(`member_id.eq.${member.data?.id},shared_with_member_id.eq.${member.data?.id}`)
+      .single();
+
+    if (recordingError || !recording) {
+      return c.json({ error: "Recording not found" }, 404);
+    }
+
+    if (!recording.azure_video_blob_name) {
+      return c.json({ error: "Video file not found" }, 404);
+    }
+
+    // Get Azure credentials
+    const { data: settings } = await supabase
+      .schema(schema)
+      .from("user_settings")
+      .select("azure_connection_string")
+      .eq("member_id", member.data?.id)
+      .single();
+
+    let azureConnectionString = settings?.azure_connection_string;
+    if (!azureConnectionString) {
+      azureConnectionString = Deno.env.get("AZURE_CONNECTION_STRING");
+    }
+
+    if (!azureConnectionString) {
+      return c.json({ error: "Azure storage not configured" }, 500);
+    }
+
+    // Parse Azure connection string
+    const connectionString = azureConnectionString;
+    const accountName = connectionString.match(/AccountName=([^;]+)/)?.[1];
+    const accountKey = connectionString.match(/AccountKey=([^;]+)/)?.[1];
+
+    if (!accountName || !accountKey) {
+      return c.json({ error: "Invalid Azure connection string" }, 500);
+    }
+
+    // Initialize Azure Blob Storage
+    const azureStorage = new AzureBlobStorageService({
+      accountName,
+      accountKey,
+      containerName: "callcaps-recordings",
+    });
+
+    // Download video from Azure
+    const videoData = await azureStorage.downloadBlob(recording.azure_video_blob_name);
+    
+    // Return video with proper headers
+    return new Response(videoData, {
+      headers: {
+        'Content-Type': recording.mime_type || 'video/webm',
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'public, max-age=3600',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+        'Access-Control-Allow-Headers': '*',
+      },
+    });
+
+  } catch (error: any) {
+    console.error("Video proxy error:", error);
+    return c.json({ error: "Failed to load video" }, 500);
+  }
+});
+
+// Get organization members for sharing UI
+app.get("/call-recordings/organization-members", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
+
+    const org = await supabase
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+    if (org.error) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+
+    const user = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+    if (user.error) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
+    const member = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("*")
+      .eq("user_id", user.data?.id)
+      .eq("organization_id", org.data?.id)
+      .single();
+    if (member.error) {
+      return c.json({ error: "Member not found" }, 404);
+    }
+
+    // Get all organization members except the current user
+    const { data: members, error: membersError } = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select(`
+        id,
+        role,
+        status,
+        joined_at,
+        users:user_id (
+          id,
+          email,
+          full_name
+        )
+      `)
+      .eq("organization_id", org.data?.id)
+      .eq("status", "active")
+      .neq("id", member.data?.id);
+
+    if (membersError) {
+      return c.json(
+        { error: "Failed to fetch organization members", details: membersError },
+        500
+      );
+    }
+
+    const formattedMembers = members.map((member: any) => ({
+      id: member.id,
+      userId: member.users.id,
+      email: member.users.email,
+      fullName: member.users.full_name,
+      role: member.role,
+      status: member.status,
+      joinedAt: member.joined_at,
+    }));
+
+    return c.json({ members: formattedMembers }, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get all accessible recordings for current user (owned + shared)
+app.get("/call-recordings/accessible", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
+
+    const org = await supabase
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+    if (org.error) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+    const schema = org.data?.schema_name.toLowerCase();
+    if (!schema) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+
+    const user = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+    if (user.error) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
+    const member = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("*")
+      .eq("user_id", user.data?.id)
+      .eq("organization_id", org.data?.id)
+      .single();
+    if (member.error) {
+      return c.json({ error: "Member not found" }, 404);
+    }
+
+    // Parse query params for filtering and pagination
+    const url = new URL(c.req.url);
+    const limit = parseInt(url.searchParams.get("limit") || "50");
+    const offset = parseInt(url.searchParams.get("offset") || "0");
+    const orderBy = url.searchParams.get("orderBy") || "start_time";
+    const orderDirection = (url.searchParams.get("orderDirection") || "desc") as "asc" | "desc";
+    const search = url.searchParams.get("search") || undefined;
+    const status = url.searchParams.get("status") || undefined;
+    const startDate = url.searchParams.get("startDate") || undefined;
+    const endDate = url.searchParams.get("endDate") || undefined;
+    const accessType = url.searchParams.get("accessType") || undefined; // 'owned', 'shared', or 'all'
+
+    // Build the query to get accessible recordings
+    let query = supabase
+      .schema(schema)
+      .from("accessible_recordings")
+      .select("*", { count: "exact" });
+
+    // Filter by access type
+    if (accessType === "owned") {
+      query = query.eq("member_id", member.data?.id);
+    } else if (accessType === "shared") {
+      query = query.eq("shared_with_member_id", member.data?.id);
+    } else {
+      // Default: get both owned and shared recordings
+      query = query.or(`member_id.eq.${member.data?.id},shared_with_member_id.eq.${member.data?.id}`);
+    }
+
+    // Apply additional filters
+    if (search) {
+      query = query.or(`title.ilike.%${search}%,participants.cs.{${search}}`);
+    }
+    if (status) {
+      query = query.eq("status", status);
+    }
+    if (startDate) {
+      query = query.gte("start_time", startDate);
+    }
+    if (endDate) {
+      query = query.lte("start_time", endDate);
+    }
+
+    // Apply ordering and pagination
+    query = query.order(orderBy, { ascending: orderDirection === "asc" });
+    query = query.range(offset, offset + limit - 1);
+
+    const { data: recordings, error, count } = await query;
+
+    if (error) {
+      return c.json(
+        { error: "Failed to fetch accessible recordings", details: error },
+        500
+      );
+    }
+
+    // Get unique shared_by_member_ids for batch lookup
+    const sharedByMemberIds = [...new Set(
+      recordings?.filter(r => r.shared_by_member_id).map(r => r.shared_by_member_id)
+    )];
+
+    // Fetch member information for shared recordings
+    let memberInfoMap: { [key: string]: any } = {};
+    if (sharedByMemberIds.length > 0) {
+      const { data: members } = await supabase
+        .schema("private")
+        .from("organization_members")
+        .select(`
+          id,
+          users:user_id (
+            full_name,
+            email
+          )
+        `)
+        .in("id", sharedByMemberIds);
+
+      memberInfoMap = (members || []).reduce((acc: any, member: any) => {
+        acc[member.id] = member;
+        return acc;
+      }, {});
+    }
+
+    // Format the recordings with additional metadata
+    const formattedRecordings = (recordings || []).map((recording: any) => ({
+      ...recording,
+      date: new Date(recording.start_time).toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      }),
+      time: new Date(recording.start_time).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      }),
+      duration: formatDuration(recording.duration),
+      // Add sharing metadata
+      isOwned: recording.member_id === member.data?.id,
+      isShared: recording.access_type === "shared",
+      sharedBy: recording.shared_by_member_id && memberInfoMap[recording.shared_by_member_id] ? {
+        id: memberInfoMap[recording.shared_by_member_id].id,
+        name: memberInfoMap[recording.shared_by_member_id].users.full_name,
+        email: memberInfoMap[recording.shared_by_member_id].users.email,
+      } : null,
+      permissionLevel: recording.permission_level || "view",
+      shareExpiresAt: recording.share_expires_at,
+      transcript_text: recording.transcript_text,
+      // Include transcript data if available
+      transcript: recording.ai_analysis
+        ? {
+            summary: recording.ai_summary,
+            actionItems: recording.action_items || [],
+            keyTopics: recording.key_topics || [],
+            sentiment: recording.sentiment,
+            wordCount: recording.word_count,
+          }
+        : null,
+    }));
+
+    // Group recordings by access type for easier consumption
+    const ownedRecordings = formattedRecordings.filter(r => r.isOwned);
+    const sharedRecordings = formattedRecordings.filter(r => r.isShared);
+
+    return c.json(
+      {
+        recordings: formattedRecordings,
+        summary: {
+          total: count || 0,
+          owned: ownedRecordings.length,
+          shared: sharedRecordings.length,
+        },
+        pagination: {
+          limit,
+          offset,
+          total: count || 0,
+          hasMore: (offset + limit) < (count || 0),
+        },
+        filters: {
+          orderBy,
+          orderDirection,
+          search,
+          status,
+          startDate,
+          endDate,
+          accessType,
+        },
+      },
+      200
+    );
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Share a recording with specific members
+app.post("/call-recordings/:id/share", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const recordingId = c.req.param("id");
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
+
+    const org = await supabase
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+    if (org.error) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+    const schema = org.data?.schema_name.toLowerCase();
+
+    const user = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+    if (user.error) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
+    const member = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("*")
+      .eq("user_id", user.data?.id)
+      .eq("organization_id", org.data?.id)
+      .single();
+    if (member.error) {
+      return c.json({ error: "Member not found" }, 404);
+    }
+
+    // Parse request body
+    const body = await c.req.json();
+    const { memberIds, permissionLevel = "view", expiresAt } = body;
+
+    if (!memberIds || !Array.isArray(memberIds) || memberIds.length === 0) {
+      return c.json({ error: "Member IDs are required" }, 400);
+    }
+
+    // Verify recording exists and user owns it
+    const { data: recording, error: recordingError } = await supabase
+      .schema(schema)
+      .from("call_recordings")
+      .select("*")
+      .eq("id", recordingId)
+      .eq("member_id", member.data?.id)
+      .single();
+
+    if (recordingError || !recording) {
+      return c.json({ error: "Recording not found or access denied" }, 404);
+    }
+
+    // Verify all member IDs belong to the same organization
+    const { data: orgMembers, error: orgMembersError } = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("id")
+      .eq("organization_id", org.data?.id)
+      .in("id", memberIds);
+
+    if (orgMembersError || orgMembers.length !== memberIds.length) {
+      return c.json({ error: "Invalid member IDs" }, 400);
+    }
+
+    // Create share records
+    const shareRecords = memberIds.map((memberId: string) => ({
+      recording_id: recordingId,
+      shared_by_member_id: member.data?.id,
+      shared_with_member_id: memberId,
+      permission_level: permissionLevel,
+      expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+    }));
+
+    const { data: shares, error: sharesError } = await supabase
+      .schema(schema)
+      .from("recording_shares")
+      .upsert(shareRecords, { onConflict: "recording_id,shared_with_member_id" })
+      .select();
+
+    if (sharesError) {
+      return c.json(
+        { error: "Failed to create shares", details: sharesError },
+        500
+      );
+    }
+
+    // Update recording to mark as shared
+    await supabase
+      .schema(schema)
+      .from("call_recordings")
+      .update({ is_shared: true })
+      .eq("id", recordingId);
+
+    return c.json({
+      success: true,
+      message: `Recording shared with ${memberIds.length} member(s)`,
+      shares: shares,
+    }, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get sharing information for a recording
+app.get("/call-recordings/:id/shares", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const recordingId = c.req.param("id");
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
+
+    const org = await supabase
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+    if (org.error) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+    const schema = org.data?.schema_name.toLowerCase();
+
+    const user = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+    if (user.error) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
+    const member = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("*")
+      .eq("user_id", user.data?.id)
+      .eq("organization_id", org.data?.id)
+      .single();
+    if (member.error) {
+      return c.json({ error: "Member not found" }, 404);
+    }
+
+    // Verify recording exists and user has access (owner or shared with)
+    const { data: recording, error: recordingError } = await supabase
+      .schema(schema)
+      .from("accessible_recordings")
+      .select("*")
+      .eq("id", recordingId)
+      .or(`member_id.eq.${member.data?.id},shared_with_member_id.eq.${member.data?.id}`)
+      .single();
+
+    if (recordingError || !recording) {
+      return c.json({ error: "Recording not found or access denied" }, 404);
+    }
+
+    // Get all shares for this recording
+    const { data: shares, error: sharesError } = await supabase
+      .schema(schema)
+      .from("recording_shares")
+      .select(`
+        id,
+        permission_level,
+        expires_at,
+        created_at,
+        updated_at,
+        shared_with_member:shared_with_member_id (
+          id,
+          role,
+          users:user_id (
+            email,
+            full_name
+          )
+        ),
+        shared_by_member:shared_by_member_id (
+          id,
+          role,
+          users:user_id (
+            email,
+            full_name
+          )
+        )
+      `)
+      .eq("recording_id", recordingId)
+      .or("expires_at.is.null,expires_at.gt.now()");
+
+    if (sharesError) {
+      return c.json(
+        { error: "Failed to fetch shares", details: sharesError },
+        500
+      );
+    }
+
+    const formattedShares = shares.map((share: any) => ({
+      id: share.id,
+      permissionLevel: share.permission_level,
+      expiresAt: share.expires_at,
+      createdAt: share.created_at,
+      updatedAt: share.updated_at,
+      sharedWith: {
+        id: share.shared_with_member.id,
+        email: share.shared_with_member.users.email,
+        fullName: share.shared_with_member.users.full_name,
+        role: share.shared_with_member.role,
+      },
+      sharedBy: {
+        id: share.shared_by_member.id,
+        email: share.shared_by_member.users.email,
+        fullName: share.shared_by_member.users.full_name,
+        role: share.shared_by_member.role,
+      },
+    }));
+
+    return c.json({
+      recordingId: recordingId,
+      isOwner: recording.member_id === member.data?.id,
+      shares: formattedShares,
+    }, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Remove sharing for a recording
+app.delete("/call-recordings/:id/share/:memberId", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const recordingId = c.req.param("id");
+  const sharedMemberId = c.req.param("memberId");
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
+
+    const org = await supabase
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+    if (org.error) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+    const schema = org.data?.schema_name.toLowerCase();
+
+    const user = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+    if (user.error) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
+    const member = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("*")
+      .eq("user_id", user.data?.id)
+      .eq("organization_id", org.data?.id)
+      .single();
+    if (member.error) {
+      return c.json({ error: "Member not found" }, 404);
+    }
+
+    // Verify recording exists and user owns it
+    const { data: recording, error: recordingError } = await supabase
+      .schema(schema)
+      .from("call_recordings")
+      .select("*")
+      .eq("id", recordingId)
+      .eq("member_id", member.data?.id)
+      .single();
+
+    if (recordingError || !recording) {
+      return c.json({ error: "Recording not found or access denied" }, 404);
+    }
+
+    // Remove the share
+    const { error: deleteError } = await supabase
+      .schema(schema)
+      .from("recording_shares")
+      .delete()
+      .eq("recording_id", recordingId)
+      .eq("shared_with_member_id", sharedMemberId);
+
+    if (deleteError) {
+      return c.json(
+        { error: "Failed to remove share", details: deleteError },
+        500
+      );
+    }
+
+    // Check if there are any remaining shares
+    const { data: remainingShares, error: remainingError } = await supabase
+      .schema(schema)
+      .from("recording_shares")
+      .select("id")
+      .eq("recording_id", recordingId)
+      .limit(1);
+
+    if (remainingError) {
+      console.error("Error checking remaining shares:", remainingError);
+    }
+
+    // Update recording's is_shared status if no shares remain
+    if (!remainingShares || remainingShares.length === 0) {
+      await supabase
+        .schema(schema)
+        .from("call_recordings")
+        .update({ is_shared: false })
+        .eq("id", recordingId);
+    }
+
+    return c.json({
+      success: true,
+      message: "Recording share removed successfully",
+    }, 200);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }

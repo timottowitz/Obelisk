@@ -1,4 +1,4 @@
-import { CallRecording, CallTranscript } from '@/types/callcaps';
+import { CallRecording, CallTranscript, OrganizationMember, RecordingShare, ShareRecordingRequest, RecordingShareInfo, AccessibleRecordingsResponse, AccessibleRecordingsFilters } from '@/types/callcaps';
 import { API_CONFIG, getAuthHeaders, handleApiResponse } from '@/config/api';
 
 // API Configuration
@@ -53,15 +53,7 @@ export interface ListRecordingsResponse {
   offset: number;
 }
 
-export interface UploadRecordingRequest {
-  recordingBlob: string;
-  mimeType: string;
-  duration: number;
-  startTime: string;
-  endTime?: string;
-  title: string;
-  participants?: string[];
-}
+
 
 export interface ProcessRecordingRequest {
   taskType?: 'transcribe' | 'analyze' | 'all';
@@ -106,32 +98,19 @@ export class CallRecordingsAPI {
     return handleApiResponse<{ recording: Recording }>(response);
   }
 
-  // Upload Recording
-  static async uploadRecording(data: UploadRecordingRequest): Promise<{
-    success: boolean;
-    recording: {
-      id: string;
-      title: string;
-      status: 'uploaded';
-      azure_video_url: string;
-      duration: number;
-      start_time: string;
-      end_time: string;
-    };
-  }> {
-    const headers = await getAuthHeaders();
-    const response = await fetch(API_BASE_URL, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(data)
-    });
-    return handleApiResponse(response);
-  }
+
 
   // Upload Recording with FormData (for large files)
   static async uploadRecordingFile(
     blob: Blob,
-    metadata: Omit<UploadRecordingRequest, 'recordingBlob'>
+    metadata: {
+      mimeType: string;
+      duration: number;
+      startTime: string;
+      endTime?: string;
+      title: string;
+      participants?: string[];
+    }
   ): Promise<{
     success: boolean;
     recording: {
@@ -194,133 +173,109 @@ export class CallRecordingsAPI {
     return handleApiResponse(response);
   }
 
-  // Helper: Convert blob to base64
-  static async blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      
-      reader.onload = () => {
-        try {
-          const result = reader.result as string;
-          if (!result) {
-            reject(new Error('Failed to read blob data'));
-            return;
-          }
-          
-          // Check if it's a valid data URL
-          if (!result.startsWith('data:')) {
-            reject(new Error('Invalid data URL format - does not start with "data:"'));
-            return;
-          }
-          
-          // Extract base64 data (remove data URL prefix)
-          const parts = result.split(',');
-          if (parts.length < 2) {
-            reject(new Error('Invalid data URL format - missing comma separator'));
-            return;
-          }
-          
-          const base64 = parts[1];
-          if (!base64) {
-            reject(new Error('Empty base64 data'));
-            return;
-          }
-          
-          // Validate base64 format
-          const isValidBase64 = /^[A-Za-z0-9+/]*={0,2}$/.test(base64);
-          if (!isValidBase64) {
-            reject(new Error('Invalid base64 format'));
-            return;
-          }
-          
-          resolve(base64);
-        } catch (error) {
-          reject(new Error(`Error processing blob data: ${error}`));
-        }
-      };
-      
-      reader.onerror = (error) => {
-        console.error('FileReader error:', error);
-        reject(new Error(`FileReader error: ${error}`));
-      };
-      
-      reader.onabort = () => {
-        reject(new Error('FileReader aborted'));
-      };
-      
-      // Read as data URL
-      reader.readAsDataURL(blob);
+
+
+
+
+  // Get Organization Members
+  static async getOrganizationMembers(): Promise<{ members: OrganizationMember[] }> {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/organization-members`, {
+      headers
     });
+    return handleApiResponse<{ members: OrganizationMember[] }>(response);
   }
 
-  // Alternative: Convert blob to base64 using ArrayBuffer (better for video files)
-  static async blobToBase64ArrayBuffer(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      
-      reader.onload = () => {
-        try {
-          const arrayBuffer = reader.result as ArrayBuffer;
-          if (!arrayBuffer) {
-            reject(new Error('Failed to read blob as ArrayBuffer'));
-            return;
-          }
-          
-          // Convert ArrayBuffer to base64
-          const bytes = new Uint8Array(arrayBuffer);
-          let binary = '';
-          for (let i = 0; i < bytes.byteLength; i++) {
-            binary += String.fromCharCode(bytes[i]);
-          }
-          
-          const base64 = btoa(binary);
-          
-          resolve(base64);
-        } catch (error) {
-          reject(new Error(`Error processing ArrayBuffer: ${error}`));
-        }
-      };
-      
-      reader.onerror = (error) => {
-        console.error('FileReader ArrayBuffer error:', error);
-        reject(new Error(`FileReader error: ${error}`));
-      };
-      
-      // Read as ArrayBuffer
-      reader.readAsArrayBuffer(blob);
+  // Get all accessible recordings for current user (owned + shared)
+  static async getAccessibleRecordings(params: AccessibleRecordingsFilters = {}): Promise<AccessibleRecordingsResponse> {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        searchParams.append(key, value.toString());
+      }
     });
+
+    const url = `${API_BASE_URL}/accessible?${searchParams.toString()}`;
+    const headers = await getAuthHeaders();
+    const response = await fetch(url, { headers });
+    const data = await handleApiResponse(response) as {
+      recordings: Recording[];
+      summary: {
+        total: number;
+        owned: number;
+        shared: number;
+      };
+      pagination: {
+        limit: number;
+        offset: number;
+        total: number;
+        hasMore: boolean;
+      };
+      filters: {
+        orderBy: string;
+        orderDirection: string;
+        search?: string;
+        status?: string;
+        startDate?: string;
+        endDate?: string;
+        accessType?: string;
+      };
+    };
+    
+    // Convert API recordings to CallRecording format
+    const convertedRecordings = data.recordings.map((recording: Recording) => 
+      this.convertToCallRecording(recording)
+    );
+    
+    return {
+      recordings: convertedRecordings,
+      summary: data.summary,
+      pagination: data.pagination,
+      filters: data.filters
+    };
   }
 
-  // Test function to verify blob conversion
-  static async testBlobConversion(blob: Blob): Promise<{
+  // Share Recording
+  static async shareRecording(
+    recordingId: string, 
+    shareData: ShareRecordingRequest
+  ): Promise<{
     success: boolean;
-    originalSize: number;
-    base64Length: number;
-    base64Preview: string;
-    error?: string;
+    message: string;
+    shares: RecordingShare[];
   }> {
-    try {
-      const base64 = await this.blobToBase64ArrayBuffer(blob);
-      
-      // Verify the base64 string
-      const isValidBase64 = /^[A-Za-z0-9+/]*={0,2}$/.test(base64);
-      
-      return {
-        success: true,
-        originalSize: blob.size,
-        base64Length: base64.length,
-        base64Preview: base64.substring(0, 100)
-      };
-    } catch (error) {
-      console.error('Blob conversion test failed:', error);
-      return {
-        success: false,
-        originalSize: blob.size,
-        base64Length: 0,
-        base64Preview: '',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/${recordingId}/share`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(shareData)
+    });
+    return handleApiResponse(response);
+  }
+
+  // Get Recording Shares
+  static async getRecordingShares(recordingId: string): Promise<RecordingShareInfo> {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/${recordingId}/shares`, {
+      headers
+    });
+    return handleApiResponse<RecordingShareInfo>(response);
+  }
+
+  // Remove Recording Share
+  static async removeRecordingShare(
+    recordingId: string, 
+    memberId: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/${recordingId}/share/${memberId}`, {
+      method: 'DELETE',
+      headers
+    });
+    return handleApiResponse(response);
   }
 
   // Helper: Convert API Recording to CallRecording type
@@ -356,7 +311,15 @@ export class CallRecordingsAPI {
       transcript,
       s3Key: apiRecording.azure_video_blob_name || '',
       transcriptS3Key: apiRecording.azure_transcript_blob_name || null,
-      sharing_link: apiRecording.azure_video_url
+      sharing_link: apiRecording.azure_video_url,
+      isShared: (apiRecording as any).is_shared,
+      accessType: (apiRecording as any).access_type || 'owner',
+      shareInfo: (apiRecording as any).access_type === 'shared' ? {
+        sharedBy: (apiRecording as any).shared_by_member_id,
+        permissionLevel: (apiRecording as any).permission_level,
+        expiresAt: (apiRecording as any).share_expires_at,
+      } : undefined,
+      transcript_text: apiRecording.transcript_text || '',
     };
   }
 }

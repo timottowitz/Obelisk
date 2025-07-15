@@ -6,6 +6,7 @@ import { useAuth } from '@clerk/nextjs';
 
 interface UseCallRecordingsOptions {
   limit?: number;
+  offset?: number;
   orderBy?: string;
   orderDirection?: 'asc' | 'desc';
   search?: string;
@@ -19,16 +20,9 @@ interface UseCallRecordingsReturn {
   loading: boolean;
   error: string | null;
   total: number;
+  limit: number;
+  offset: number;
   refresh: () => Promise<void>;
-  uploadRecording: (data: {
-    recordingBlob: string;
-    mimeType: string;
-    duration: number;
-    startTime: string;
-    endTime?: string;
-    title: string;
-    participants?: string[];
-  }) => Promise<CallRecording>;
   processRecording: (recordingId: string) => Promise<void>;
   updateRecording: (recordingId: string, updates: Partial<CallRecording>) => void;
 }
@@ -47,7 +41,8 @@ export function useCallRecordings(options: UseCallRecordingsOptions = {}): UseCa
     queryKey: ['call-recordings', orgId, options],
     queryFn: async () => {
       const response = await CallRecordingsAPI.listRecordings({
-        limit: options.limit || 50,
+        limit: options.limit || 20,
+        offset: options.offset || 0,
         orderBy: options.orderBy || 'start_time',
         orderDirection: options.orderDirection || 'desc',
         search: options.search,
@@ -59,7 +54,9 @@ export function useCallRecordings(options: UseCallRecordingsOptions = {}): UseCa
         recordings: response.recordings.map((recording: Recording) =>
           CallRecordingsAPI.convertToCallRecording(recording)
         ),
-        total: response.total
+        total: response.total,
+        limit: response.limit,
+        offset: response.offset
       };
     },
     enabled: !!orgId
@@ -67,53 +64,12 @@ export function useCallRecordings(options: UseCallRecordingsOptions = {}): UseCa
 
   const recordings = data?.recordings || [];
   const total = data?.total || 0;
+  const limit = data?.limit || 20;
+  const offset = data?.offset || 0;
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['call-recordings', orgId] });
   };
-
-  const uploadRecording = useCallback(async (data: {
-    recordingBlob: string;
-    mimeType: string;
-    duration: number;
-    startTime: string;
-    endTime?: string;
-    title: string;
-    participants?: string[];
-  }): Promise<CallRecording> => {
-    try {
-      const response = await CallRecordingsAPI.uploadRecording(data);
-      
-      const newRecording: CallRecording = {
-        id: response.recording.id,
-        title: response.recording.title,
-        date: new Date(data.startTime).toLocaleDateString('en-US', {
-          weekday: 'long',
-          month: 'long',
-          day: 'numeric'
-        }),
-        time: new Date(data.startTime).toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit'
-        }),
-        duration: `${Math.round(data.duration / 1000 / 60)}min`,
-        participants: data.participants || ['Current User'],
-        status: 'processing',
-        hasVideo: true,
-        hasAudio: true,
-        transcript: null,
-        s3Key: response.recording.azure_video_url,
-        transcriptS3Key: null,
-        sharing_link: response.recording.azure_video_url,
-        thumbnail: '/api/placeholder/300/200'
-      };
-
-      return newRecording;
-    } catch (err) {
-      console.error('Failed to upload recording:', err);
-      throw err;
-    }
-  }, []);
 
   const processRecording = useCallback(async (recordingId: string): Promise<void> => {
     try {
@@ -133,8 +89,9 @@ export function useCallRecordings(options: UseCallRecordingsOptions = {}): UseCa
     loading,
     error: error ? (error instanceof Error ? error.message : String(error)) : null,
     total,
+    limit,
+    offset,
     refresh,
-    uploadRecording,
     processRecording,
     updateRecording
   };

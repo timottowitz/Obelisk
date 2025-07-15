@@ -77,6 +77,7 @@ import StoreDocumentsAPI from '@/services/store-documents-api';
 import { useAuth, useUser } from '@clerk/nextjs';
 import DocViewer, { DocViewerRenderers } from '@cyntler/react-doc-viewer';
 import { AlertModal } from '@/components/modal/alert-modal';
+import { useStorageOperations } from '@/hooks/useDocuments';
 
 export interface SolarDocumentItem {
   id: string;
@@ -177,9 +178,16 @@ export default function DocumentsWorkspacePageCompact({
   onOrgChange,
   onQuickAction
 }: DocumentsWorkspacePageCompactProps) {
-  const [foldersList, setFoldersList] = useState<FolderNode[]>([]);
-  const [isLoadingFolders, setIsLoadingFolders] = useState(false);
   const { isSignedIn, isLoaded } = useAuth();
+  
+  // Use React Query hooks for all storage operations
+  const storageOps = useStorageOperations();
+  const { folders, documents, uploadDocument, createFolder, deleteFile, deleteFolder, downloadFile } = storageOps;
+
+  // Derive state from React Query data
+  const foldersList = folders.data || [];
+  const isLoadingFolders = folders.isLoading;
+  const foldersError = folders.error;
 
   const userInfo = useUser();
   const [user, setUser] = useState<any>(null);
@@ -208,61 +216,55 @@ export default function DocumentsWorkspacePageCompact({
   // Upload document state
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
 
+  // Initialize expanded folders from localStorage when folders are loaded
   useEffect(() => {
-    if (isSignedIn && isLoaded) {
-      setIsLoadingFolders(true);
-      StoreDocumentsAPI.getFolders()
-        .then((response: any) => {
-          const folders = response.data || [];
-          setFoldersList(folders);
+    if (Array.isArray(foldersList) && foldersList.length > 0) {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('expandedFolders');
+        if (saved) {
+          try {
+            const savedArray = JSON.parse(saved);
+            const validExpandedFolders = new Set<string>();
 
-          // Initialize expanded folders from localStorage
-          if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('expandedFolders');
-            if (saved) {
-              try {
-                const savedArray = JSON.parse(saved);
-                const validExpandedFolders = new Set<string>();
+            // Only include folder IDs that actually exist in the current folder structure
+            const allFolderIds = new Set(
+              foldersList.map((folder: any) => folder.id)
+            );
 
-                // Only include folder IDs that actually exist in the current folder structure
-                const allFolderIds = new Set(
-                  folders.map((folder: any) => folder.id)
-                );
-
-                savedArray.forEach((folderId: string) => {
-                  if (allFolderIds.has(folderId)) {
-                    validExpandedFolders.add(folderId);
-                  }
-                });
-
-                setExpandedFolders(validExpandedFolders);
-              } catch (error) {
-                console.warn(
-                  'Failed to parse expanded folders from localStorage:',
-                  error
-                );
-                // Expand all root folders by default
-                setExpandedFolders(
-                  new Set<string>(folders.map((folder: any) => folder.id))
-                );
+            savedArray.forEach((folderId: string) => {
+              if (allFolderIds.has(folderId)) {
+                validExpandedFolders.add(folderId);
               }
-            } else {
-              // No saved state, expand all root folders by default
-              setExpandedFolders(
-                new Set<string>(folders.map((folder: any) => folder.id))
-              );
-            }
+            });
+
+            setExpandedFolders(validExpandedFolders);
+          } catch (error) {
+            console.warn(
+              'Failed to parse expanded folders from localStorage:',
+              error
+            );
+            // Expand all root folders by default
+            setExpandedFolders(
+              new Set<string>(foldersList.map((folder: any) => folder.id))
+            );
           }
-        })
-        .catch((error) => {
-          console.error('Failed to fetch folders:', error);
-          toast.error('Failed to load folder structure');
-        })
-        .finally(() => {
-          setIsLoadingFolders(false);
-        });
+        } else {
+          // No saved state, expand all root folders by default
+          setExpandedFolders(
+            new Set<string>(foldersList.map((folder: any) => folder.id))
+          );
+        }
+      }
     }
-  }, [isSignedIn, isLoaded]);
+  }, [foldersList]);
+
+  // Show error toast if folders failed to load
+  useEffect(() => {
+    if (foldersError) {
+      console.error('Failed to fetch folders:', foldersError);
+      toast.error('Failed to load folder structure');
+    }
+  }, [foldersError]);
 
   const getAllFolders = useCallback((folders: any[]): any[] => {
     const allFolders: any[] = [];
@@ -306,7 +308,7 @@ export default function DocumentsWorkspacePageCompact({
 
   // Update selectedUploadFolderId when folders are loaded
   useEffect(() => {
-    if (foldersList.length > 0 && selectedUploadFolderId === 'root') {
+    if (Array.isArray(foldersList) && foldersList.length > 0 && selectedUploadFolderId === 'root') {
       const allFolders = getAllFolders(foldersList);
       if (allFolders.length > 0) {
         setSelectedUploadFolderId(allFolders[0].id);
@@ -423,7 +425,7 @@ export default function DocumentsWorkspacePageCompact({
 
   // Use processed folder structure from backend
 
-  const filteredFolders = foldersList.filter((folder) => {
+  const filteredFolders = Array.isArray(foldersList) ? foldersList.filter((folder) => {
     // Logically fix: search should check folder name, its documents, and recursively its children
     const matchesSearch = (folderOrChild: any): boolean => {
       if (searchQuery.length === 0) {
@@ -445,9 +447,9 @@ export default function DocumentsWorkspacePageCompact({
     };
 
     return matchesSearch(folder);
-  });
+  }) : [];
 
-  const folderStructure: FolderNode[] = filteredFolders;
+  const folderStructure = filteredFolders;
 
   // Handle scroll for top bar shadow
   useEffect(() => {
@@ -673,50 +675,40 @@ export default function DocumentsWorkspacePageCompact({
 
     setIsCreatingFolder(true);
     try {
-      const response: any = await StoreDocumentsAPI.createFolder(
-        newFolderName.trim(),
-        selectedParentFolderId
-      );
+      await createFolder.mutateAsync({
+        folderName: newFolderName.trim(),
+        parentId: selectedParentFolderId
+      });
 
-      if (response.success) {
-        toast.success(`Folder "${newFolderName}" created successfully`);
+      toast.success(`Folder "${newFolderName}" created successfully`);
 
-        // Refresh folder structure
-        const foldersResponse: any = await StoreDocumentsAPI.getFolders();
-        const folders = foldersResponse.data || [];
-
-        setFoldersList(folders);
-
-        // Expand the parent folder if a parent was selected
-        if (selectedParentFolderId !== 'root') {
-          setExpandedFolders((prev) => {
-            const newSet = new Set(prev);
-            newSet.add(selectedParentFolderId);
-            // Save to localStorage
-            if (typeof window !== 'undefined') {
-              localStorage.setItem(
-                'expandedFolders',
-                JSON.stringify(Array.from(newSet))
-              );
-            }
-            return newSet;
-          });
-        }
-
-        // Reset form
-        setNewFolderName('');
-        setSelectedParentFolderId('root');
-        setIsCreateFolderDialogOpen(false);
-      } else {
-        toast.error('Failed to create folder');
+      // Expand the parent folder if a parent was selected
+      if (selectedParentFolderId !== 'root') {
+        setExpandedFolders((prev) => {
+          const newSet = new Set(prev);
+          newSet.add(selectedParentFolderId);
+          // Save to localStorage
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(
+              'expandedFolders',
+              JSON.stringify(Array.from(newSet))
+            );
+          }
+          return newSet;
+        });
       }
+
+      // Reset form
+      setNewFolderName('');
+      setSelectedParentFolderId('root');
+      setIsCreateFolderDialogOpen(false);
     } catch (error) {
       console.error('Error creating folder:', error);
       toast.error('Failed to create folder');
     } finally {
       setIsCreatingFolder(false);
     }
-  }, [newFolderName, selectedParentFolderId]);
+  }, [newFolderName, selectedParentFolderId, createFolder]);
 
   // Get all available folders for parent selection
 
@@ -822,7 +814,7 @@ export default function DocumentsWorkspacePageCompact({
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
 
-      if (selectedUploadFolderId === 'root' && foldersList.length === 0) {
+      if (selectedUploadFolderId === 'root' && (!Array.isArray(foldersList) || foldersList.length === 0)) {
         toast.error('Please create a folder to upload the document');
         return;
       }
@@ -835,25 +827,14 @@ export default function DocumentsWorkspacePageCompact({
             id: 'upload-progress'
           });
 
-          const response: any = await StoreDocumentsAPI.uploadDocument(
+          await uploadDocument.mutateAsync({
             file,
-            selectedUploadFolderId
-          );
+            folderId: selectedUploadFolderId
+          });
 
-          if (response.success) {
-            toast.success('Document uploaded successfully', {
-              id: 'upload-progress'
-            });
-
-            // Refresh folder structure to show new document
-            const foldersResponse: any = await StoreDocumentsAPI.getFolders();
-            const folders = foldersResponse.data || [];
-            setFoldersList(folders);
-          } else {
-            toast.error('Failed to upload document', {
-              id: 'upload-progress'
-            });
-          }
+          toast.success('Document uploaded successfully', {
+            id: 'upload-progress'
+          });
         } catch (error) {
           console.error('Error uploading document:', error);
           toast.error('Failed to upload document', {
@@ -868,7 +849,7 @@ export default function DocumentsWorkspacePageCompact({
         }
       }
     },
-    [selectedUploadFolderId, foldersList]
+    [selectedUploadFolderId, foldersList, uploadDocument]
   );
 
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
@@ -878,16 +859,18 @@ export default function DocumentsWorkspacePageCompact({
       toast.error('No document selected');
       return;
     }
-    const response: any = await StoreDocumentsAPI.downloadFile(
-      selectedDocument.id
-    );
-
-    if (response.success) {
-      setDownloadUrl(response.data.sasUrl);
-    } else {
+    
+    try {
+      const response = await downloadFile.mutateAsync(selectedDocument.id);
+      if (response.success && response.data?.sasUrl) {
+        setDownloadUrl(response.data.sasUrl);
+      } else {
+        toast.error('Failed to download document');
+      }
+    } catch (error) {
       toast.error('Failed to download document');
     }
-  }, [selectedDocument]);
+  }, [selectedDocument, downloadFile]);
 
   const handleDownloadFile = useCallback(async () => {
     if (!downloadUrl) {
@@ -929,41 +912,35 @@ export default function DocumentsWorkspacePageCompact({
 
   const handleDeleteFile = useCallback(async (id: string) => {
     setDeleteLoading(true);
-    const response: any = await StoreDocumentsAPI.deleteFile(id);
-    if (response.success) {
+    try {
+      await deleteFile.mutateAsync(id);
       toast.success('File deleted successfully');
       setDeleteTargetId(null);
       setDeleteTargetType(null);
-      const foldersResponse: any = await StoreDocumentsAPI.getFolders();
-      const folders = foldersResponse.data || [];
-      setFoldersList(folders);
       setDeleteModalOpen(false);
-    } else {
+    } catch (error) {
       toast.error('Failed to delete file');
     }
     setDeleteLoading(false);
-  }, []);
+  }, [deleteFile]);
 
   const handleDeleteFolder = useCallback(async (id: string) => {
     setDeleteLoading(true);
-    const response: any = await StoreDocumentsAPI.deleteFolder(id);
-    if (response.success) {
+    try {
+      await deleteFolder.mutateAsync(id);
       toast.success('Folder deleted successfully');
       setDeleteTargetId(null);
       setDeleteTargetType(null);
-      const foldersResponse: any = await StoreDocumentsAPI.getFolders();
-      const folders = foldersResponse.data || [];
-      setFoldersList(folders);
       setDeleteModalOpen(false);
-    } else {
+    } catch (error) {
       toast.error('Failed to delete folder');
     }
     setDeleteLoading(false);
-  }, []);
+  }, [deleteFolder]);
 
   // Recursive component to render folder tree
   const renderFolderTree = useCallback(
-    (folders: FolderNode[], level: number = 0) => {
+    (folders: any[], level: number = 0) => {
       return folders.map((folder, index) => {
         const FolderIcon = folder.icon || Folder;
         const isExpanded = expandedFolders.has(folder.id);
@@ -1075,7 +1052,7 @@ export default function DocumentsWorkspacePageCompact({
                     No documents in this category
                   </div>
                 ) : (
-                  documents.map((document, docIndex) => {
+                  documents.map((document: any, docIndex: number) => {
                     const isLastDocument = docIndex === documents.length - 1;
                     return (
                       <motion.div

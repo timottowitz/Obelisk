@@ -10,10 +10,18 @@ export interface CallRecording {
   hasVideo: boolean;
   hasAudio: boolean;
   transcript: CallTranscript | null;
+  transcript_text: string;
   s3Key: string;
   transcriptS3Key: string | null;
   sharing_link?: string;
   webRecording?: WebRecording;
+  isShared?: boolean;
+  accessType?: 'owner' | 'shared';
+  shareInfo?: {
+    sharedBy?: string;
+    permissionLevel?: 'view' | 'edit' | 'admin';
+    expiresAt?: string;
+  };
 }
 
 export interface CallTranscript {
@@ -67,4 +75,82 @@ export interface ConnectionTestResult {
   success: boolean;
   error: string | null;
   message?: string;
+}
+
+export interface OrganizationMember {
+  id: string;
+  userId: string;
+  email: string;
+  fullName: string;
+  role: 'owner' | 'admin' | 'lawyer' | 'paralegal' | 'client';
+  status: 'active' | 'invited' | 'suspended';
+  joinedAt: string;
+}
+
+export interface RecordingShare {
+  id: string;
+  permissionLevel: 'view' | 'edit' | 'admin';
+  expiresAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  sharedWith: {
+    id: string;
+    email: string;
+    fullName: string;
+    role: string;
+  };
+  sharedBy: {
+    id: string;
+    email: string;
+    fullName: string;
+    role: string;
+  };
+}
+
+export interface ShareRecordingRequest {
+  memberIds: string[];
+  permissionLevel?: 'view' | 'edit' | 'admin';
+  expiresAt?: string;
+}
+
+export interface RecordingShareInfo {
+  recordingId: string;
+  isOwner: boolean;
+  shares: RecordingShare[];
+}
+
+export interface AccessibleRecordingsResponse {
+  recordings: CallRecording[];
+  summary: {
+    total: number;
+    owned: number;
+    shared: number;
+  };
+  pagination: {
+    limit: number;
+    offset: number;
+    total: number;
+    hasMore: boolean;
+  };
+  filters: {
+    orderBy: string;
+    orderDirection: string;
+    search?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    accessType?: string;
+  };
+}
+
+export interface AccessibleRecordingsFilters {
+  limit?: number;
+  offset?: number;
+  orderBy?: string;
+  orderDirection?: 'asc' | 'desc';
+  search?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  accessType?: 'owned' | 'shared' | 'all';
 }

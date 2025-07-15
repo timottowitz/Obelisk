@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Calendar,
   Clock,
@@ -18,16 +18,25 @@ import {
   X
 } from 'lucide-react';
 import { CallRecording } from '@/types/callcaps';
+import { getAuthHeaders } from '@/config/api';
+import { ShareRecordingDialog } from './share-recording-dialog';
 
 const RecordingDetailModal = ({
   recording,
-  onClose
+  onClose,
+  onRecordingUpdated
 }: {
   recording: CallRecording;
   onClose: () => void;
+  onRecordingUpdated?: () => void;
 }) => {
+  console.log(recording);
   const [activeTab, setActiveTab] = useState('summary');
   const [isPlaying, setIsPlaying] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const tabs = [
     { id: 'summary', label: 'Summary', icon: FileText },
@@ -37,8 +46,96 @@ const RecordingDetailModal = ({
     { id: 'insights', label: 'Insights', icon: Brain }
   ];
 
+  const handlePlayVideo = async () => {
+    if (videoUrl) {
+      // Video is already loaded, just play/pause
+      if (videoRef.current) {
+        if (isPlaying) {
+          videoRef.current.pause();
+        } else {
+          videoRef.current.play().catch(console.error);
+        }
+      }
+      return;
+    }
+
+    if (!recording.s3Key) {
+      console.log('No video URL available for recording');
+      return;
+    }
+
+    setVideoLoading(true);
+
+    try {
+      // Construct the proxy URL
+      const proxyUrl = `https://rnmjwdxqtsvsbelcftzg.supabase.co/functions/v1/call-recordings/${recording.id}/video`;
+
+      console.log('Loading video from proxy URL:', proxyUrl);
+
+      // Get authentication headers
+      const headers = await getAuthHeaders();
+      const filteredHeaders = Object.fromEntries(
+        Object.entries(headers).filter(([key]) => key.toLowerCase() !== 'content-type')
+      );
+
+      // Fetch the video with authentication
+      const videoResponse = await fetch(proxyUrl, {
+        headers: filteredHeaders
+      });
+
+      if (!videoResponse.ok) {
+        throw new Error(`Failed to load video: ${videoResponse.status}`);
+      }
+
+      // Create blob URL
+      const videoBlob = await videoResponse.blob();
+      const blobUrl = URL.createObjectURL(videoBlob);
+      
+      setVideoUrl(blobUrl);
+      
+      // Auto-play after loading
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.play().catch(console.error);
+        }
+      }, 100);
+
+    } catch (error) {
+      console.error('Failed to load video:', error);
+      alert(`Failed to load video: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setVideoLoading(false);
+    }
+  };
+
+  const handleVideoPlay = () => {
+    setIsPlaying(true);
+  };
+
+  const handleVideoPause = () => {
+    setIsPlaying(false);
+  };
+
+  // Cleanup video URL when modal closes
+  const handleClose = () => {
+    if (videoUrl && videoUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(videoUrl);
+    }
+    onClose();
+  };
+
+  const handleShareClick = () => {
+    setIsShareDialogOpen(true);
+  };
+
+  const handleShareSuccess = () => {
+    if (onRecordingUpdated) {
+      onRecordingUpdated();
+    }
+  };
+
   return (
-    <div className='bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black p-4'>
+    <div className='fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4'>
       <div className='bg-card flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-[var(--radius)]'>
         {/* Header */}
         <div className='border-border flex items-center justify-between border-b p-6'>
@@ -65,14 +162,17 @@ const RecordingDetailModal = ({
             <button className='text-muted-foreground hover:text-foreground hover:bg-muted rounded-[calc(var(--radius)-2px)] p-2'>
               <Download className='h-5 w-5' />
             </button>
-            <button className='text-muted-foreground hover:text-foreground hover:bg-muted rounded-[calc(var(--radius)-2px)] p-2'>
+            <button 
+              onClick={handleShareClick}
+              className='text-muted-foreground hover:text-foreground hover:bg-muted rounded-[calc(var(--radius)-2px)] p-2'
+            >
               <Share2 className='h-5 w-5' />
             </button>
             <button className='text-muted-foreground hover:text-foreground hover:bg-muted rounded-[calc(var(--radius)-2px)] p-2'>
               <Trash2 className='h-5 w-5' />
             </button>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className='text-muted-foreground hover:text-foreground hover:bg-muted rounded-[calc(var(--radius)-2px)] p-2'
             >
               <X className='h-5 w-5' />
@@ -88,29 +188,47 @@ const RecordingDetailModal = ({
               className='relative mb-4 overflow-hidden rounded-[var(--radius)] bg-black'
               style={{ aspectRatio: '16/9' }}
             >
-              <div className='absolute inset-0 flex items-center justify-center'>
-                <button
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  className='bg-opacity-20 hover:bg-opacity-30 flex h-16 w-16 items-center justify-center rounded-full bg-white'
-                >
-                  {isPlaying ? (
-                    <Pause className='h-8 w-8 text-white' />
-                  ) : (
-                    <Play className='ml-1 h-8 w-8 text-white' />
-                  )}
-                </button>
-              </div>
-              <div className='absolute right-2 bottom-2 left-2'>
-                <div className='h-1 w-full rounded-full bg-gray-600'>
-                  <div
-                    className='h-1 rounded-full bg-blue-500'
-                    style={{ width: '30%' }}
-                  ></div>
-                </div>
-              </div>
-              <div className='bg-opacity-75 absolute right-4 bottom-4 rounded bg-black px-2 py-1 text-xs text-white'>
-                12:30 / {recording.duration}
-              </div>
+              {videoUrl ? (
+                <video
+                  ref={videoRef}
+                  src={videoUrl}
+                  className="w-full h-full object-contain"
+                  controls
+                  preload="metadata"
+                  playsInline
+                  onPlay={handleVideoPlay}
+                  onPause={handleVideoPause}
+                  onError={(e) => {
+                    console.error('Video error:', e);
+                    const video = e.target as HTMLVideoElement;
+                    console.error('Video error details:', {
+                      error: video.error,
+                      networkState: video.networkState,
+                      readyState: video.readyState,
+                      currentSrc: video.currentSrc
+                    });
+                  }}
+                />
+              ) : (
+                <>
+                  <div className='absolute inset-0 flex items-center justify-center'>
+                    <button
+                      onClick={handlePlayVideo}
+                      disabled={videoLoading}
+                      className='bg-opacity-20 hover:bg-opacity-30 flex h-16 w-16 items-center justify-center rounded-full bg-white disabled:opacity-50'
+                    >
+                      {videoLoading ? (
+                        <div className='animate-spin rounded-full h-8 w-8 border-t-4 border-b-4 border-primary'></div>
+                      ) : (
+                        <Play className='ml-1 h-8 w-8 text-white' />
+                      )}
+                    </button>
+                  </div>
+                  <div className='bg-opacity-75 absolute right-4 bottom-4 rounded bg-black px-2 py-1 text-xs text-white'>
+                    {recording.duration}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Recording Stats */}
@@ -298,13 +416,7 @@ Date: ${recording.date} at ${recording.time}
 Participants: ${recording.participants.join(', ')}
 Duration: ${recording.duration}
 
-[00:01] Charles Bennett: Good afternoon everyone, thank you for joining today&apos;s strategy meeting.
-
-[00:15] Sarah Johnson: Great to be here. I&apos;ve prepared the talent acquisition analysis we discussed.
-
-[00:32] Tim Ottowitz: Perfect. Let&apos;s dive into the project execution methodologies and how we can optimize our workflow processes.
-
-[Full transcript would continue with all meeting content...]
+${recording.transcript_text}
 
 --- End of Transcript ---
 Generated by Call Caps AI Processing System`;
@@ -352,59 +464,7 @@ Generated by Call Caps AI Processing System`;
                     </button>
                   </div>
                   <div className='bg-muted rounded-[var(--radius)] p-6'>
-                    <div className='space-y-4'>
-                      <div className='space-y-3'>
-                        <div className='flex space-x-3'>
-                          <span className='text-muted-foreground mt-1 w-16 flex-shrink-0 text-xs'>
-                            00:01
-                          </span>
-                          <div>
-                            <span className='text-primary font-medium'>
-                              Charles Bennett:
-                            </span>
-                            <span className='text-foreground/80 ml-2'>
-                              Good afternoon everyone, thank you for joining
-                              today&apos;s strategy meeting.
-                            </span>
-                          </div>
-                        </div>
-                        <div className='flex space-x-3'>
-                          <span className='text-muted-foreground mt-1 w-16 flex-shrink-0 text-xs'>
-                            00:15
-                          </span>
-                          <div>
-                            <span className='text-success font-medium'>
-                              Sarah Johnson:
-                            </span>
-                            <span className='text-foreground/80 ml-2'>
-                              Great to be here. I&apos;ve prepared the talent
-                              acquisition analysis we discussed.
-                            </span>
-                          </div>
-                        </div>
-                        <div className='flex space-x-3'>
-                          <span className='text-muted-foreground mt-1 w-16 flex-shrink-0 text-xs'>
-                            00:32
-                          </span>
-                          <div>
-                            <span className='text-accent-foreground font-medium'>
-                              Tim Ottowitz:
-                            </span>
-                            <span className='text-foreground/80 ml-2'>
-                              Perfect. Let&apos;s dive into the project execution
-                              methodologies and how we can optimize our workflow
-                              processes.
-                            </span>
-                          </div>
-                        </div>
-                        <div className='py-4 text-center'>
-                          <span className='text-muted-foreground text-sm italic'>
-                            ... showing first few lines. Full transcript
-                            continues below ...
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                    {recording.transcript_text}
                   </div>
                 </div>
               )}
@@ -556,6 +616,14 @@ Generated by Call Caps AI Processing System`;
           </div>
         </div>
       </div>
+
+      {/* Share Dialog */}
+      <ShareRecordingDialog
+        recording={recording}
+        isOpen={isShareDialogOpen}
+        onClose={() => setIsShareDialogOpen(false)}
+        onSuccess={handleShareSuccess}
+      />
     </div>
   );
 };
