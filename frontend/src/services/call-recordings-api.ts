@@ -22,7 +22,10 @@ export interface Recording {
   azure_transcript_url?: string;
   azure_transcript_blob_name?: string;
   transcript_text?: string;
-  transcript_segments?: any[];
+  transcript_segments?: {
+    speaker: string;
+    transcription: string;
+  }[];
   ai_analysis?: any;
   ai_summary?: string;
   action_items?: any[];
@@ -320,6 +323,7 @@ export class CallRecordingsAPI {
         expiresAt: (apiRecording as any).share_expires_at,
       } : undefined,
       transcript_text: apiRecording.transcript_text || '',
+      transcript_segments: apiRecording.transcript_segments || [],
     };
   }
 }

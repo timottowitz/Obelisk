@@ -11,6 +11,10 @@ export interface CallRecording {
   hasAudio: boolean;
   transcript: CallTranscript | null;
   transcript_text: string;
+  transcript_segments: {
+    speaker: string;
+    transcription: string;
+  }[];
   s3Key: string;
   transcriptS3Key: string | null;
   sharing_link?: string;

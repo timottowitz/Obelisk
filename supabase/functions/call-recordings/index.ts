@@ -7,9 +7,15 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { Hono } from "jsr:@hono/hono";
 import { cors } from "jsr:@hono/hono/cors";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
 import { extractUserAndOrgId } from "../_shared/index.ts";
 import { AzureBlobStorageService } from "../_shared/azure-storage.ts";
+import {
+  GoogleGenAI,
+  createUserContent,
+  createPartFromUri,
+  FileState,
+} from "https://esm.sh/@google/genai@1.9.0";
 
 console.log("Hello from Functions!");
 
@@ -30,8 +36,6 @@ function formatDuration(milliseconds: number): string {
     return `${seconds}s`;
   }
 }
-
-
 
 // Helper to generate markdown report
 function generateMarkdownReport(
@@ -186,14 +190,14 @@ app.use(
   })
 );
 
-  app.use("/call-recordings", extractUserAndOrgId);
-  app.use("/call-recordings/:id/process", extractUserAndOrgId);
-  app.use("/call-recordings/:id/video", extractUserAndOrgId);
-  app.use("/call-recordings/:id/share", extractUserAndOrgId);
-  app.use("/call-recordings/:id/shares", extractUserAndOrgId);
-  app.use("/call-recordings/upload", extractUserAndOrgId);
-  app.use("/call-recordings/organization-members", extractUserAndOrgId);
-  app.use("/call-recordings/accessible", extractUserAndOrgId);
+app.use("/call-recordings", extractUserAndOrgId);
+app.use("/call-recordings/:id/process", extractUserAndOrgId);
+app.use("/call-recordings/:id/video", extractUserAndOrgId);
+app.use("/call-recordings/:id/share", extractUserAndOrgId);
+app.use("/call-recordings/:id/shares", extractUserAndOrgId);
+app.use("/call-recordings/upload", extractUserAndOrgId);
+app.use("/call-recordings/organization-members", extractUserAndOrgId);
+app.use("/call-recordings/accessible", extractUserAndOrgId);
 
 app.options("*", (c) => {
   return c.text("", 200);
@@ -267,7 +271,9 @@ app.get("/call-recordings", async (c) => {
         .from("accessible_recordings")
         .select("*")
         .eq("id", recordingId)
-        .or(`member_id.eq.${member.data?.id},shared_with_member_id.eq.${member.data?.id}`)
+        .or(
+          `member_id.eq.${member.data?.id},shared_with_member_id.eq.${member.data?.id}`
+        )
         .single();
       if (error || !recording) {
         return c.json({ error: "Recording not found" }, 404);
@@ -280,7 +286,9 @@ app.get("/call-recordings", async (c) => {
       .schema(schema)
       .from("accessible_recordings")
       .select("*", { count: "exact" })
-      .or(`member_id.eq.${member.data?.id},shared_with_member_id.eq.${member.data?.id}`);
+      .or(
+        `member_id.eq.${member.data?.id},shared_with_member_id.eq.${member.data?.id}`
+      );
     if (search) {
       query = query.or(`title.ilike.%${search}%,participants.cs.{${search}}`);
     }
@@ -617,28 +625,28 @@ app.post("/call-recordings/upload", async (c) => {
     const metadataString = formData.get("metadata") as string;
 
     if (!file || !metadataString) {
-      return c.json({
-        error: "Missing required fields: file and metadata"
-      }, 400);
+      return c.json(
+        {
+          error: "Missing required fields: file and metadata",
+        },
+        400
+      );
     }
 
     let metadata;
     try {
       metadata = JSON.parse(metadataString);
     } catch (parseError) {
-      return c.json({
-        error: "Invalid metadata JSON format"
-      }, 400);
+      return c.json(
+        {
+          error: "Invalid metadata JSON format",
+        },
+        400
+      );
     }
 
-    const {
-      mimeType,
-      duration,
-      startTime,
-      endTime,
-      title,
-      participants,
-    } = metadata;
+    const { mimeType, duration, startTime, endTime, title, participants } =
+      metadata;
 
     if (!mimeType || !duration || !startTime || !title) {
       return c.json(
@@ -899,6 +907,8 @@ app.post("/call-recordings/:id/process", async (c) => {
       openaiApiKey = Deno.env.get("OPENAI_API_KEY");
     }
 
+    const googleApiKey = Deno.env.get("GOOGLE_API_KEY");
+
     if (!azureConnectionString) {
       azureConnectionString = Deno.env.get("AZURE_CONNECTION_STRING");
     }
@@ -908,6 +918,16 @@ app.post("/call-recordings/:id/process", async (c) => {
         {
           error:
             "OpenAI API key not configured. Please add your API key in settings or configure OPENAI_API_KEY environment variable.",
+        },
+        400
+      );
+    }
+
+    if (!googleApiKey) {
+      return c.json(
+        {
+          error:
+            "Google API key not configured. Please add your API key in settings or configure GOOGLE_API_KEY environment variable.",
         },
         400
       );
@@ -947,43 +967,93 @@ app.post("/call-recordings/:id/process", async (c) => {
           containerName: "callcaps-recordings",
         });
 
-        // Download video from Azure
-        const videoData = await azureStorage.downloadBlob(
+        // Download video from Azure and prepare for Gemini upload
+        const videoBytes = await azureStorage.downloadBlob(
           recording.azure_video_blob_name
         );
 
-        // Create form data for OpenAI Whisper
-        const formData = new FormData();
-        formData.append(
-          "file",
-          new Blob([videoData], { type: recording.mime_type }),
-          "recording.webm"
-        );
-        formData.append("model", "whisper-1");
-        formData.append("language", "en");
-        formData.append("response_format", "verbose_json");
-        formData.append("temperature", "0.2");
+        // Convert bytes to Blob (supported in Deno)
+        const videoBlob = new Blob([videoBytes], { type: recording.mime_type });
 
-        // Call OpenAI Whisper API
-        const whisperResponse = await fetch(
-          "https://api.openai.com/v1/audio/transcriptions",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${openaiApiKey}`,
-            },
-            body: formData,
+        const genAI = new GoogleGenAI({ apiKey: googleApiKey });
+
+        // Upload the file to Gemini and use the returned File object directly
+        let geminiFile = await genAI.files.upload({
+          file: videoBlob,
+          config: {
+            mimeType: recording.mime_type,
+            displayName: recording.azure_video_blob_name,
+          },
+        });
+
+        console.log("Gemini file state:", geminiFile.state);
+
+        while (geminiFile.state !== FileState.ACTIVE) {
+          geminiFile = await genAI.files.get({
+            name: geminiFile.name ?? "",
+          });
+          console.log("Gemini file state:", geminiFile.state);
+          if (geminiFile.state === FileState.FAILED) {
+            throw new Error(
+              `Failed to upload file to Gemini: ${geminiFile.error}`
+            );
           }
-        );
-
-        if (!whisperResponse.ok) {
-          const error = await whisperResponse.text();
-          throw new Error(`Whisper API error: ${error}`);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
 
-        const whisperResult = await whisperResponse.json();
-        transcriptText = whisperResult.text;
-        transcriptSegments = whisperResult.segments || [];
+        const prompt = `Generate audio diarization for this interview. Respond ONLY with a valid JSON array (not inside a markdown code block or with any extra text), where each item has the following shape:
+{
+  "speaker": "Speaker name or number (e.g., 'Speaker A', 'Speaker B', or a real name if you can infer it)",
+  "transcription": "Utterance text"
+}
+Do not include any commentary, explanation, or markdown formatting. The output must be a valid JSON array that can be directly parsed as a JavaScript object.`;
+
+        if (!geminiFile.uri || !geminiFile.mimeType) {
+          throw new Error("Failed to upload file to Gemini");
+        }
+
+        // Call Gemini model directly via models.generateContent
+        const genResponse = await genAI.models.generateContent({
+          model: "gemini-1.5-flash",
+          contents: createUserContent([
+            prompt,
+            createPartFromUri(geminiFile.uri, geminiFile.mimeType),
+          ]),
+        });
+
+        const rawText = genResponse.text?.trim();
+        console.log("Raw text:", rawText);
+
+        // Gemini often returns JSON wrapped in markdown code blocks or with additional commentary.
+        // Extract the JSON payload safely.
+        let rawJsonText = rawText;
+        if (rawJsonText?.startsWith("```")) {
+          rawJsonText = rawJsonText.replace(/```json|```/gi, "").trim();
+        }
+
+        console.log("Raw JSON text:", rawJsonText);
+
+
+
+        // Attempt to parse JSON. If it fails, try to locate the first JSON object/array in the text.
+        let transcript;
+        try {
+          transcript = JSON.parse(rawJsonText ?? "");
+        } catch (parseErr) {
+          const jsonMatch = rawJsonText?.match(/[\[{].*[\]}]/s);
+          if (jsonMatch) {
+            transcript = JSON.parse(jsonMatch[0]);
+          } else {
+            throw new Error(
+              `Failed to parse transcript JSON: ${(parseErr as Error)?.message}. Raw response: ${rawText ?? ""}`
+            );
+          }
+        }
+
+        console.log("Transcript:", transcript);
+
+        transcriptText = transcript.map((t: any) => t.transcription).join("\n");
+        transcriptSegments = transcript;
 
         // Update recording with transcript
         await supabase
@@ -1037,7 +1107,7 @@ app.post("/call-recordings/:id/process", async (c) => {
           {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${openaiApiKey}`,
+              Authorization: `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
@@ -1069,9 +1139,9 @@ app.post("/call-recordings/:id/process", async (c) => {
         try {
           analysis = JSON.parse(analysisText);
         } catch (parseError) {
-          console.error('JSON parsing error:', parseError);
-          console.error('Raw analysis text:', analysisText);
-          
+          console.error("JSON parsing error:", parseError);
+          console.error("Raw analysis text:", analysisText);
+
           // Fallback if JSON parsing fails
           analysis = {
             summary: analysisText,
@@ -1257,7 +1327,9 @@ app.get("/call-recordings/:id/video", async (c) => {
       .from("accessible_recordings")
       .select("*")
       .eq("id", recordingId)
-      .or(`member_id.eq.${member.data?.id},shared_with_member_id.eq.${member.data?.id}`)
+      .or(
+        `member_id.eq.${member.data?.id},shared_with_member_id.eq.${member.data?.id}`
+      )
       .single();
 
     if (recordingError || !recording) {
@@ -1302,20 +1374,21 @@ app.get("/call-recordings/:id/video", async (c) => {
     });
 
     // Download video from Azure
-    const videoData = await azureStorage.downloadBlob(recording.azure_video_blob_name);
-    
+    const videoData = await azureStorage.downloadBlob(
+      recording.azure_video_blob_name
+    );
+
     // Return video with proper headers
     return new Response(videoData, {
       headers: {
-        'Content-Type': recording.mime_type || 'video/webm',
-        'Accept-Ranges': 'bytes',
-        'Cache-Control': 'public, max-age=3600',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-        'Access-Control-Allow-Headers': '*',
+        "Content-Type": recording.mime_type || "video/webm",
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "public, max-age=3600",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
       },
     });
-
   } catch (error: any) {
     console.error("Video proxy error:", error);
     return c.json({ error: "Failed to load video" }, 500);
@@ -1369,7 +1442,8 @@ app.get("/call-recordings/organization-members", async (c) => {
     const { data: members, error: membersError } = await supabase
       .schema("private")
       .from("organization_members")
-      .select(`
+      .select(
+        `
         id,
         role,
         status,
@@ -1379,14 +1453,18 @@ app.get("/call-recordings/organization-members", async (c) => {
           email,
           full_name
         )
-      `)
+      `
+      )
       .eq("organization_id", org.data?.id)
       .eq("status", "active")
       .neq("id", member.data?.id);
 
     if (membersError) {
       return c.json(
-        { error: "Failed to fetch organization members", details: membersError },
+        {
+          error: "Failed to fetch organization members",
+          details: membersError,
+        },
         500
       );
     }
@@ -1459,7 +1537,8 @@ app.get("/call-recordings/accessible", async (c) => {
     const limit = parseInt(url.searchParams.get("limit") || "50");
     const offset = parseInt(url.searchParams.get("offset") || "0");
     const orderBy = url.searchParams.get("orderBy") || "start_time";
-    const orderDirection = (url.searchParams.get("orderDirection") || "desc") as "asc" | "desc";
+    const orderDirection = (url.searchParams.get("orderDirection") ||
+      "desc") as "asc" | "desc";
     const search = url.searchParams.get("search") || undefined;
     const status = url.searchParams.get("status") || undefined;
     const startDate = url.searchParams.get("startDate") || undefined;
@@ -1479,7 +1558,9 @@ app.get("/call-recordings/accessible", async (c) => {
       query = query.eq("shared_with_member_id", member.data?.id);
     } else {
       // Default: get both owned and shared recordings
-      query = query.or(`member_id.eq.${member.data?.id},shared_with_member_id.eq.${member.data?.id}`);
+      query = query.or(
+        `member_id.eq.${member.data?.id},shared_with_member_id.eq.${member.data?.id}`
+      );
     }
 
     // Apply additional filters
@@ -1510,9 +1591,13 @@ app.get("/call-recordings/accessible", async (c) => {
     }
 
     // Get unique shared_by_member_ids for batch lookup
-    const sharedByMemberIds = [...new Set(
-      recordings?.filter(r => r.shared_by_member_id).map(r => r.shared_by_member_id)
-    )];
+    const sharedByMemberIds = [
+      ...new Set(
+        recordings
+          ?.filter((r) => r.shared_by_member_id)
+          .map((r) => r.shared_by_member_id)
+      ),
+    ];
 
     // Fetch member information for shared recordings
     let memberInfoMap: { [key: string]: any } = {};
@@ -1520,13 +1605,15 @@ app.get("/call-recordings/accessible", async (c) => {
       const { data: members } = await supabase
         .schema("private")
         .from("organization_members")
-        .select(`
+        .select(
+          `
           id,
           users:user_id (
             full_name,
             email
           )
-        `)
+        `
+        )
         .in("id", sharedByMemberIds);
 
       memberInfoMap = (members || []).reduce((acc: any, member: any) => {
@@ -1551,14 +1638,20 @@ app.get("/call-recordings/accessible", async (c) => {
       // Add sharing metadata
       isOwned: recording.member_id === member.data?.id,
       isShared: recording.access_type === "shared",
-      sharedBy: recording.shared_by_member_id && memberInfoMap[recording.shared_by_member_id] ? {
-        id: memberInfoMap[recording.shared_by_member_id].id,
-        name: memberInfoMap[recording.shared_by_member_id].users.full_name,
-        email: memberInfoMap[recording.shared_by_member_id].users.email,
-      } : null,
+      sharedBy:
+        recording.shared_by_member_id &&
+        memberInfoMap[recording.shared_by_member_id]
+          ? {
+              id: memberInfoMap[recording.shared_by_member_id].id,
+              name: memberInfoMap[recording.shared_by_member_id].users
+                .full_name,
+              email: memberInfoMap[recording.shared_by_member_id].users.email,
+            }
+          : null,
       permissionLevel: recording.permission_level || "view",
       shareExpiresAt: recording.share_expires_at,
       transcript_text: recording.transcript_text,
+      transcript_segments: recording.transcript_segments,
       // Include transcript data if available
       transcript: recording.ai_analysis
         ? {
@@ -1572,8 +1665,8 @@ app.get("/call-recordings/accessible", async (c) => {
     }));
 
     // Group recordings by access type for easier consumption
-    const ownedRecordings = formattedRecordings.filter(r => r.isOwned);
-    const sharedRecordings = formattedRecordings.filter(r => r.isShared);
+    const ownedRecordings = formattedRecordings.filter((r) => r.isOwned);
+    const sharedRecordings = formattedRecordings.filter((r) => r.isShared);
 
     return c.json(
       {
@@ -1587,7 +1680,7 @@ app.get("/call-recordings/accessible", async (c) => {
           limit,
           offset,
           total: count || 0,
-          hasMore: (offset + limit) < (count || 0),
+          hasMore: offset + limit < (count || 0),
         },
         filters: {
           orderBy,
@@ -1696,7 +1789,9 @@ app.post("/call-recordings/:id/share", async (c) => {
     const { data: shares, error: sharesError } = await supabase
       .schema(schema)
       .from("recording_shares")
-      .upsert(shareRecords, { onConflict: "recording_id,shared_with_member_id" })
+      .upsert(shareRecords, {
+        onConflict: "recording_id,shared_with_member_id",
+      })
       .select();
 
     if (sharesError) {
@@ -1713,11 +1808,14 @@ app.post("/call-recordings/:id/share", async (c) => {
       .update({ is_shared: true })
       .eq("id", recordingId);
 
-    return c.json({
-      success: true,
-      message: `Recording shared with ${memberIds.length} member(s)`,
-      shares: shares,
-    }, 200);
+    return c.json(
+      {
+        success: true,
+        message: `Recording shared with ${memberIds.length} member(s)`,
+        shares: shares,
+      },
+      200
+    );
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -1774,7 +1872,9 @@ app.get("/call-recordings/:id/shares", async (c) => {
       .from("accessible_recordings")
       .select("*")
       .eq("id", recordingId)
-      .or(`member_id.eq.${member.data?.id},shared_with_member_id.eq.${member.data?.id}`)
+      .or(
+        `member_id.eq.${member.data?.id},shared_with_member_id.eq.${member.data?.id}`
+      )
       .single();
 
     if (recordingError || !recording) {
@@ -1785,7 +1885,8 @@ app.get("/call-recordings/:id/shares", async (c) => {
     const { data: shares, error: sharesError } = await supabase
       .schema(schema)
       .from("recording_shares")
-      .select(`
+      .select(
+        `
         id,
         permission_level,
         expires_at,
@@ -1807,7 +1908,8 @@ app.get("/call-recordings/:id/shares", async (c) => {
             full_name
           )
         )
-      `)
+      `
+      )
       .eq("recording_id", recordingId)
       .or("expires_at.is.null,expires_at.gt.now()");
 
@@ -1838,11 +1940,14 @@ app.get("/call-recordings/:id/shares", async (c) => {
       },
     }));
 
-    return c.json({
-      recordingId: recordingId,
-      isOwner: recording.member_id === member.data?.id,
-      shares: formattedShares,
-    }, 200);
+    return c.json(
+      {
+        recordingId: recordingId,
+        isOwner: recording.member_id === member.data?.id,
+        shares: formattedShares,
+      },
+      200
+    );
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -1943,10 +2048,13 @@ app.delete("/call-recordings/:id/share/:memberId", async (c) => {
         .eq("id", recordingId);
     }
 
-    return c.json({
-      success: true,
-      message: "Recording share removed successfully",
-    }, 200);
+    return c.json(
+      {
+        success: true,
+        message: "Recording share removed successfully",
+      },
+      200
+    );
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }

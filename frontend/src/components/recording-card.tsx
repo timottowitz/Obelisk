@@ -280,8 +280,14 @@ const RecordingCard = ({
                   <span className='flex items-center text-blue-600 dark:text-blue-400'>
                     <Share2 className='mr-1 h-4 w-4' />
                     Shared by{' '}
-                    {members.find((m) => m.id === recording.sharedBy)?.fullName ||
-                      recording.sharedBy}
+                    {(() => {
+                      const sharedById = recording.shareInfo?.sharedBy;
+                      if (!sharedById) return 'Unknown';
+                      return (
+                        members.find((m) => m.id === sharedById)?.fullName ||
+                        sharedById
+                      );
+                    })()}
                   </span>
                 )}
               </div>
