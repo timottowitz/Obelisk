@@ -14,14 +14,36 @@ import {
   X
 } from 'lucide-react';
 import { CallRecording, OrganizationMember } from '@/types/callcaps';
+import { useQuery } from '@tanstack/react-query';
 import { getAuthHeaders } from '@/config/api';
 import { ShareRecordingDialog } from './share-recording-dialog';
 
 const statusColors = {
-  processed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  processing: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+  processed:
+    'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  processing:
+    'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
   failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
 };
+
+// Custom hook to fetch and cache organization members
+function useOrganizationMembers() {
+  return useQuery<OrganizationMember[]>({
+    queryKey: ['organization-members'],
+    queryFn: async () => {
+      const headers = await getAuthHeaders();
+      const response = await fetch(
+        `https://rnmjwdxqtsvsbelcftzg.supabase.co/functions/v1/members`,
+        { headers }
+      );
+      if (!response.ok) throw new Error('Failed to fetch members');
+      const data = await response.json();
+      return data.members;
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: 1
+  });
+}
 
 const RecordingCard = ({
   recording,
@@ -35,31 +57,14 @@ const RecordingCard = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
-  const [members, setMembers] = useState<OrganizationMember[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const fetchMembers = async () => {
-      try {
-        const headers = await getAuthHeaders();
-        const response = await fetch(
-          `https://rnmjwdxqtsvsbelcftzg.supabase.co/functions/v1/members`,
-          {
-            headers,
-          }
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setMembers(data.members);
-        }
-      } catch (error) {
-        console.error("Failed to fetch members:", error);
-      }
-    };
-
-    fetchMembers();
-  }, []);
+  const {
+    data: members = [],
+    isLoading: membersLoading,
+    error: membersError
+  } = useOrganizationMembers();
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
@@ -103,37 +108,48 @@ const RecordingCard = ({
       console.log('=== Step 1: Testing URL accessibility ===');
       const headers = await getAuthHeaders();
       console.log('Auth headers:', headers);
-      
+
       const filteredHeaders = Object.fromEntries(
-        Object.entries(headers).filter(([key]) => key.toLowerCase() !== 'content-type')
+        Object.entries(headers).filter(
+          ([key]) => key.toLowerCase() !== 'content-type'
+        )
       );
       console.log('Filtered headers for HEAD request:', filteredHeaders);
-      
-      const testResponse = await fetch(proxyUrl, { 
+
+      const testResponse = await fetch(proxyUrl, {
         method: 'HEAD',
         headers: filteredHeaders
       });
-      
+
       console.log('HEAD response status:', testResponse.status);
-      console.log('HEAD response headers:', Object.fromEntries(testResponse.headers.entries()));
-      
+      console.log(
+        'HEAD response headers:',
+        Object.fromEntries(testResponse.headers.entries())
+      );
+
       if (!testResponse.ok) {
-        throw new Error(`HTTP ${testResponse.status}: ${testResponse.statusText}`);
+        throw new Error(
+          `HTTP ${testResponse.status}: ${testResponse.statusText}`
+        );
       }
-      
+
       console.log('✓ URL is accessible');
     } catch (error) {
       console.error('❌ URL accessibility test failed:', error);
-      alert(`Cannot access video: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert(
+        `Cannot access video: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
       return;
     }
 
     // Check WebM support
     console.log('=== Step 2: Checking WebM support ===');
     const video = document.createElement('video');
-    const canPlayWebM = video.canPlayType('video/webm; codecs="vp8, vorbis"') !== '';
-    const canPlayWebMVP9 = video.canPlayType('video/webm; codecs="vp9, opus"') !== '';
-    
+    const canPlayWebM =
+      video.canPlayType('video/webm; codecs="vp8, vorbis"') !== '';
+    const canPlayWebMVP9 =
+      video.canPlayType('video/webm; codecs="vp9, opus"') !== '';
+
     console.log('Browser WebM support:', {
       vp8: canPlayWebM,
       vp9: canPlayWebMVP9,
@@ -149,18 +165,23 @@ const RecordingCard = ({
     try {
       const headers = await getAuthHeaders();
       const filteredHeaders = Object.fromEntries(
-        Object.entries(headers).filter(([key]) => key.toLowerCase() !== 'content-type')
+        Object.entries(headers).filter(
+          ([key]) => key.toLowerCase() !== 'content-type'
+        )
       );
-      
+
       console.log('Making GET request to:', proxyUrl);
       console.log('With headers:', filteredHeaders);
-      
+
       const videoResponse = await fetch(proxyUrl, {
         headers: filteredHeaders
       });
 
       console.log('GET response status:', videoResponse.status);
-      console.log('GET response headers:', Object.fromEntries(videoResponse.headers.entries()));
+      console.log(
+        'GET response headers:',
+        Object.fromEntries(videoResponse.headers.entries())
+      );
 
       if (!videoResponse.ok) {
         throw new Error(`Failed to load video: ${videoResponse.status}`);
@@ -173,22 +194,24 @@ const RecordingCard = ({
         type: videoBlob.type,
         sizeInMB: (videoBlob.size / (1024 * 1024)).toFixed(2) + ' MB'
       });
-      
+
       if (videoBlob.size === 0) {
         throw new Error('Received empty video blob');
       }
-      
+
       const blobUrl = URL.createObjectURL(videoBlob);
       console.log('Created blob URL:', blobUrl);
-      
+
       console.log('=== Step 5: Opening modal ===');
       setVideoUrl(blobUrl);
       setIsModalOpen(true);
-      
+
       console.log('✓ Video load process completed successfully');
     } catch (error) {
       console.error('❌ Failed to load video:', error);
-      alert(`Failed to load video: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert(
+        `Failed to load video: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   };
 
@@ -212,7 +235,10 @@ const RecordingCard = ({
   // Handle click outside modal
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+      if (
+        modalRef.current &&
+        !modalRef.current.contains(event.target as Node)
+      ) {
         handleCloseModal();
       }
     };
@@ -228,7 +254,7 @@ const RecordingCard = ({
 
   return (
     <div
-      className='bg-card rounded-lg shadow-sm border p-4 hover:shadow-md transition-shadow cursor-pointer'
+      className='bg-card cursor-pointer rounded-lg border p-4 shadow-sm transition-shadow hover:shadow-md'
       onClick={(e) => {
         e.stopPropagation();
         onClick(recording);
@@ -242,9 +268,9 @@ const RecordingCard = ({
             <button
               onClick={handlePlayClick}
               disabled={recording.status !== 'processed' || !recording.id}
-              className={`p-2 rounded-full transition-all ${
+              className={`rounded-full p-2 transition-all ${
                 recording.status === 'processed' && recording.id
-                  ? 'text-white bg-black bg-opacity-50 hover:bg-opacity-70 cursor-pointer'
+                  ? 'bg-opacity-50 hover:bg-opacity-70 cursor-pointer bg-black text-white'
                   : 'text-muted-foreground cursor-not-allowed'
               }`}
             >
@@ -263,7 +289,7 @@ const RecordingCard = ({
               <h3 className='text-foreground truncate text-lg font-semibold'>
                 {recording.title}
               </h3>
-              <div className='mt-1 flex items-center space-x-4 text-sm text-muted-foreground'>
+              <div className='text-muted-foreground mt-1 flex items-center space-x-4 text-sm'>
                 <span className='flex items-center'>
                   <Calendar className='mr-1 h-4 w-4' />
                   {recording.date}
@@ -276,20 +302,21 @@ const RecordingCard = ({
                   <Users className='mr-1 h-4 w-4' />
                   {recording.participants.length} participants
                 </span>
-                {recording.accessType === 'shared' && recording.shareInfo?.sharedBy && (
-                  <span className='flex items-center text-blue-600 dark:text-blue-400'>
-                    <Share2 className='mr-1 h-4 w-4' />
-                    Shared by{' '}
-                    {(() => {
-                      const sharedById = recording.shareInfo?.sharedBy;
-                      if (!sharedById) return 'Unknown';
-                      return (
-                        members.find((m) => m.id === sharedById)?.fullName ||
-                        sharedById
-                      );
-                    })()}
-                  </span>
-                )}
+                {recording.accessType === 'shared' &&
+                  recording.shareInfo?.sharedBy && (
+                    <span className='flex items-center text-blue-600 dark:text-blue-400'>
+                      <Share2 className='mr-1 h-4 w-4' />
+                      Shared by{' '}
+                      {(() => {
+                        const sharedById = recording.shareInfo?.sharedBy;
+                        if (!sharedById) return 'Unknown';
+                        return (
+                          members.find((m) => m.id === sharedById)?.fullName ||
+                          sharedById
+                        );
+                      })()}
+                    </span>
+                  )}
               </div>
               <div className='mt-2 flex items-center space-x-2'>
                 <span
@@ -305,25 +332,25 @@ const RecordingCard = ({
                     recording.status.slice(1)}
                 </span>
                 {recording.accessType === 'shared' && (
-                  <span className='inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'>
+                  <span className='inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200'>
                     <Share2 className='mr-1 h-3 w-3' />
                     Shared
                   </span>
                 )}
                 {recording.isShared && recording.accessType === 'owner' && (
-                  <span className='inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'>
+                  <span className='inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800 dark:bg-purple-900 dark:text-purple-200'>
                     <Users className='mr-1 h-3 w-3' />
                     Shared by me
                   </span>
                 )}
                 {recording.hasVideo && (
-                  <span className='inline-flex items-center text-xs text-muted-foreground'>
+                  <span className='text-muted-foreground inline-flex items-center text-xs'>
                     <Video className='mr-1 h-3 w-3' />
                     Video
                   </span>
                 )}
                 {recording.hasAudio && (
-                  <span className='inline-flex items-center text-xs text-muted-foreground'>
+                  <span className='text-muted-foreground inline-flex items-center text-xs'>
                     <Mic className='mr-1 h-3 w-3' />
                     Audio
                   </span>
@@ -345,7 +372,7 @@ const RecordingCard = ({
               <button className='text-muted-foreground hover:text-foreground hover:bg-muted rounded-[calc(var(--radius)-2px)] p-2'>
                 <Download className='h-4 w-4' />
               </button>
-              <button 
+              <button
                 onClick={handleShareClick}
                 className='text-muted-foreground hover:text-foreground hover:bg-muted rounded-[calc(var(--radius)-2px)] p-2'
               >
@@ -370,8 +397,8 @@ const RecordingCard = ({
           }}
           className='fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm'
         >
-          <div 
-            className='relative w-full max-w-6xl mx-4 aspect-video bg-black rounded-lg overflow-hidden'
+          <div
+            className='relative mx-4 aspect-video w-full max-w-6xl overflow-hidden rounded-lg bg-black'
             onClick={(e) => {
               e.stopPropagation(); // Prevent triggering the background click
             }}
@@ -380,9 +407,9 @@ const RecordingCard = ({
             <video
               ref={videoRef}
               src={videoUrl || undefined}
-              className="w-full h-full object-contain"
+              className='h-full w-full object-contain'
               controls
-              preload="metadata"
+              preload='metadata'
               playsInline
               autoPlay
               muted
@@ -407,7 +434,7 @@ const RecordingCard = ({
                 console.log('Video readyState:', videoRef.current?.readyState);
                 // Try to play automatically
                 if (videoRef.current) {
-                  videoRef.current.play().catch(error => {
+                  videoRef.current.play().catch((error) => {
                     console.error('Auto-play failed:', error);
                   });
                 }
@@ -454,14 +481,14 @@ const RecordingCard = ({
             {/* Close Button */}
             <button
               onClick={handleCloseModal}
-              className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all hover:scale-110 z-10"
+              className='absolute top-4 right-4 z-10 rounded-full bg-black/50 p-2 text-white transition-all hover:scale-110 hover:bg-black/70'
             >
               <X className='h-6 w-6' />
             </button>
 
             {/* Video Info */}
-            <div className="absolute bottom-4 left-4 text-white z-10">
-              <h3 className='text-lg font-semibold mb-1'>{recording.title}</h3>
+            <div className='absolute bottom-4 left-4 z-10 text-white'>
+              <h3 className='mb-1 text-lg font-semibold'>{recording.title}</h3>
               <div className='flex items-center space-x-4 text-sm text-gray-300'>
                 <span>{recording.date}</span>
                 <span>{recording.time}</span>
