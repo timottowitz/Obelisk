@@ -209,7 +209,6 @@ app.get("/storage/list", async (c) => {
       .eq("clerk_organization_id", orgId)
       .single();
 
-
     const result = await handleFileList(supabaseClient, {
       userId: user.data?.id,
       folderId,
@@ -223,6 +222,84 @@ app.get("/storage/list", async (c) => {
     return c.json({ success: false, error: error.message }, 500);
   }
 });
+
+// Create folder case endpoint
+app.post("/storage/folder-cases", async (c) => {
+  try {
+    const orgId = c.get("orgId");
+    const userId = c.get("userId");
+    const body = await c.req.json();
+    const { folderCaseName } = body;
+    console.log("Folder case name:", folderCaseName);
+
+    const supabaseClient = await getSupabaseClient();
+
+    const user = await supabaseClient
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+
+    const org = await supabaseClient
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+
+    if (!folderCaseName) {
+      return c.json({ error: "Folder case name required" }, 400);
+    }
+
+    const result = await handleCreateFolderCase(supabaseClient, {
+      userId: user.data?.id,
+      folderCaseName,
+      tenantId: orgId,
+      schema: org.data?.schema_name.toLowerCase(),
+    });
+
+    return c.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error("Create folder case error:", error);
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
+// Get folder cases endpoint
+app.get("/storage/folder-cases", async (c) => {
+  try {
+    const orgId = c.get("orgId");
+    const userId = c.get("userId");
+
+    const supabaseClient = await getSupabaseClient();
+
+    const user = await supabaseClient
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+      
+      const org = await supabaseClient
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+
+    const result = await handleGetFolderCases(supabaseClient, {
+      userId: user.data?.id,
+      tenantId: orgId,
+      schema: org.data?.schema_name.toLowerCase(),
+    });
+
+    return c.json({ success: true, data: result }); 
+  } catch (error: any) {
+    console.error("Get folder cases error:", error);
+    return c.json({ success: false, error: error.message }, 500);
+  } 
+})
 
 // Create folder endpoint
 app.post("/storage/folders", async (c) => {
@@ -251,7 +328,6 @@ app.post("/storage/folders", async (c) => {
     if (!folderName) {
       return c.json({ error: "Folder name required" }, 400);
     }
-
 
     const result = await handleCreateFolder(supabaseClient, {
       userId: user.data?.id,
@@ -1164,12 +1240,12 @@ async function logStorageActivity(
   const { userId, action, resourceType, resourceId, details, schema } = params;
 
   await supabaseClient.schema(schema).from("storage_activity_log").insert({
-    user_id: userId,
-    action: action,
-    resource_type: resourceType,
-    resource_id: resourceId,
-    details: details || {},
-  });
+      user_id: userId,
+      action: action,
+      resource_type: resourceType,
+      resource_id: resourceId,
+      details: details || {},
+    });
 }
 
 // Direct file upload handler (no base64 conversion)
@@ -1339,6 +1415,82 @@ async function handleGetFolders(
   if (filesError) throw filesError;
 
   return treeData;
+}
+
+async function handleCreateFolderCase(
+  supabaseClient: any,
+  params: {
+    folderCaseName: string;
+    userId: string;
+    schema: string;
+  }
+) {
+  const { folderCaseName, schema, userId } = params;
+  console.log("handleCreateFolderCase", folderCaseName);
+
+  const { data: folderCase, error: folderCaseError } = await supabaseClient
+    .schema(schema)
+    .from("folder_cases")
+    .insert({
+      name: folderCaseName,
+    })
+    .select()
+    .single();
+
+  const defaultFolders = [
+    {
+      name: "Contracts",
+      path: "/contracts",
+    },
+    {
+      name: "Financial",
+      path: "/financial",
+    },
+    {
+      name: "Documents",
+      path: "/documents",
+    },
+    {
+      name: "Evidence Documentation",
+      path: "/evidence-documentation",
+    },
+    {
+      name: "Correspondence",
+      path: "/correspondence",
+    },
+    {
+      name: "Legal Documents",
+      path: "/legal-documents",
+    },
+  ];
+
+  for (const folder of defaultFolders) {
+    await supabaseClient.schema(schema).from("storage_folders").insert({
+      name: folder.name,
+      path: folder.path,
+      case: folderCase.id,
+      created_by: userId,
+    });
+  }
+
+  if (folderCaseError) throw folderCaseError;
+  return folderCase;
+}
+
+async function handleGetFolderCases(
+  supabaseClient: any,
+  params: {
+    userId: string;
+    schema: string;
+  }
+) {
+  const { userId, schema } = params;
+
+  const { data: folderCases, error: folderCasesError } = await supabaseClient.schema(schema).from("folder_cases").select("*");
+
+  if (folderCasesError) throw folderCasesError;
+
+  return folderCases;
 }
 
 export default app;

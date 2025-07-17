@@ -136,4 +136,40 @@ export default class StoreDocumentsAPI {
     });
     return handleApiResponse(response);
   }
+
+  static async createFolderCase(folderCaseName: string) {
+    const headers = await getAuthHeaders();
+    const uploadHeaders: Record<string, string> = {};
+    if (typeof headers === 'object' && headers !== null) {
+      Object.entries(headers).forEach(([key, value]) => {
+        if (key.toLowerCase() !== 'content-type') {
+          uploadHeaders[key] = value as string;
+        }
+      });
+    }
+    const response = await fetch(`${API_BASE_URL}/folder-cases`, {
+      method: 'POST',
+      headers: uploadHeaders,
+      body: JSON.stringify({ folderCaseName })
+    });   
+
+    return handleApiResponse(response);
+  }
+
+  static async getFolderCases() {
+    const headers = await getAuthHeaders();
+    const uploadHeaders: Record<string, string> = {};
+    if (typeof headers === 'object' && headers !== null) {
+      Object.entries(headers).forEach(([key, value]) => {
+        if (key.toLowerCase() !== 'content-type') {
+          uploadHeaders[key] = value as string;
+        }
+      });
+    }
+    const response = await fetch(`${API_BASE_URL}/folder-cases`, {
+      method: 'GET',
+      headers: uploadHeaders
+    });
+    return handleApiResponse(response);
+  }
 }
