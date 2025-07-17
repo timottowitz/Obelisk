@@ -5,8 +5,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import {
   Search,
-  Bell,
-  ChevronDown,
   FileText,
   Image,
   File,
@@ -14,48 +12,23 @@ import {
   Folder,
   FolderOpen,
   User,
-  Package,
   Loader2,
   Clock,
-  Shield,
-  Scale,
-  Gavel,
-  FileCheck,
-  Target,
   Sun,
   Bot,
   Send,
   FolderTree,
-  DollarSign,
-  Receipt,
-  PanelLeftClose,
-  PanelLeftOpen,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
   Zap,
-  Mail,
-  FileBarChart,
-  MessageCircle,
-  Settings,
-  PlusCircle,
-  StickyNote,
-  Banknote,
-  TrendingUp,
-  FileSpreadsheet,
   ChevronLeft,
   Trash2,
   FolderPlus,
-  UploadIcon,
-  Moon,
-  SunIcon
+  UploadIcon
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Breadcrumb,
@@ -65,145 +38,90 @@ import {
   BreadcrumbSeparator
 } from '@/components/ui/breadcrumb';
 import { toast } from 'sonner';
+import {
+  formatFileSize,
+  formatDate,
+  countDocuments,
+  countAllDocuments,
+  getStatusDisplay
+} from '@/lib/document-utils';
+import {
+  DocumentsWorkspacePageCompactProps,
+  SolarDocumentItem,
+  AgentStatus,
+  ChatMessage
+} from '@/types/documents';
 
 // Radix Primitives
-import * as NavigationMenu from '@radix-ui/react-navigation-menu';
-import * as Dialog from '@radix-ui/react-dialog';
-import * as Accordion from '@radix-ui/react-accordion';
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import * as Collapsible from '@radix-ui/react-collapsible';
-import StoreDocumentsAPI from '@/services/store-documents-api';
-import { useAuth, useUser } from '@clerk/nextjs';
-import DocViewer, { DocViewerRenderers } from '@cyntler/react-doc-viewer';
+
 import { AlertModal } from '@/components/modal/alert-modal';
 import { useStorageOperations } from '@/hooks/useDocuments';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 
-export interface SolarDocumentItem {
-  id: string;
-  name: string;
-  mime_type: string;
-  size_bytes: number;
-  //  modified: Date;
-  azure_blob_url: string;
-  created_at: Date;
-  updated_at: Date;
+import { DocumentPreviewModal } from '@/features/documents/components/document-preview-modal';
+import { CreateFolderModal } from '@/features/documents/components/create-folder-modal';
+import { CreateCaseModal } from '@/features/documents/components/create-case-modal';
+
+// Get file icon
+function getFileIcon(type: string, className?: string) {
+  const iconClass = cn('h-4 w-4', className);
+  const mimeType = type.split('/')[1];
+  switch (mimeType) {
+    case 'pdf':
+      return <FileText className={cn(iconClass, 'text-red-500')} />;
+    case 'doc':
+    case 'vnd.openxmlformats-officedocument.wordprocessingml.document':
+      return <FileText className={cn(iconClass, 'text-blue-500')} />;
+    case 'txt':
+      return <FileText className={cn(iconClass, 'text-gray-500')} />;
+    case 'jpg':
+    case 'jpeg':
+    case 'png':
+    case 'gif':
+      return <Image className={cn(iconClass, 'text-green-500')} />;
+    default:
+      return <File className={cn(iconClass, 'text-muted-foreground')} />;
+  }
 }
-export interface SolarCaseDetails {
-  arbitrationTribunal: string;
-  financeCompany: string;
-  loanAmount: number;
-  monthlyPayments: number;
-  totalExpenses: number;
-  casePhase: 'intake' | 'discovery' | 'arbitration' | 'settlement' | 'closed';
-  nextHearing?: Date;
-  arbitrator?: string;
-}
-export interface ClientInfo {
-  name: string;
-  phone: string;
-  email: string;
-  age: number;
-  address: string;
-  installationDate?: Date;
-  systemSize?: string;
-}
-export interface ChatMessage {
-  id: string;
-  type: 'user' | 'agent';
-  content: string;
-  timestamp: Date;
-  isTyping?: boolean;
-}
-export interface AgentStatus {
-  status: 'online' | 'busy' | 'offline';
-  lastSeen?: Date;
-  currentTask?: string;
-}
-export interface NavigationItem {
-  id: string;
-  label: string;
-  icon: React.ComponentType<{
-    className?: string;
-  }>;
-  isActive?: boolean;
-  hasSubmenu?: boolean;
-  submenu?: Array<{
-    id: string;
-    label: string;
-    icon: React.ComponentType<{
-      className?: string;
-    }>;
-    isActive?: boolean;
-  }>;
-}
-export interface FolderNode {
-  id: string;
-  name: string;
-  path: string;
-  parentId?: string;
-  children?: FolderNode[];
-  documents?: SolarDocumentItem[];
-  isExpanded?: boolean;
-  level?: number;
-  icon?: React.ComponentType<{
-    className?: string;
-  }>;
-  category?: string;
-  documentCount?: number;
-  lastModified?: Date;
-}
-export interface DocumentsWorkspacePageCompactProps {
-  currentOrg?: string;
-  currentMatter?: string;
-  user?: {
-    name: string;
-    email: string;
-    avatar?: string;
-    initials: string;
-  };
-  notifications?: number;
-  documents?: SolarDocumentItem[];
-  caseDetails?: SolarCaseDetails;
-  clientInfo?: ClientInfo;
-  onOrgChange?: (org: string) => void;
-  onMatterChange?: (matter: string) => void;
-  onSearch?: (query: string) => void;
-  onQuickAction?: (action: string) => void;
-}
+
 export default function DocumentsWorkspacePageCompact({
-  currentOrg = 'Solar Legal Solutions',
-  currentMatter = 'Johnson Solar Arbitration',
-  notifications = 3,
-  onOrgChange,
-  onQuickAction
+  currentMatter = 'Johnson Solar Arbitration'
 }: DocumentsWorkspacePageCompactProps) {
-  const { isSignedIn, isLoaded } = useAuth();
-  
   // Use React Query hooks for all storage operations
   const storageOps = useStorageOperations();
-  const { folders, documents, uploadDocument, createFolder, deleteFile, deleteFolder, downloadFile } = storageOps;
+  const {
+    folders,
+    folderCases,
+    createFolderCase,
+    uploadDocument,
+    createFolder,
+    deleteFile,
+    deleteFolder,
+    downloadFile
+  } = storageOps;
 
   // Derive state from React Query data
   const foldersList = folders.data || [];
   const isLoadingFolders = folders.isLoading;
   const foldersError = folders.error;
-
-  const userInfo = useUser();
-  const [user, setUser] = useState<any>(null);
-  useEffect(() => {
-    if (userInfo.user) {
-      setUser(userInfo.user);
-    }
-  }, [userInfo.user]);
+  const folderCasesList = folderCases.data || [];
+  const isLoadingFolderCases = folderCases.isLoading;
+  const folderCasesError = folderCases.error;
 
   const [searchValue, setSearchValue] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [currentPath] = useState('/Solar Cases/Johnson');
   const [selectedDocument, setSelectedDocument] =
     useState<SolarDocumentItem | null>(null);
   const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
+  const [selectedFolderCase, setSelectedFolderCase] = useState<string>();
 
   // Create folder state
   const [isCreateFolderDialogOpen, setIsCreateFolderDialogOpen] =
@@ -211,10 +129,13 @@ export default function DocumentsWorkspacePageCompact({
   const [newFolderName, setNewFolderName] = useState('');
   const [selectedParentFolderId, setSelectedParentFolderId] =
     useState<string>('root');
-  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [isCreatingFolderAndCase, setIsCreatingFolderAndCase] = useState(false);
 
   // Upload document state
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
+  const [newFolderCaseName, setNewFolderCaseName] = useState('');
+  const [isNewFolderCaseDialogOpen, setIsNewFolderCaseDialogOpen] =
+    useState(false);
 
   // Initialize expanded folders from localStorage when folders are loaded
   useEffect(() => {
@@ -260,65 +181,23 @@ export default function DocumentsWorkspacePageCompact({
 
   // Show error toast if folders failed to load
   useEffect(() => {
-    if (foldersError) {
+    if (foldersError || folderCasesError) {
       console.error('Failed to fetch folders:', foldersError);
-      toast.error('Failed to load folder structure');
+      console.error('Failed to fetch cases:', folderCasesError);
+      toast.error('Failed to load folder and cases');
     }
-  }, [foldersError]);
+  }, [foldersError, folderCasesError]);
 
-  const getAllFolders = useCallback((folders: any[]): any[] => {
-    const allFolders: any[] = [];
-
-    const collectFolders = (folderList: any[]) => {
-      folderList.forEach((folder) => {
-        allFolders.push(folder);
-        if (folder.children && folder.children.length > 0) {
-          collectFolders(folder.children);
-        }
-      });
-    };
-
-    collectFolders(folders);
-    return allFolders;
-  }, []);
+  // Set default selected folder case when folder cases are loaded
+  useEffect(() => {
+    if (folderCasesList.length > 0 && !selectedFolderCase) {
+      setSelectedFolderCase(folderCasesList[0].name);
+    }
+  }, [folderCasesList, selectedFolderCase]);
 
   // Recursive function to count all documents in a folder and its children
-  const countDocuments = useCallback((folder: any): number => {
-    let count = folder.documents?.length || 0;
-
-    if (folder.children && folder.children.length > 0) {
-      folder.children.forEach((child: any) => {
-        count += countDocuments(child);
-      });
-    }
-
-    return count;
-  }, []);
-
-  const countAllDocuments = useCallback((folder: any): number => {
-    let count = 0;
-    folder.forEach((folder: any) => {
-      count += countDocuments(folder);
-    });
-    return count;
-  }, []);
-
   const [selectedUploadFolderId, setSelectedUploadFolderId] =
     useState<string>('root');
-
-  // Update selectedUploadFolderId when folders are loaded
-  useEffect(() => {
-    if (Array.isArray(foldersList) && foldersList.length > 0 && selectedUploadFolderId === 'root') {
-      const allFolders = getAllFolders(foldersList);
-      if (allFolders.length > 0) {
-        setSelectedUploadFolderId(allFolders[0].id);
-      }
-    }
-  }, [foldersList, selectedUploadFolderId, getAllFolders]);
-
-  // Sidebar state
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [activeNavItem, setActiveNavItem] = useState('case-summary');
 
   // AI Assistant state - now width-based
   const [isAgentPanelCollapsed, setIsAgentPanelCollapsed] = useState(false);
@@ -329,9 +208,6 @@ export default function DocumentsWorkspacePageCompact({
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
     new Set([])
   );
-
-  // Theme state
-  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Agent status and messages
   const [agentStatus] = useState<AgentStatus>({
@@ -362,227 +238,47 @@ export default function DocumentsWorkspacePageCompact({
     }
   ]);
 
-  // Solar-specific navigation items
-  const navigationItems: NavigationItem[] = [
-    {
-      id: 'case-summary',
-      label: 'Case Summary',
-      icon: Sun,
-      isActive: activeNavItem === 'case-summary'
-    },
-    {
-      id: 'documents-timeline',
-      label: 'Documents Timeline',
-      icon: FileBarChart,
-      isActive: activeNavItem === 'documents-timeline'
-    },
-    {
-      id: 'status-tracker',
-      label: 'Status Tracker',
-      icon: Target,
-      isActive: activeNavItem === 'status-tracker'
-    },
-    {
-      id: 'expenses-financials',
-      label: 'Expenses & Financials',
-      icon: DollarSign,
-      isActive: activeNavItem === 'expenses-financials',
-      hasSubmenu: true,
-      submenu: [
-        {
-          id: 'loan-details',
-          label: 'Loan Details',
-          icon: Banknote,
-          isActive: activeNavItem === 'loan-details'
-        },
-        {
-          id: 'payment-history',
-          label: 'Payment History',
-          icon: TrendingUp,
-          isActive: activeNavItem === 'payment-history'
-        },
-        {
-          id: 'expense-tracking',
-          label: 'Expense Tracking',
-          icon: FileSpreadsheet,
-          isActive: activeNavItem === 'expense-tracking'
-        }
-      ]
-    },
-    {
-      id: 'communications-log',
-      label: 'Communications Log',
-      icon: MessageCircle,
-      isActive: activeNavItem === 'communications-log'
-    },
-    {
-      id: 'admin-tools',
-      label: 'Admin Tools',
-      icon: Settings,
-      isActive: activeNavItem === 'admin-tools'
-    }
-  ];
-
   // Use processed folder structure from backend
-
-  const filteredFolders = Array.isArray(foldersList) ? foldersList.filter((folder) => {
-    // Logically fix: search should check folder name, its documents, and recursively its children
-    const matchesSearch = (folderOrChild: any): boolean => {
-      if (searchQuery.length === 0) {
-        return true;
-      }
-      // Check documents in this folder/child
-      if (
-        folderOrChild.documents?.some((doc: any) =>
-          doc.name?.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      ) {
-        return true;
-      }
-      // Recursively check children
-      if (folderOrChild.children?.some((child: any) => matchesSearch(child))) {
-        return true;
-      }
-      return false;
-    };
-
-    return matchesSearch(folder);
-  }) : [];
-
-  const folderStructure = filteredFolders;
-
-  // Handle scroll for top bar shadow
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 0);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // Load theme from localStorage and apply to document
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('darkMode');
-      if (savedTheme) {
-        try {
-          const isDark = JSON.parse(savedTheme);
-          setIsDarkMode(isDark);
-        } catch (error) {
-          console.warn('Failed to parse theme from localStorage:', error);
-        }
-      }
-    }
-  }, []);
-
-  // Apply theme to document element
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      if (isDarkMode) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    }
-  }, [isDarkMode]);
-
-  // Format file size
-  const formatFileSize = useCallback((bytes: number): string => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  }, []);
-
-  // Format date
-  const formatDate = useCallback((date: Date): string => {
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - new Date(date).getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    if (diffDays === 1) return 'Today';
-    if (diffDays === 2) return 'Yesterday';
-    if (diffDays <= 7) return `${diffDays - 1}d ago`;
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
-    });
-  }, []);
-
-  // Get file icon
-  const getFileIcon = useCallback((type: string, className?: string) => {
-    const iconClass = cn('h-4 w-4', className);
-    const mimeType = type.split('/')[1];
-    switch (mimeType) {
-      case 'pdf':
-        return <FileText className={cn(iconClass, 'text-red-500')} />;
-      case 'doc':
-      case 'vnd.openxmlformats-officedocument.wordprocessingml.document':
-        return <FileText className={cn(iconClass, 'text-blue-500')} />;
-      case 'txt':
-        return <FileText className={cn(iconClass, 'text-gray-500')} />;
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-      case 'gif':
-        return <Image className={cn(iconClass, 'text-green-500')} />;
-      default:
-        return <File className={cn(iconClass, 'text-muted-foreground')} />;
-    }
-  }, []);
-
-  // Get status color and icon
-  const getStatusDisplay = useCallback((status: string) => {
-    switch (status) {
-      case 'complete':
-        return {
-          color: 'text-green-600',
-          bg: 'bg-green-100',
-          icon: CheckCircle
+  const filteredFolders = React.useMemo(
+    () =>
+      foldersList.filter((folder) => {
+        const selectedFolderCaseId = folderCasesList.find(
+          (folderCase: any) => folderCase.name === selectedFolderCase
+        )?.id;
+        // Logically fix: search should check folder name, its documents, and recursively its children
+        const matchesSearch = (folderOrChild: any): boolean => {
+          if (searchQuery.length === 0) {
+            return true;
+          }
+          // Check documents in this folder/child
+          if (
+            folderOrChild.documents?.some((doc: any) =>
+              doc.name?.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+          ) {
+            return true;
+          }
+          // Recursively check children
+          if (
+            folderOrChild.children?.some((child: any) => matchesSearch(child))
+          ) {
+            return true;
+          }
+          return false;
         };
-      case 'under-review':
-        return {
-          color: 'text-yellow-600',
-          bg: 'bg-yellow-100',
-          icon: AlertCircle
-        };
-      case 'pending':
-        return {
-          color: 'text-blue-600',
-          bg: 'bg-blue-100',
-          icon: Clock
-        };
-      case 'missing':
-        return {
-          color: 'text-red-600',
-          bg: 'bg-red-100',
-          icon: XCircle
-        };
-      default:
-        return {
-          color: 'text-gray-600',
-          bg: 'bg-gray-100',
-          icon: AlertCircle
-        };
-    }
-  }, []);
+
+        return matchesSearch(folder) && folder.case === selectedFolderCaseId;
+      }),
+    [foldersList, searchQuery, selectedFolderCase]
+  );
+
+  const folderStructure = Array.isArray(foldersList) ? filteredFolders : [];
 
   // Handle search
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setSearchQuery(searchValue);
   };
-
-  // Handle document selection
-  const handleDocumentSelect = useCallback((document: SolarDocumentItem) => {
-    setSelectedDocument(document);
-    setIsDocumentDialogOpen(true);
-  }, []);
-
-  // Handle navigation item click
-  const handleNavItemClick = useCallback((itemId: string) => {
-    setActiveNavItem(itemId);
-  }, []);
 
   // Handle folder toggle
   const toggleFolder = useCallback((folderId: string) => {
@@ -649,23 +345,6 @@ export default function DocumentsWorkspacePageCompact({
     setIsAgentPanelCollapsed((prev) => !prev);
   }, []);
 
-  // Toggle sidebar collapse
-  const toggleSidebar = useCallback(() => {
-    setIsSidebarCollapsed((prev) => !prev);
-  }, []);
-
-  // Toggle theme
-  const toggleTheme = useCallback(() => {
-    setIsDarkMode((prev) => {
-      const newMode = !prev;
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('darkMode', JSON.stringify(newMode));
-      }
-      return newMode;
-    });
-  }, []);
-
   // Handle create folder
   const handleCreateFolder = useCallback(async () => {
     if (!newFolderName.trim()) {
@@ -673,7 +352,7 @@ export default function DocumentsWorkspacePageCompact({
       return;
     }
 
-    setIsCreatingFolder(true);
+    setIsCreatingFolderAndCase(true);
     try {
       await createFolder.mutateAsync({
         folderName: newFolderName.trim(),
@@ -700,124 +379,38 @@ export default function DocumentsWorkspacePageCompact({
 
       // Reset form
       setNewFolderName('');
-      setSelectedParentFolderId('root');
       setIsCreateFolderDialogOpen(false);
     } catch (error) {
       console.error('Error creating folder:', error);
       toast.error('Failed to create folder');
     } finally {
-      setIsCreatingFolder(false);
+      setIsCreatingFolderAndCase(false);
     }
   }, [newFolderName, selectedParentFolderId, createFolder]);
 
-  // Get all available folders for parent selection
+  // Handle create folder case
+  const handleCreateFolderCase = useCallback(async () => {
+    try {
+      setIsCreatingFolderAndCase(true);
+      await createFolderCase.mutateAsync(newFolderCaseName);
+      toast.success('Folder case created successfully');
+    } catch (error) {
+      console.error('Error creating folder case:', error);
+      toast.error('Failed to create folder case');
+    } finally {
+      setIsCreatingFolderAndCase(false);
+      setIsNewFolderCaseDialogOpen(false);
+      setNewFolderCaseName('');
+    }
+  }, [newFolderCaseName]);
 
-  // Parse breadcrumb path
-  const breadcrumbParts = currentPath.split('/').filter(Boolean);
-
-  // Render navigation item
-  const renderNavigationItem = useCallback(
-    (item: NavigationItem) => {
-      const IconComponent = item.icon;
-      if (item.hasSubmenu) {
-        return (
-          <Accordion.Root key={item.id} type='single' collapsible>
-            <Accordion.Item value={item.id}>
-              <Accordion.Trigger
-                className={cn(
-                  'flex h-10 w-full items-center justify-between gap-3 px-3 text-sm font-medium transition-all duration-200',
-                  'hover:bg-accent/80 hover:text-accent-foreground rounded-md',
-                  item.isActive &&
-                  'bg-primary/10 text-primary border-primary border-r-2',
-                  isSidebarCollapsed && 'justify-center px-2'
-                )}
-              >
-                <div className='flex items-center gap-3'>
-                  <IconComponent className='h-4 w-4 flex-shrink-0' />
-                  {!isSidebarCollapsed && (
-                    <span className='flex-1 text-left'>{item.label}</span>
-                  )}
-                </div>
-                {!isSidebarCollapsed && (
-                  <ChevronDown className='h-3 w-3 transition-transform duration-200 data-[state=open]:rotate-180' />
-                )}
-              </Accordion.Trigger>
-              {!isSidebarCollapsed && (
-                <Accordion.Content className='data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up space-y-1 overflow-hidden pr-3 pb-2 pl-6'>
-                  {item.submenu?.map((subItem) => {
-                    const SubIconComponent = subItem.icon;
-                    return (
-                      <Button
-                        key={subItem.id}
-                        variant='ghost'
-                        onClick={() => handleNavItemClick(subItem.id)}
-                        className={cn(
-                          'h-8 w-full justify-start gap-3 px-3 text-xs font-medium transition-all duration-200',
-                          'hover:bg-accent/60 hover:text-accent-foreground',
-                          subItem.isActive && 'bg-primary/10 text-primary'
-                        )}
-                      >
-                        <SubIconComponent className='h-3 w-3 flex-shrink-0' />
-                        <span className='flex-1 text-left'>
-                          {subItem.label}
-                        </span>
-                      </Button>
-                    );
-                  })}
-                </Accordion.Content>
-              )}
-            </Accordion.Item>
-          </Accordion.Root>
-        );
-      }
-      return (
-        <Tooltip.Provider key={item.id}>
-          <Tooltip.Root>
-            <Tooltip.Trigger asChild>
-              <Button
-                variant='ghost'
-                onClick={() => handleNavItemClick(item.id)}
-                className={cn(
-                  'h-10 w-full justify-start gap-3 px-3 text-sm font-medium transition-all duration-200',
-                  'hover:bg-accent/80 hover:text-accent-foreground',
-                  item.isActive &&
-                  'bg-primary/10 text-primary border-primary border-r-2',
-                  isSidebarCollapsed && 'justify-center px-2'
-                )}
-              >
-                <IconComponent className='h-4 w-4 flex-shrink-0' />
-                {!isSidebarCollapsed && (
-                  <span className='flex-1 text-left'>{item.label}</span>
-                )}
-              </Button>
-            </Tooltip.Trigger>
-            {isSidebarCollapsed && (
-              <Tooltip.Portal>
-                <Tooltip.Content
-                  side='right'
-                  className='bg-popover text-popover-foreground rounded border px-2 py-1 text-xs shadow-md'
-                  sideOffset={5}
-                >
-                  {item.label}
-                  <Tooltip.Arrow className='fill-popover' />
-                </Tooltip.Content>
-              </Tooltip.Portal>
-            )}
-          </Tooltip.Root>
-        </Tooltip.Provider>
-      );
-    },
-    [handleNavItemClick, isSidebarCollapsed]
-  );
+  const handleFolderCaseChange = useCallback((value: string) => {
+    setSelectedFolderCase(value);
+  }, []);
 
   const handleUploadEvidence = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-
-      if (selectedUploadFolderId === 'root' && (!Array.isArray(foldersList) || foldersList.length === 0)) {
-        toast.error('Please create a folder to upload the document');
-        return;
-      }
 
       if (file) {
         try {
@@ -853,24 +446,31 @@ export default function DocumentsWorkspacePageCompact({
   );
 
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [isLoadingDownloadUrl, setIsLoadingDownloadUrl] = useState(false);
 
-  const handleGetDownloadUrl = useCallback(async () => {
-    if (!selectedDocument) {
-      toast.error('No document selected');
-      return;
-    }
-    
-    try {
-      const response = await downloadFile.mutateAsync(selectedDocument.id);
-      if (response.success && response.data?.sasUrl) {
-        setDownloadUrl(response.data.sasUrl);
-      } else {
-        toast.error('Failed to download document');
+  const handleGetDownloadUrl = useCallback(
+    async (document: SolarDocumentItem) => {
+      setIsLoadingDownloadUrl(true);
+      if (!document) {
+        toast.error('No document selected');
+        return;
       }
-    } catch (error) {
-      toast.error('Failed to download document');
-    }
-  }, [selectedDocument, downloadFile]);
+
+      try {
+        const response = await downloadFile.mutateAsync(document.id);
+        if (response.success && response.data?.sasUrl) {
+          setDownloadUrl(response.data.sasUrl);
+        } else {
+          toast.error('Failed to download document');
+        }
+      } catch (error) {
+        toast.error('Failed to download document');
+      } finally {
+        setIsLoadingDownloadUrl(false);
+      }
+    },
+    [downloadFile]
+  );
 
   const handleDownloadFile = useCallback(async () => {
     if (!downloadUrl) {
@@ -880,28 +480,28 @@ export default function DocumentsWorkspacePageCompact({
     // Download the file using the downloadUrl
     try {
       // Create a temporary anchor element and trigger download
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      // Try to get filename from selectedDocument, fallback to 'document'
+      // Download the file using the same URL, but use the Fetch API to get the blob and trigger download
       const filename =
         (selectedDocument && selectedDocument.name) || 'document';
+      const response = await fetch(downloadUrl);
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
       link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
       toast.success('Download started');
     } catch (error) {
       console.error('Error downloading file:', error);
       toast.error('Failed to download file');
     }
   }, [downloadUrl, selectedDocument]);
-
-  // Get download URL when document is selected
-  useEffect(() => {
-    if (selectedDocument) {
-      handleGetDownloadUrl();
-    }
-  }, [selectedDocument, handleGetDownloadUrl]);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
@@ -910,39 +510,44 @@ export default function DocumentsWorkspacePageCompact({
     'folder' | 'document' | null
   >(null);
 
-  const handleDeleteFile = useCallback(async (id: string) => {
-    setDeleteLoading(true);
-    try {
-      await deleteFile.mutateAsync(id);
-      toast.success('File deleted successfully');
-      setDeleteTargetId(null);
-      setDeleteTargetType(null);
-      setDeleteModalOpen(false);
-    } catch (error) {
-      toast.error('Failed to delete file');
-    }
-    setDeleteLoading(false);
-  }, [deleteFile]);
+  const handleDeleteFile = useCallback(
+    async (id: string) => {
+      setDeleteLoading(true);
+      try {
+        await deleteFile.mutateAsync(id);
+        toast.success('File deleted successfully');
+        setDeleteTargetId(null);
+        setDeleteTargetType(null);
+        setDeleteModalOpen(false);
+      } catch (error) {
+        toast.error('Failed to delete file');
+      }
+      setDeleteLoading(false);
+    },
+    [deleteFile]
+  );
 
-  const handleDeleteFolder = useCallback(async (id: string) => {
-    setDeleteLoading(true);
-    try {
-      await deleteFolder.mutateAsync(id);
-      toast.success('Folder deleted successfully');
-      setDeleteTargetId(null);
-      setDeleteTargetType(null);
-      setDeleteModalOpen(false);
-    } catch (error) {
-      toast.error('Failed to delete folder');
-    }
-    setDeleteLoading(false);
-  }, [deleteFolder]);
+  const handleDeleteFolder = useCallback(
+    async (id: string) => {
+      setDeleteLoading(true);
+      try {
+        await deleteFolder.mutateAsync(id);
+        toast.success('Folder deleted successfully');
+        setDeleteTargetId(null);
+        setDeleteTargetType(null);
+        setDeleteModalOpen(false);
+      } catch (error) {
+        toast.error('Failed to delete folder');
+      }
+      setDeleteLoading(false);
+    },
+    [deleteFolder]
+  );
 
   // Recursive component to render folder tree
   const renderFolderTree = useCallback(
     (folders: any[], level: number = 0) => {
       return folders.map((folder, index) => {
-        const FolderIcon = folder.icon || Folder;
         const isExpanded = expandedFolders.has(folder.id);
         const documents = folder.documents || [];
         const children = folder.children || [];
@@ -952,7 +557,7 @@ export default function DocumentsWorkspacePageCompact({
           <div key={folder.id} className='relative space-y-1'>
             {/* Vertical line for non-last items */}
             {!isLastItem && (
-              <div className='absolute left-6 top-8 w-px h-full bg-border' />
+              <div className='bg-border absolute top-8 left-6 h-full w-px' />
             )}
             {/* Folder Header */}
             <Collapsible.Root
@@ -972,7 +577,7 @@ export default function DocumentsWorkspacePageCompact({
                 >
                   {/* Horizontal line connecting to parent */}
                   {level > 0 && (
-                    <div className='absolute left-0 top-1/2 w-6 h-px bg-border -translate-y-1/2' />
+                    <div className='bg-border absolute top-1/2 left-0 h-px w-6 -translate-y-1/2' />
                   )}
                   {isExpanded ? (
                     <FolderOpen className='h-4 w-4 text-blue-500' />
@@ -999,7 +604,7 @@ export default function DocumentsWorkspacePageCompact({
                   <span
                     className={cn(
                       'hover:bg-accent/10 hover:text-accent ml-1 flex h-6 w-6 flex-shrink-0 cursor-pointer flex-row items-center justify-start rounded text-left',
-                      isUploadingDocument && 'opacity-50 cursor-not-allowed'
+                      isUploadingDocument && 'cursor-not-allowed opacity-50'
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1011,7 +616,8 @@ export default function DocumentsWorkspacePageCompact({
                       }
                     }}
                   >
-                    {isUploadingDocument && selectedUploadFolderId === folder.id ? (
+                    {isUploadingDocument &&
+                    selectedUploadFolderId === folder.id ? (
                       <Loader2 className='h-4 w-4 animate-spin text-blue-600' />
                     ) : (
                       <UploadIcon className='h-4 w-4 text-blue-600' />
@@ -1040,9 +646,9 @@ export default function DocumentsWorkspacePageCompact({
               </Collapsible.Trigger>
 
               {/* Folder Contents */}
-              <Collapsible.Content className='data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up space-y-1 overflow-hidden pl-6 relative'>
+              <Collapsible.Content className='data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up relative space-y-1 overflow-hidden pl-6'>
                 {/* Vertical line for folder contents */}
-                <div className='absolute left-6 top-0 w-px h-full bg-border' />
+                <div className='bg-border absolute top-0 left-6 h-full w-px' />
                 {/* Render child folders first */}
                 {children.length > 0 && renderFolderTree(children, level + 1)}
 
@@ -1054,6 +660,9 @@ export default function DocumentsWorkspacePageCompact({
                 ) : (
                   documents.map((document: any, docIndex: number) => {
                     const isLastDocument = docIndex === documents.length - 1;
+                    const status = ['complete', 'under-review', 'pending', 'missing'];
+                    const documentStatus = status[Math.floor(Math.random() * status.length)];
+                    const statusDisplay = getStatusDisplay(documentStatus);
                     return (
                       <motion.div
                         key={document.id}
@@ -1063,14 +672,18 @@ export default function DocumentsWorkspacePageCompact({
                         className='relative'
                       >
                         {/* Horizontal line for documents */}
-                        <div className='absolute left-0 top-1/2 w-6 h-px bg-border -translate-y-1/2' />
+                        <div className='bg-border absolute top-1/2 left-0 h-px w-6 -translate-y-1/2' />
                         {/* Vertical line for non-last documents */}
                         {!isLastDocument && (
-                          <div className='absolute left-6 top-8 w-px h-full bg-border' />
+                          <div className='bg-border absolute top-8 left-6 h-full w-px' />
                         )}
                         <Button
                           variant='ghost'
-                          onClick={() => handleDocumentSelect(document)}
+                          onClick={() => {
+                            handleGetDownloadUrl(document);
+                            setSelectedDocument(document);
+                            setIsDocumentDialogOpen(true);
+                          }}
                           className='hover:bg-accent/60 h-auto w-full justify-start gap-3 p-3 text-left transition-colors'
                           role='treeitem'
                           aria-label={`${document.name}, ${document.mime_type.toUpperCase()}, ${formatFileSize(document.size_bytes)}, modified ${formatDate(document.created_at)}`}
@@ -1094,6 +707,15 @@ export default function DocumentsWorkspacePageCompact({
                               <span className='flex items-center gap-1'>
                                 <Clock className='h-3 w-3' />
                                 {formatDate(document.created_at)}
+                              </span>
+                              <span
+                                className={cn(
+                                  'rounded-full px-2 py-0.5 text-xs font-medium',
+                                  statusDisplay.bg,
+                                  statusDisplay.color
+                                )}
+                              >
+                                {documentStatus}
                               </span>
                             </div>
                           </div>
@@ -1125,7 +747,6 @@ export default function DocumentsWorkspacePageCompact({
       expandedFolders,
       toggleFolder,
       getStatusDisplay,
-      handleDocumentSelect,
       getFileIcon,
       formatFileSize,
       formatDate,
@@ -1135,15 +756,14 @@ export default function DocumentsWorkspacePageCompact({
 
   return (
     <Tooltip.Provider>
-      <div className='flex h-full flex-col bg-background'>
-
+      <div className='bg-background flex h-full flex-col'>
         {/* Main workspace layout */}
         <div className='flex min-h-0 flex-1 overflow-hidden'>
           {/* Main content area with scroll */}
           <main className='flex min-h-0 flex-1 flex-col overflow-y-auto'>
             {/* Solar Case Information Header */}
             <section
-              className='border-b bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-950/20 dark:to-yellow-950/20 p-6'
+              className='border-b bg-gradient-to-r from-orange-50 to-yellow-50 p-6 dark:from-orange-950/20 dark:to-yellow-950/20'
               aria-labelledby='case-header'
             >
               {/* Case Navigation Breadcrumb */}
@@ -1153,7 +773,7 @@ export default function DocumentsWorkspacePageCompact({
                     <BreadcrumbItem>
                       <BreadcrumbLink className='text-muted-foreground hover:text-primary flex items-center gap-1 text-sm font-medium transition-colors'>
                         <Sun className='h-4 w-4' />
-                        Solar Cases
+                        {selectedFolderCase}
                       </BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator>
@@ -1185,12 +805,6 @@ export default function DocumentsWorkspacePageCompact({
                     <h1 className='text-foreground truncate text-2xl font-bold'>
                       {currentMatter}
                     </h1>
-                    <Badge
-                      variant='secondary'
-                      className='px-2 py-1 text-xs font-medium'
-                    >
-                      {/* Case #{clientInfo.name.split(' ')[1]}-2024 */}
-                    </Badge>
                   </div>
 
                   {/* Document Summary Stats */}
@@ -1283,6 +897,41 @@ export default function DocumentsWorkspacePageCompact({
                       </div>
                     )}
                   </div>
+                  <div className='flex items-center gap-2'>
+                    <span className='text-sm text-muted-foreground'>Cases:</span>
+                    {!isLoadingFolderCases && (
+                      <Select
+                        onValueChange={handleFolderCaseChange}
+                        value={selectedFolderCase}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder='Select Case' />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {folderCasesList.map((folderCase: any) => (
+                            <SelectItem
+                              key={folderCase.id}
+                              value={folderCase.name}
+                            >
+                              {folderCase.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {isLoadingFolderCases && (
+                      <div className='mt-2 flex items-center gap-2 text-sm text-blue-600'>
+                        <Loader2 className='h-4 w-4 animate-spin' />
+                        <span>Loading cases...</span>
+                      </div>
+                    )}
+                    <Button
+                      className='rounded-md bg-blue-500 px-4 py-2 text-white'
+                      onClick={() => setIsNewFolderCaseDialogOpen(true)}
+                    >
+                      Create New
+                    </Button>
+                  </div>
                 </header>
 
                 <ScrollArea className='bg-card h-[calc(100%-4rem)] rounded-lg border'>
@@ -1306,24 +955,6 @@ export default function DocumentsWorkspacePageCompact({
                         aria-label='Document tree'
                       >
                         <div className='flex items-center gap-1'>
-                          {renderFolderTree(folderStructure).length > 0 ? (
-                            <FolderOpen className='h-4 w-4 text-blue-500' />
-                          ) : (
-                            <Folder className='h-4 w-4 text-blue-500' />
-                          )}
-                          <span>root</span>
-                          <Button
-                            variant='ghost'
-                            size='icon'
-                            className='ml-2 h-6 w-6 cursor-pointer p-0'
-                            aria-label='Add folder to root'
-                            onClick={() => {
-                              setIsCreateFolderDialogOpen(true);
-                              setSelectedParentFolderId('root');
-                            }}
-                          >
-                            <FolderPlus className='h-4 w-4 text-green-600' />
-                          </Button>
                           <input
                             type='file'
                             id='upload-document'
@@ -1362,7 +993,7 @@ export default function DocumentsWorkspacePageCompact({
             aria-label='Solar AI Assistant'
           >
             {/* Agent Panel Header - Always visible */}
-            <div className='flex min-h-[73px] items-center justify-between border-b bg-orange-50/50 dark:bg-orange-950/20 p-4'>
+            <div className='flex min-h-[73px] items-center justify-between border-b bg-orange-50/50 p-4 dark:bg-orange-950/20'>
               {!isAgentPanelCollapsed ? (
                 <div className='flex items-center gap-3'>
                   <div className='flex items-center gap-2'>
@@ -1390,7 +1021,10 @@ export default function DocumentsWorkspacePageCompact({
               ) : (
                 <div className='flex flex-col items-center gap-2'>
                   <div className='relative'>
-                    <Bot className='h-5 w-5 text-orange-600' />
+                    <Bot
+                      className='h-5 w-5 text-orange-600'
+                      onClick={toggleAgentPanel}
+                    />
                     <div
                       className={cn(
                         'border-background absolute -right-0.5 -bottom-0.5 h-2 w-2 rounded-full border',
@@ -1470,7 +1104,7 @@ export default function DocumentsWorkspacePageCompact({
                       >
                         <Avatar className='h-7 w-7 flex-shrink-0'>
                           {message.type === 'agent' ? (
-                            <AvatarFallback className='bg-orange-100 dark:bg-orange-950/50 text-orange-600 dark:text-orange-400'>
+                            <AvatarFallback className='bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400'>
                               <Bot className='h-4 w-4' />
                             </AvatarFallback>
                           ) : (
@@ -1483,15 +1117,14 @@ export default function DocumentsWorkspacePageCompact({
                         <div
                           className={cn(
                             'max-w-[80%] flex-1',
-                            message.type === 'user' &&
-                            'flex flex-col items-end'
+                            message.type === 'user' && 'flex flex-col items-end'
                           )}
                         >
                           <div
                             className={cn(
                               'rounded-lg px-3 py-2 text-sm',
                               message.type === 'agent'
-                                ? 'text-foreground border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30'
+                                ? 'text-foreground border border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/30'
                                 : 'bg-primary text-primary-foreground'
                             )}
                           >
@@ -1523,11 +1156,11 @@ export default function DocumentsWorkspacePageCompact({
                         className='flex gap-3'
                       >
                         <Avatar className='h-7 w-7 flex-shrink-0'>
-                          <AvatarFallback className='bg-orange-100 dark:bg-orange-950/50 text-orange-600 dark:text-orange-400'>
+                          <AvatarFallback className='bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400'>
                             <Bot className='h-4 w-4' />
                           </AvatarFallback>
                         </Avatar>
-                        <div className='rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30 px-3 py-2'>
+                        <div className='rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 dark:border-orange-800 dark:bg-orange-950/30'>
                           <div className='flex items-center gap-1'>
                             <div className='flex gap-1'>
                               <div className='h-2 w-2 animate-bounce rounded-full bg-orange-400 dark:bg-orange-500' />
@@ -1560,7 +1193,7 @@ export default function DocumentsWorkspacePageCompact({
                     <Input
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
-                      onKeyPress={handleKeyPress}
+                      onKeyDown={handleKeyPress}
                       placeholder='Ask about your solar case...'
                       className='flex-1 text-sm'
                       disabled={isAgentTyping}
@@ -1585,133 +1218,25 @@ export default function DocumentsWorkspacePageCompact({
         </div>
       </div>
 
-      {/* Create Folder Dialog */}
-      <Dialog.Root
-        open={isCreateFolderDialogOpen}
-        onOpenChange={setIsCreateFolderDialogOpen}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay className='data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 bg-black/50' />
-          <Dialog.Content className='bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] fixed top-[50%] left-[50%] z-50 grid w-full max-w-md translate-x-[-50%] translate-y-[-50%] gap-4 border p-6 shadow-lg duration-200 sm:rounded-lg'>
-            <div className='flex flex-col space-y-1.5 text-center sm:text-left'>
-              <Dialog.Title className='text-lg leading-none font-semibold tracking-tight'>
-                Create New Folder
-              </Dialog.Title>
-              <Dialog.Description className='text-muted-foreground text-sm'>
-                Create a new folder to organize your documents
-              </Dialog.Description>
-            </div>
+      {/* Create Folder Modal */}
+      <CreateFolderModal
+        isOpen={isCreateFolderDialogOpen}
+        onClose={() => setIsCreateFolderDialogOpen(false)}
+        folderName={newFolderName}
+        onFolderNameChange={setNewFolderName}
+        onCreateFolder={handleCreateFolder}
+        isLoading={isCreatingFolderAndCase}
+      />
 
-            <div className='grid gap-4'>
-              <div className='grid gap-2'>
-                <label htmlFor='folder-name' className='text-sm font-medium'>
-                  Folder Name
-                </label>
-                <Input
-                  id='folder-name'
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  placeholder='Enter folder name...'
-                  className='w-full'
-                />
-              </div>
-            </div>
-
-            <div className='flex justify-end gap-2'>
-              <Dialog.Close asChild>
-                <Button
-                  variant='outline'
-                  onClick={() => {
-                    setNewFolderName('');
-                  }}
-                >
-                  Cancel
-                </Button>
-              </Dialog.Close>
-              <Button
-                onClick={handleCreateFolder}
-                disabled={!newFolderName.trim() || isCreatingFolder}
-                className='flex items-center gap-2'
-              >
-                {isCreatingFolder ? (
-                  <>
-                    <Loader2 className='h-4 w-4 animate-spin' />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <PlusCircle className='h-4 w-4' />
-                    Create Folder
-                  </>
-                )}
-              </Button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-
-      {/* Document Preview Dialog */}
-      <Dialog.Root
-        open={isDocumentDialogOpen}
-        onOpenChange={setIsDocumentDialogOpen}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay className='data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 bg-black/50' />
-          <Dialog.Content className='bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] fixed top-[50%] left-[50%] z-50 grid w-full max-w-4xl translate-x-[-50%] translate-y-[-50%] gap-4 border p-6 shadow-lg duration-200 sm:rounded-lg md:w-full'>
-            <div className='flex flex-col space-y-1.5 text-center sm:text-left'>
-              <Dialog.Title className='text-lg leading-none font-semibold tracking-tight'>
-                Solar Document Preview
-              </Dialog.Title>
-              <Dialog.Description className='text-muted-foreground text-sm'>
-                {selectedDocument?.name}
-              </Dialog.Description>
-            </div>
-
-            {selectedDocument && (
-              <div className='grid gap-4'>
-                <div className='grid grid-cols-2 gap-4 text-sm'>
-                  <div>
-                    <span className='font-medium'>Type:</span>{' '}
-                    {selectedDocument.name.split('.').pop()?.toUpperCase()}
-                  </div>
-                  <div>
-                    <span className='font-medium'>Size:</span>{' '}
-                    {formatFileSize(selectedDocument.size_bytes)}
-                  </div>
-                  <div>
-                    <span className='font-medium'>Modified:</span>{' '}
-                    {formatDate(selectedDocument.updated_at)}
-                  </div>
-                </div>
-
-                <div className='bg-muted/30 flex min-h-[300px] items-center justify-center rounded-lg border p-4'>
-                  <div className='text-center'>
-                    {getFileIcon(
-                      selectedDocument.mime_type,
-                      'h-16 w-16 mb-4'
-                    )}
-                    <DocViewer
-                      documents={[
-                        {
-                          uri: downloadUrl || ''
-                        }
-                      ]}
-                      pluginRenderers={DocViewerRenderers}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className='flex justify-end gap-2'>
-              <Dialog.Close asChild>
-                <Button variant='outline'>Close</Button>
-              </Dialog.Close>
-              <Button onClick={handleDownloadFile}>Download</Button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+      {/* Document Preview Modal */}
+      <DocumentPreviewModal
+        isOpen={isDocumentDialogOpen}
+        onClose={() => setIsDocumentDialogOpen(false)}
+        document={selectedDocument}
+        downloadUrl={downloadUrl}
+        isLoadingDownloadUrl={isLoadingDownloadUrl}
+        onDownload={handleDownloadFile}
+      />
 
       {/* Confirm Delete Modal */}
       <AlertModal
@@ -1730,6 +1255,16 @@ export default function DocumentsWorkspacePageCompact({
           }
         }}
         loading={deleteLoading}
+      />
+
+      {/* Create Case Modal */}
+      <CreateCaseModal
+        isOpen={isNewFolderCaseDialogOpen}
+        onClose={() => setIsNewFolderCaseDialogOpen(false)}
+        caseName={newFolderCaseName}
+        onCaseNameChange={setNewFolderCaseName}
+        onCreateCase={handleCreateFolderCase}
+        isLoading={isCreatingFolderAndCase}
       />
     </Tooltip.Provider>
   );
