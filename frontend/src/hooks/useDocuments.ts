@@ -19,6 +19,7 @@ export interface Folder {
   name: string;
   parentId: string | null;
   createdBy: string;
+  case: string;
   createdAt: string;
   children?: Folder[];
   documents?: Document[];
@@ -45,6 +46,7 @@ export interface ApiResponse<T> {
 const QUERY_KEYS = {
   documents: ['documents'] as const,
   folders: ['folders'] as const,
+  folderCases: ['folderCases'] as const,
 } as const;
 
 // Hooks for querying data
@@ -184,18 +186,57 @@ export function useDeleteFolder() {
   });
 }
 
+export function useCreateFolderCase() {
+  const queryClient = useQueryClient();
+  const { orgId } = useAuth();
+
+  return useMutation({
+    mutationFn: async (folderCaseName: string) => {
+      const response = await StoreDocumentsAPI.createFolderCase(folderCaseName) as ApiResponse<any>;
+      if (!response.success) {
+        throw new Error(response.error || 'Create folder case failed');
+      }
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.folders, orgId] });
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.folderCases, orgId] });
+    },
+    onError: (error) => {
+      console.error('Create folder case failed:', error);
+    },
+  })
+}
+
+export function useFolderCases() {
+  const { orgId } = useAuth();
+
+  return useQuery({
+    queryKey: [...QUERY_KEYS.folderCases, orgId],
+    queryFn: async () => {
+      const response = await StoreDocumentsAPI.getFolderCases() as ApiResponse<any>;
+      return response.data || [];
+    },
+    enabled: !!orgId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 2,
+  });
+}
+
 // Compound hook for all storage operations
 export function useStorageOperations() {
   return {
     // Queries
-    documents: useDocuments(),
+    // documents: useDocuments(),
     folders: useFolders(),
-    
+    folderCases: useFolderCases(),
     // Mutations
+    createFolderCase: useCreateFolderCase(),
     uploadDocument: useUploadDocument(),
     createFolder: useCreateFolder(),
     downloadFile: useDownloadFile(),
     deleteFile: useDeleteFile(),
     deleteFolder: useDeleteFolder(),
+
   };
 } 
