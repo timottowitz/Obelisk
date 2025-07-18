@@ -624,18 +624,20 @@ export default function DocumentsWorkspacePageCompact({
                     )}
                   </span>
                   {/* Folder delete button */}
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteTargetId(folder.id);
-                      setDeleteTargetType('folder');
-                      setDeleteModalOpen(true);
-                    }}
-                    className='text-destructive flex h-6 w-6 flex-shrink-0 cursor-pointer items-center justify-center rounded'
-                    aria-label={`Delete folder ${folder.name}`}
-                  >
-                    <Trash2 className='h-3 w-3' />
-                  </span>
+                  {folder.parent_folder_id && (
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteTargetId(folder.id);
+                        setDeleteTargetType('folder');
+                        setDeleteModalOpen(true);
+                      }}
+                      className='text-destructive flex h-6 w-6 flex-shrink-0 cursor-pointer items-center justify-center rounded'
+                      aria-label={`Delete folder ${folder.name}`}
+                    >
+                      <Trash2 className='h-3 w-3' />
+                    </span>
+                  )}
                   <ChevronRight
                     className={cn(
                       'h-3 w-3 transition-transform duration-200',
