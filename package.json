@@ -1,7 +1,10 @@
 {
   "scripts": {
     "migrate": "tsx scripts/inAppMigrationRunner.ts all-tenants",
-    "upload-migrations": "tsx scripts/uploadTenantMigrationsToDb.ts"
+    "upload-migrations": "tsx scripts/uploadTenantMigrationsToDb.ts",
+    "start": "cd frontend && npm start",
+    "build": "cd frontend && npm run build",
+    "dev": "cd frontend && npm run dev"
   },
   "dependencies": {
     "dotenv": "^16.5.0",
