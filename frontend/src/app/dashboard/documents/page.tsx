@@ -46,7 +46,6 @@ import {
   getStatusDisplay
 } from '@/lib/document-utils';
 import {
-  DocumentsWorkspacePageCompactProps,
   SolarDocumentItem,
   AgentStatus,
   ChatMessage
@@ -92,9 +91,8 @@ function getFileIcon(type: string, className?: string) {
   }
 }
 
-export default function DocumentsWorkspacePageCompact({
-  currentMatter = 'Johnson Solar Arbitration'
-}: DocumentsWorkspacePageCompactProps) {
+export default function DocumentsWorkspacePageCompact() {
+  const currentMatter = 'Johnson Solar Arbitration';
   // Use React Query hooks for all storage operations
   const storageOps = useStorageOperations();
   const {
