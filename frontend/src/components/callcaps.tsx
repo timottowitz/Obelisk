@@ -87,6 +87,8 @@ const CallCaps = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [currentRecording, setCurrentRecording] = useState<any>(null);
   const [recordingStatus, setRecordingStatus] = useState('idle'); // idle, recording, processing
+  const [recordingStartTime, setRecordingStartTime] = useState<Date | null>(null);
+  const [recordingDuration, setRecordingDuration] = useState(0);
 
   // Initialize Web Recording service
   useEffect(() => {
@@ -102,6 +104,8 @@ const CallCaps = () => {
       setIsRecording(true);
       setCurrentRecording(recording);
       setRecordingStatus('recording');
+      setRecordingStartTime(new Date());
+      setRecordingDuration(0);
     };
 
     const handleRecordingStopped = async (recording: any) => {
@@ -114,6 +118,8 @@ const CallCaps = () => {
       
       setIsRecording(false);
       setCurrentRecording(null);
+      setRecordingStartTime(null);
+      setRecordingDuration(0);
       setRecordingStatus('processing');
 
       try {
@@ -150,6 +156,8 @@ const CallCaps = () => {
     const handleRecordingProcessed = ({ recording, analysis }: any) => {
       console.log('Web recording processed:', recording, analysis);
       setRecordingStatus('idle');
+      setRecordingStartTime(null);
+      setRecordingDuration(0);
 
       // Refresh recordings list and go to first page to see new recording
       setCurrentPage(1);
@@ -161,6 +169,8 @@ const CallCaps = () => {
       setRecordingStatus('idle');
       setIsRecording(false);
       setCurrentRecording(null);
+      setRecordingStartTime(null);
+      setRecordingDuration(0);
       alert(`Recording error: ${error.message}`);
     };
 
@@ -178,6 +188,32 @@ const CallCaps = () => {
       webScreenRecorder.off('recordingError', handleRecordingError);
     };
   }, []);
+
+  // Update recording duration when recording is active
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (isRecording && recordingStartTime) {
+      interval = setInterval(() => {
+        const now = new Date();
+        const duration = Math.floor((now.getTime() - recordingStartTime.getTime()) / 1000);
+        setRecordingDuration(duration);
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isRecording, recordingStartTime]);
+
+  // Format duration as MM:SS
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleConnectZoom = async () => {
     console.log('Connecting to Zoom...');
@@ -281,46 +317,98 @@ const CallCaps = () => {
   if (!zoomConnected && recordings.length === 0) {
     const isSupported = webScreenRecorder.isSupported();
     return (
-      <div className='flex min-h-screen items-center justify-center'>
-        <div className='bg-card w-full max-w-lg rounded-[var(--radius)] p-8 text-center shadow-sm'>
-          <div className='bg-primary/10 mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full'>
-            <Video className='text-primary h-10 w-10' />
-          </div>
-          <h2 className='text-foreground mb-3 text-2xl font-semibold'>
-            Welcome to CallCaps
-          </h2>
-          <p className='text-muted-foreground mb-6'>
-            Record and analyze your legal meetings with AI-powered insights.
-          </p>
-
-          <div className='space-y-4'>
-            {isSupported && (
+      <div className='bg-background min-h-screen'>
+        {/* Recording Status Banner */}
+        {isRecording && (
+          <div className='bg-red-600 text-white px-4 py-3 shadow-lg'>
+            <div className='mx-auto max-w-7xl flex items-center justify-between'>
+              <div className='flex items-center space-x-3'>
+                <div className='flex items-center space-x-2'>
+                  <div className='h-3 w-3 rounded-full bg-white animate-pulse'></div>
+                  <span className='font-medium'>RECORDING</span>
+                </div>
+                <span className='text-sm opacity-90'>
+                  Duration: {formatDuration(recordingDuration)}
+                </span>
+              </div>
               <button
-                onClick={() =>
-                  handleStartRecording({ includeMicrophone: true })
-                }
-                className='bg-primary text-primary-foreground hover:bg-primary/90 flex w-full items-center justify-center gap-2 rounded-[var(--radius)] px-4 py-3 text-sm font-medium transition-colors'
+                onClick={handleStopRecording}
+                className='bg-white text-red-600 hover:bg-gray-100 px-4 py-2 rounded-md text-sm font-medium transition-colors'
               >
-                <Monitor className='h-4 w-4' />
-                Start Screen Recording
+                Stop Recording
               </button>
-            )}
-
-            <button
-              onClick={handleConnectZoom}
-              className='bg-secondary text-secondary-foreground hover:bg-secondary/80 flex w-full items-center justify-center gap-2 rounded-[var(--radius)] px-4 py-3 text-sm font-medium transition-colors'
-            >
-              <Video className='h-4 w-4' />
-              Connect Zoom Account
-            </button>
+            </div>
           </div>
+        )}
 
-          {!isSupported && (
-            <p className='text-muted-foreground mt-4 text-xs'>
-              Screen recording is not supported in your browser. Please use
-              Chrome, Firefox, or Edge.
+        {/* Processing Status Banner */}
+        {recordingStatus === 'processing' && (
+          <div className='bg-yellow-600 text-white px-4 py-3 shadow-lg'>
+            <div className='mx-auto max-w-7xl flex items-center justify-center'>
+              <div className='flex items-center space-x-3'>
+                <div className='h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin'></div>
+                <span className='font-medium'>Processing Recording...</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className='flex min-h-screen items-center justify-center p-4'>
+          <div className='bg-card w-full max-w-lg rounded-[var(--radius)] p-8 text-center shadow-sm'>
+            <div className='bg-primary/10 mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full'>
+              <Video className='text-primary h-10 w-10' />
+            </div>
+            <h2 className='text-foreground mb-3 text-2xl font-semibold'>
+              {isRecording ? 'Recording in Progress' : 'Welcome to CallCaps'}
+            </h2>
+            <p className='text-muted-foreground mb-6'>
+              {isRecording 
+                ? `Recording your screen... Duration: ${formatDuration(recordingDuration)}`
+                : 'Record and analyze your legal meetings with AI-powered insights.'
+              }
             </p>
-          )}
+
+            <div className='space-y-4'>
+              {!isRecording && isSupported && (
+                <button
+                  onClick={() =>
+                    handleStartRecording({ includeMicrophone: true })
+                  }
+                  className='bg-primary text-primary-foreground hover:bg-primary/90 flex w-full items-center justify-center gap-2 rounded-[var(--radius)] px-4 py-3 text-sm font-medium transition-colors'
+                >
+                  <Monitor className='h-4 w-4' />
+                  Start Screen Recording
+                </button>
+              )}
+
+              {!isRecording && (
+                <button
+                  onClick={handleConnectZoom}
+                  className='bg-secondary text-secondary-foreground hover:bg-secondary/80 flex w-full items-center justify-center gap-2 rounded-[var(--radius)] px-4 py-3 text-sm font-medium transition-colors'
+                >
+                  <Video className='h-4 w-4' />
+                  Connect Zoom Account
+                </button>
+              )}
+
+              {isRecording && (
+                <button
+                  onClick={handleStopRecording}
+                  className='bg-destructive text-destructive-foreground hover:bg-destructive/90 flex w-full items-center justify-center gap-2 rounded-[var(--radius)] px-4 py-3 text-sm font-medium transition-colors'
+                >
+                  <Square className='h-4 w-4' />
+                  Stop Recording
+                </button>
+              )}
+            </div>
+
+            {!isSupported && !isRecording && (
+              <p className='text-muted-foreground mt-4 text-xs'>
+                Screen recording is not supported in your browser. Please use
+                Chrome, Firefox, or Edge.
+              </p>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -329,6 +417,41 @@ const CallCaps = () => {
   // Main UI rendering (recordings list, filters, modal, etc.)
   return (
     <div className='bg-background'>
+      {/* Recording Status Banner */}
+      {isRecording && (
+        <div className='bg-red-600 text-white px-4 py-3 shadow-lg'>
+          <div className='mx-auto max-w-7xl flex items-center justify-between'>
+            <div className='flex items-center space-x-3'>
+              <div className='flex items-center space-x-2'>
+                <div className='h-3 w-3 rounded-full bg-white animate-pulse'></div>
+                <span className='font-medium'>RECORDING</span>
+              </div>
+              <span className='text-sm opacity-90'>
+                Duration: {formatDuration(recordingDuration)}
+              </span>
+            </div>
+            <button
+              onClick={handleStopRecording}
+              className='bg-white text-red-600 hover:bg-gray-100 px-4 py-2 rounded-md text-sm font-medium transition-colors'
+            >
+              Stop Recording
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Processing Status Banner */}
+      {recordingStatus === 'processing' && (
+        <div className='bg-yellow-600 text-white px-4 py-3 shadow-lg'>
+          <div className='mx-auto max-w-7xl flex items-center justify-center'>
+            <div className='flex items-center space-x-3'>
+              <div className='h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin'></div>
+              <span className='font-medium'>Processing Recording...</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filters Bar with Recording Controls */}
       <div className='bg-card border-border border-b'>
         <div className='mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8'>
@@ -357,23 +480,6 @@ const CallCaps = () => {
               </div>
             </div>
             <div className='flex items-center space-x-4'>
-              {/* Recording Status */}
-              {recordingStatus !== 'idle' && (
-                <div className='flex items-center space-x-2'>
-                  <div
-                    className={`h-3 w-3 rounded-full ${
-                      recordingStatus === 'recording'
-                        ? 'animate-pulse bg-red-500'
-                        : recordingStatus === 'processing'
-                          ? 'bg-yellow-500'
-                          : 'bg-green-500'
-                    }`}
-                  ></div>
-                  <span className='text-sm text-muted-foreground capitalize'>
-                    {recordingStatus}
-                  </span>
-                </div>
-              )}
               {/* Recording Controls */}
               {!isRecording ? (
                 <div className='flex items-center space-x-2'>
@@ -396,13 +502,12 @@ const CallCaps = () => {
                   </button>
                 </div>
               ) : (
-                <button
-                  onClick={handleStopRecording}
-                  className='inline-flex items-center rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90'
-                >
-                  <Square className='mr-2 h-4 w-4' />
-                  Stop Recording
-                </button>
+                <div className='flex items-center space-x-2'>
+                  <div className='flex items-center space-x-2 text-sm text-muted-foreground'>
+                    <div className='h-2 w-2 rounded-full bg-red-500 animate-pulse'></div>
+                    <span>Recording in progress...</span>
+                  </div>
+                </div>
               )}
               <div className='text-sm text-muted-foreground'>
                 {summary ? (

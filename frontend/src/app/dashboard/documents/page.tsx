@@ -45,11 +45,7 @@ import {
   countAllDocuments,
   getStatusDisplay
 } from '@/lib/document-utils';
-import {
-  SolarDocumentItem,
-  AgentStatus,
-  ChatMessage
-} from '@/types/documents';
+import { SolarDocumentItem, AgentStatus, ChatMessage } from '@/types/documents';
 
 // Radix Primitives
 import * as Tooltip from '@radix-ui/react-tooltip';
@@ -134,6 +130,9 @@ export default function DocumentsWorkspacePageCompact() {
   const [newFolderCaseName, setNewFolderCaseName] = useState('');
   const [isNewFolderCaseDialogOpen, setIsNewFolderCaseDialogOpen] =
     useState(false);
+
+  console.log(foldersList, 'foldersList');
+  console.log(folderCasesList, 'folderCasesList');
 
   // Initialize expanded folders from localStorage when folders are loaded
   useEffect(() => {
@@ -243,6 +242,7 @@ export default function DocumentsWorkspacePageCompact() {
         const selectedFolderCaseId = folderCasesList.find(
           (folderCase: any) => folderCase.name === selectedFolderCase
         )?.id;
+        console.log(selectedFolderCaseId, 'selectedFolderCaseId');
         // Logically fix: search should check folder name, its documents, and recursively its children
         const matchesSearch = (folderOrChild: any): boolean => {
           if (searchQuery.length === 0) {
@@ -270,7 +270,12 @@ export default function DocumentsWorkspacePageCompact() {
     [foldersList, searchQuery, selectedFolderCase]
   );
 
+  console.log(selectedFolderCase, 'selectedFolderCase');
+  console.log(filteredFolders, 'filteredFolders');
+
   const folderStructure = Array.isArray(foldersList) ? filteredFolders : [];
+
+  console.log(folderStructure, 'folderStructure');
 
   // Handle search
   const handleSearch = (e: React.FormEvent) => {
@@ -658,8 +663,14 @@ export default function DocumentsWorkspacePageCompact() {
                 ) : (
                   documents.map((document: any, docIndex: number) => {
                     const isLastDocument = docIndex === documents.length - 1;
-                    const status = ['complete', 'under-review', 'pending', 'missing'];
-                    const documentStatus = status[Math.floor(Math.random() * status.length)];
+                    const status = [
+                      'complete',
+                      'under-review',
+                      'pending',
+                      'missing'
+                    ];
+                    const documentStatus =
+                      status[Math.floor(Math.random() * status.length)];
                     const statusDisplay = getStatusDisplay(documentStatus);
                     return (
                       <motion.div
@@ -896,7 +907,9 @@ export default function DocumentsWorkspacePageCompact() {
                     )}
                   </div>
                   <div className='flex items-center gap-2'>
-                    <span className='text-sm text-muted-foreground'>Cases:</span>
+                    <span className='text-muted-foreground text-sm'>
+                      Cases:
+                    </span>
                     {!isLoadingFolderCases && (
                       <Select
                         onValueChange={handleFolderCaseChange}

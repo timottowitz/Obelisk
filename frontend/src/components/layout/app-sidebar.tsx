@@ -18,7 +18,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -38,8 +37,6 @@ import {
   IconChevronsDown,
   IconCreditCard,
   IconLogout,
-  IconPhotoUp,
-  IconSun,
   IconUserCircle
 } from '@tabler/icons-react';
 import { SignOutButton } from '@clerk/nextjs';
@@ -55,22 +52,28 @@ export default function AppSidebar() {
   const pathname = usePathname();
   const { isOpen } = useMediaQuery();
   const { user } = useUser();
-  const auth = useAuth();
   const { userMemberships, setActive: setActiveTenant } = useOrganizationList({
-    userMemberships: true
+    userMemberships: {
+      infinite: true
+    }
   });
+  const auth = useAuth();
+  
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const handleSwitchTenant = (_tenantId: string) => {
+  const handleSwitchTenant = async (_tenantId: string) => {
     if (setActiveTenant) {
-      setActiveTenant({
+      await setActiveTenant({
         organization: _tenantId
       });
     }
-    // Reset react-query cache when switching organization
     queryClient.clear();
   };
+
+  React.useEffect(() => {
+    router.refresh();
+  }, []);
 
   const activeTenant = userMemberships.data?.find(
     (membership) => membership.organization.id === auth.orgId
@@ -89,7 +92,7 @@ export default function AppSidebar() {
           </div>
         ) : (
           <OrgSwitcher
-            tenants={(userMemberships?.data || []).map((membership) => ({
+            tenants={(userMemberships.data || []).map((membership) => ({
               name: membership.organization.name,
               id: membership.organization.id
             }))}
