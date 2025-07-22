@@ -9,7 +9,7 @@ import { Hono } from "jsr:@hono/hono";
 import { cors } from "jsr:@hono/hono/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
 import { extractUserAndOrgId } from "../_shared/index.ts";
-import { AzureBlobStorageService } from "../_shared/azure-storage.ts";
+import { GoogleCloudStorageService } from "../_shared/google-storage.ts";
 import {
   GoogleGenAI,
   createUserContent,
@@ -416,41 +416,7 @@ app.post("/call-recordings", async (c) => {
     }
 
     const recordingsTable = `call_recordings`;
-    const settingsTable = `user_settings`;
     const queueTable = `processing_queue`;
-
-    // Get user's Azure credentials from settings, fallback to environment variables
-    const { data: settings, error: settingsError } = await supabase
-      .schema(schema)
-      .from(settingsTable)
-      .select("azure_connection_string")
-      .eq("member_id", member.data?.id)
-      .single();
-
-    // Use user settings if available, otherwise use environment variables
-    let azureConnectionString = settings?.azure_connection_string;
-    if (!azureConnectionString) {
-      azureConnectionString = Deno.env.get("AZURE_CONNECTION_STRING");
-    }
-
-    if (!azureConnectionString) {
-      return c.json(
-        {
-          error:
-            "Azure storage not configured. Please add your Azure connection string in settings or configure AZURE_CONNECTION_STRING environment variable.",
-        },
-        400
-      );
-    }
-
-    // Parse Azure connection string
-    const connectionString = azureConnectionString;
-    const accountName = connectionString.match(/AccountName=([^;]+)/)?.[1];
-    const accountKey = connectionString.match(/AccountKey=([^;]+)/)?.[1];
-
-    if (!accountName || !accountKey) {
-      return c.json({ error: "Invalid Azure connection string format" }, 400);
-    }
 
     // Create recording record in database
     const { data: recording, error: insertError } = await supabase
@@ -481,11 +447,7 @@ app.post("/call-recordings", async (c) => {
 
     try {
       // Initialize Azure Blob Storage
-      const azureStorage = new AzureBlobStorageService({
-        accountName,
-        accountKey,
-        containerName: "callcaps-recordings",
-      });
+      const gcsService = getGcsService();
 
       // Convert base64 to ArrayBuffer
       const binaryString = atob(recordingBlob);
@@ -495,7 +457,7 @@ app.post("/call-recordings", async (c) => {
       }
 
       // Upload to Azure Blob Storage
-      const uploadResult = await azureStorage.uploadVideo(
+      const uploadResult = await gcsService.uploadVideo(
         user.data?.id,
         recording.id,
         bytes,
@@ -507,8 +469,8 @@ app.post("/call-recordings", async (c) => {
         .schema(schema)
         .from(recordingsTable)
         .update({
-          azure_video_url: uploadResult.blobUrl,
-          azure_video_blob_name: uploadResult.blobName,
+          gcs_video_url: uploadResult.blobUrl,
+          gcs_video_blob_name: uploadResult.blobName,
           file_size: bytes.length,
           status: "uploaded",
         })
@@ -542,7 +504,7 @@ app.post("/call-recordings", async (c) => {
             id: recording.id,
             title: recording.title,
             status: "uploaded",
-            azure_video_url: uploadResult.blobUrl,
+            gcs_video_url: uploadResult.blobUrl,
             duration: recording.duration,
             start_time: recording.start_time,
             end_time: recording.end_time,
@@ -662,39 +624,6 @@ app.post("/call-recordings/upload", async (c) => {
     const settingsTable = `user_settings`;
     const queueTable = `processing_queue`;
 
-    // Get user's Azure credentials from settings, fallback to environment variables
-    const { data: settings, error: settingsError } = await supabase
-      .schema(schema)
-      .from(settingsTable)
-      .select("azure_connection_string")
-      .eq("member_id", member.data?.id)
-      .single();
-
-    // Use user settings if available, otherwise use environment variables
-    let azureConnectionString = settings?.azure_connection_string;
-    if (!azureConnectionString) {
-      azureConnectionString = Deno.env.get("AZURE_CONNECTION_STRING");
-    }
-
-    if (!azureConnectionString) {
-      return c.json(
-        {
-          error:
-            "Azure storage not configured. Please add your Azure connection string in settings or configure AZURE_CONNECTION_STRING environment variable.",
-        },
-        400
-      );
-    }
-
-    // Parse Azure connection string
-    const connectionString = azureConnectionString;
-    const accountName = connectionString.match(/AccountName=([^;]+)/)?.[1];
-    const accountKey = connectionString.match(/AccountKey=([^;]+)/)?.[1];
-
-    if (!accountName || !accountKey) {
-      return c.json({ error: "Invalid Azure connection string format" }, 400);
-    }
-
     // Create recording record in database
     const { data: recording, error: insertError } = await supabase
       .schema(schema)
@@ -724,18 +653,14 @@ app.post("/call-recordings/upload", async (c) => {
 
     try {
       // Initialize Azure Blob Storage
-      const azureStorage = new AzureBlobStorageService({
-        accountName,
-        accountKey,
-        containerName: "callcaps-recordings",
-      });
+      const gcsService = getGcsService();
 
       // Convert File to ArrayBuffer
       const fileArrayBuffer = await file.arrayBuffer();
       const bytes = new Uint8Array(fileArrayBuffer);
 
       // Upload to Azure Blob Storage
-      const uploadResult = await azureStorage.uploadVideo(
+      const uploadResult = await gcsService.uploadVideo(
         user.data?.id,
         recording.id,
         bytes,
@@ -747,8 +672,8 @@ app.post("/call-recordings/upload", async (c) => {
         .schema(schema)
         .from(recordingsTable)
         .update({
-          azure_video_url: uploadResult.blobUrl,
-          azure_video_blob_name: uploadResult.blobName,
+          gcs_video_url: uploadResult.blobUrl,
+          gcs_video_blob_name: uploadResult.blobName,
           file_size: bytes.length,
           status: "uploaded",
         })
@@ -782,7 +707,7 @@ app.post("/call-recordings/upload", async (c) => {
             id: recording.id,
             title: recording.title,
             status: "uploaded",
-            azure_video_url: uploadResult.blobUrl,
+            gcs_video_url: uploadResult.blobUrl,
             duration: recording.duration,
             start_time: recording.start_time,
             end_time: recording.end_time,
@@ -893,25 +818,18 @@ app.post("/call-recordings/:id/process", async (c) => {
     const { data: settings, error: settingsError } = await supabase
       .schema(schema)
       .from(settingsTable)
-      .select(
-        "openai_api_key, azure_connection_string, ai_model, temperature, custom_prompts"
-      )
+      .select("openai_api_key, ai_model, temperature, custom_prompts")
       .eq("member_id", member.data?.id)
       .single();
 
     // Use user settings if available, otherwise use environment variables
     let openaiApiKey = settings?.openai_api_key;
-    let azureConnectionString = settings?.azure_connection_string;
 
     if (!openaiApiKey) {
       openaiApiKey = Deno.env.get("OPENAI_API_KEY");
     }
 
     const googleApiKey = Deno.env.get("GOOGLE_API_KEY");
-
-    if (!azureConnectionString) {
-      azureConnectionString = Deno.env.get("AZURE_CONNECTION_STRING");
-    }
 
     if (!openaiApiKey) {
       return c.json(
@@ -951,25 +869,11 @@ app.post("/call-recordings/:id/process", async (c) => {
       ) {
         console.log("Starting transcription...");
 
-        // Parse Azure connection string
-        const connectionString = azureConnectionString;
-        const accountName = connectionString.match(/AccountName=([^;]+)/)?.[1];
-        const accountKey = connectionString.match(/AccountKey=([^;]+)/)?.[1];
-
-        if (!accountName || !accountKey) {
-          throw new Error("Invalid Azure connection string");
-        }
-
-        // Initialize Azure Blob Storage
-        const azureStorage = new AzureBlobStorageService({
-          accountName,
-          accountKey,
-          containerName: "callcaps-recordings",
-        });
+        const gcsService = getGcsService();
 
         // Download video from Azure and prepare for Gemini upload
-        const videoBytes = await azureStorage.downloadBlob(
-          recording.azure_video_blob_name
+        const videoBytes = await gcsService.downloadBlob(
+          recording.gcs_video_blob_name
         );
 
         // Convert bytes to Blob (supported in Deno)
@@ -982,7 +886,7 @@ app.post("/call-recordings/:id/process", async (c) => {
           file: videoBlob,
           config: {
             mimeType: recording.mime_type,
-            displayName: recording.azure_video_blob_name,
+            displayName: recording.gcs_video_blob_name,
           },
         });
 
@@ -1033,8 +937,6 @@ Do not include any commentary, explanation, or markdown formatting. The output m
 
         console.log("Raw JSON text:", rawJsonText);
 
-
-
         // Attempt to parse JSON. If it fails, try to locate the first JSON object/array in the text.
         let transcript;
         try {
@@ -1045,7 +947,9 @@ Do not include any commentary, explanation, or markdown formatting. The output m
             transcript = JSON.parse(jsonMatch[0]);
           } else {
             throw new Error(
-              `Failed to parse transcript JSON: ${(parseErr as Error)?.message}. Raw response: ${rawText ?? ""}`
+              `Failed to parse transcript JSON: ${
+                (parseErr as Error)?.message
+              }. Raw response: ${rawText ?? ""}`
             );
           }
         }
@@ -1181,38 +1085,27 @@ Do not include any commentary, explanation, or markdown formatting. The output m
           analysis
         );
 
-        // Parse Azure connection string
-        const connectionString = azureConnectionString;
-        const accountName = connectionString.match(/AccountName=([^;]+)/)?.[1];
-        const accountKey = connectionString.match(/AccountKey=([^;]+)/)?.[1];
+        // Initialize Azure Blob Storage
+        const gcsService = getGcsService();
 
-        if (accountName && accountKey) {
-          // Initialize Azure Blob Storage
-          const azureStorage = new AzureBlobStorageService({
-            accountName,
-            accountKey,
-            containerName: "callcaps-recordings",
-          });
+        // Upload markdown to Azure
+        const transcriptResult = await gcsService.uploadTranscript(
+          user.data?.id,
+          recordingId,
+          markdown
+        );
 
-          // Upload markdown to Azure
-          const transcriptResult = await azureStorage.uploadTranscript(
-            user.data?.id,
-            recordingId,
-            markdown
-          );
-
-          // Update recording with transcript URL
-          await supabase
-            .schema(schema)
-            .from(recordingsTable)
-            .update({
-              azure_transcript_url: transcriptResult.blobUrl,
-              azure_transcript_blob_name: transcriptResult.blobName,
-              status: "processed",
-              processed_at: new Date().toISOString(),
-            })
-            .eq("id", recordingId);
-        }
+        // Update recording with transcript URL
+        await supabase
+          .schema(schema)
+          .from(recordingsTable)
+          .update({
+            gcs_transcript_url: transcriptResult.blobUrl,
+            gcs_transcript_blob_name: transcriptResult.blobName,
+            status: "processed",
+            processed_at: new Date().toISOString(),
+          })
+          .eq("id", recordingId);
       }
 
       // Update processing queue
@@ -1336,46 +1229,15 @@ app.get("/call-recordings/:id/video", async (c) => {
       return c.json({ error: "Recording not found" }, 404);
     }
 
-    if (!recording.azure_video_blob_name) {
+    if (!recording.gcs_video_blob_name) {
       return c.json({ error: "Video file not found" }, 404);
     }
 
-    // Get Azure credentials
-    const { data: settings } = await supabase
-      .schema(schema)
-      .from("user_settings")
-      .select("azure_connection_string")
-      .eq("member_id", member.data?.id)
-      .single();
-
-    let azureConnectionString = settings?.azure_connection_string;
-    if (!azureConnectionString) {
-      azureConnectionString = Deno.env.get("AZURE_CONNECTION_STRING");
-    }
-
-    if (!azureConnectionString) {
-      return c.json({ error: "Azure storage not configured" }, 500);
-    }
-
-    // Parse Azure connection string
-    const connectionString = azureConnectionString;
-    const accountName = connectionString.match(/AccountName=([^;]+)/)?.[1];
-    const accountKey = connectionString.match(/AccountKey=([^;]+)/)?.[1];
-
-    if (!accountName || !accountKey) {
-      return c.json({ error: "Invalid Azure connection string" }, 500);
-    }
-
-    // Initialize Azure Blob Storage
-    const azureStorage = new AzureBlobStorageService({
-      accountName,
-      accountKey,
-      containerName: "callcaps-recordings",
-    });
+    const gcsService = getGcsService();
 
     // Download video from Azure
-    const videoData = await azureStorage.downloadBlob(
-      recording.azure_video_blob_name
+    const videoData = await gcsService.downloadBlob(
+      recording.gcs_video_blob_name
     );
 
     // Return video with proper headers
@@ -2059,6 +1921,24 @@ app.delete("/call-recordings/:id/share/:memberId", async (c) => {
     return c.json({ error: error.message }, 500);
   }
 });
+
+// Place getGcsService at the top so it's in scope for all endpoints
+function getGcsService() {
+  const gcsKeyRaw = Deno.env.get("GCS_JSON_KEY");
+  const bucketName = Deno.env.get("GCS_BUCKET_NAME");
+  if (!gcsKeyRaw || !bucketName) {
+    throw new Error(
+      "GCS storage not configured. Please set GCS_JSON_KEY and GCS_BUCKET_NAME in environment variables."
+    );
+  }
+  let credentials;
+  try {
+    credentials = JSON.parse(gcsKeyRaw);
+  } catch (e: any) {
+    throw new Error("Invalid GCS_JSON_KEY: " + (e?.message || e));
+  }
+  return new GoogleCloudStorageService({ bucketName, credentials });
+}
 
 export default app;
 

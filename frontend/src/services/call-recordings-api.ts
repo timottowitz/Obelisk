@@ -17,10 +17,10 @@ export interface Recording {
   file_size: number;
   has_video: boolean;
   has_audio: boolean;
-  azure_video_url?: string;
-  azure_video_blob_name?: string;
-  azure_transcript_url?: string;
-  azure_transcript_blob_name?: string;
+  gcs_video_url?: string;
+  gcs_video_blob_name?: string;
+  gcs_transcript_url?: string;
+  gcs_transcript_blob_name?: string;
   transcript_text?: string;
   transcript_segments?: {
     speaker: string;
@@ -120,7 +120,7 @@ export class CallRecordingsAPI {
       id: string;
       title: string;
       status: 'uploaded';
-      azure_video_url: string;
+      gcs_video_url: string;
       duration: number;
       start_time: string;
       end_time: string;
@@ -308,13 +308,13 @@ export class CallRecordingsAPI {
       duration: apiRecording.duration, // API already provides formatted duration
       participants: apiRecording.participants,
       status,
-      thumbnail: apiRecording.azure_video_url || '/api/placeholder/300/200',
+      thumbnail: apiRecording.gcs_video_url || '/api/placeholder/300/200',
       hasVideo: apiRecording.has_video,
       hasAudio: apiRecording.has_audio,
       transcript,
-      s3Key: apiRecording.azure_video_blob_name || '',
-      transcriptS3Key: apiRecording.azure_transcript_blob_name || null,
-      sharing_link: apiRecording.azure_video_url,
+      s3Key: apiRecording.gcs_video_blob_name || '',
+      transcriptS3Key: apiRecording.gcs_transcript_blob_name || null,
+      sharing_link: apiRecording.gcs_video_url,
       isShared: (apiRecording as any).is_shared,
       accessType: (apiRecording as any).access_type || 'owner',
       shareInfo: (apiRecording as any).access_type === 'shared' ? {

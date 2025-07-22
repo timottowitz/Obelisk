@@ -180,6 +180,26 @@ const RecordingDetailModal = ({
             >
               <X className='h-5 w-5' />
             </button>
+            {/* Add process/analysis button if not processed */}
+            {recording.status !== 'processed' && (
+              <button
+                onClick={async () => {
+                  try {
+                    // Call process API
+                    await import('@/services/call-recordings-api').then(({ CallRecordingsAPI }) =>
+                      CallRecordingsAPI.processRecording(recording.id)
+                    );
+                    // Call onRecordingUpdated to revalidate/fetch
+                    if (onRecordingUpdated) onRecordingUpdated();
+                  } catch (err) {
+                    alert('Failed to process recording: ' + (err instanceof Error ? err.message : err));
+                  }
+                }}
+                className='bg-primary text-primary-foreground hover:bg-primary/90 rounded-[calc(var(--radius)-2px)] p-2 ml-2 text-xs font-semibold'
+              >
+                <Brain className='inline-block h-4 w-4 mr-1' /> Analyze
+              </button>
+            )}
           </div>
         </div>
 
