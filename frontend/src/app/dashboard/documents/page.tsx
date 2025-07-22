@@ -660,9 +660,7 @@ export default function DocumentsWorkspacePageCompact({
                 ) : (
                   documents.map((document: any, docIndex: number) => {
                     const isLastDocument = docIndex === documents.length - 1;
-                    const status = ['complete', 'under-review', 'pending', 'missing'];
-                    const documentStatus = status[Math.floor(Math.random() * status.length)];
-                    const statusDisplay = getStatusDisplay(documentStatus);
+                    const statusDisplay = getStatusDisplay(document.status);
                     return (
                       <motion.div
                         key={document.id}
@@ -715,7 +713,7 @@ export default function DocumentsWorkspacePageCompact({
                                   statusDisplay.color
                                 )}
                               >
-                                {documentStatus}
+                                {document.status}
                               </span>
                             </div>
                           </div>

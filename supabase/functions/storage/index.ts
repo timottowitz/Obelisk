@@ -624,6 +624,9 @@ async function handleFileUpload(
     { checksum, uploadedBy: userId }
   );
 
+  const status = ['complete', 'under-review', 'pending', 'missing'];
+  const documentStatus = status[Math.floor(Math.random() * status.length)];
+
   // Save file metadata to database
   const { data: fileRecord, error } = await supabaseClient
     .schema("org_2ycgcrzpztj0emidxp0u3iztcqy")
@@ -638,6 +641,7 @@ async function handleFileUpload(
       size_bytes: fileBytes.length,
       checksum: checksum,
       uploaded_by: userId,
+      status: documentStatus,
     })
     .select()
     .single();
