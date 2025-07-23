@@ -184,6 +184,14 @@ export const navItems: NavItem[] = [
     items: []
   },
   {
+    title: 'Members',
+    url: '/dashboard/members',
+    icon: 'user',
+    isActive: false,
+    shortcut: ['m', 'm'],
+    items: []
+  },
+  {
     title: 'Settings',
     url: '/dashboard/settings',
     icon: 'settings',
