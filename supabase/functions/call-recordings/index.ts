@@ -191,6 +191,7 @@ app.use(
 );
 
 app.use("/call-recordings", extractUserAndOrgId);
+app.use("/call-recordings/:id", extractUserAndOrgId);
 app.use("/call-recordings/:id/process", extractUserAndOrgId);
 app.use("/call-recordings/:id/video", extractUserAndOrgId);
 app.use("/call-recordings/:id/share", extractUserAndOrgId);
@@ -1918,6 +1919,97 @@ app.delete("/call-recordings/:id/share/:memberId", async (c) => {
       200
     );
   } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Update DELETE endpoint for hard delete
+app.delete("/call-recordings/:id", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const recordingId = c.req.param("id");
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
+
+    const org = await supabase
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+    if (org.error) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+    const schema = org.data?.schema_name.toLowerCase();
+    if (!schema) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+
+    const user = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+    if (user.error) {
+      return c.json({ error: "User not found" }, 404);
+    }
+    const member = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("*")
+      .eq("user_id", user.data?.id)
+      .eq("organization_id", org.data?.id)
+      .single();
+    if (member.error) {
+      return c.json({ error: "Member not found" }, 404);
+    }
+
+    // Only allow owner to delete
+    const { data: recording, error: recordingError } = await supabase
+      .schema(schema)
+      .from("call_recordings")
+      .select("*")
+      .eq("id", recordingId)
+      .eq("member_id", member.data?.id)
+      .single();
+    if (recordingError || !recording) {
+      return c.json({ error: "Recording not found or access denied" }, 404);
+    }
+
+    // Hard delete: remove the row from the database
+    const { error: deleteError } = await supabase
+      .schema(schema)
+      .from("call_recordings")
+      .delete()
+      .eq("id", recordingId);
+    if (deleteError) {
+      console.error("Error deleting recording:", deleteError);
+      return c.json({ error: "Failed to delete recording", details: deleteError }, 500);
+    }
+
+    // Remove blobs from GCS if present
+    try {
+      const gcsService = getGcsService();
+      if (recording.gcs_video_blob_name) {
+        await gcsService.deleteFile(recording.gcs_video_blob_name);
+      }
+      if (recording.gcs_transcript_blob_name) {
+        await gcsService.deleteFile(recording.gcs_transcript_blob_name);
+      }
+    } catch (blobError) {
+      // Log but don't fail the request
+      console.error("Failed to delete blobs from GCS:", blobError);
+    }
+
+    return c.json({ success: true, message: "Recording deleted" }, 200);
+  } catch (error: any) {
+    console.error("Error deleting recording:", error);
     return c.json({ error: error.message }, 500);
   }
 });

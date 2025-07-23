@@ -139,7 +139,10 @@ const CallCaps = () => {
         
         // Start processing the recording
         try {
-          await CallRecordingsAPI.processRecording(newRecording.recording.id);
+          await CallRecordingsAPI.processRecording(newRecording.recording.id).then(() => {
+            refresh();
+            setRecordingStatus('idle');
+          });
         } catch (processError) {
           console.error('Failed to process recording:', processError);
         }
