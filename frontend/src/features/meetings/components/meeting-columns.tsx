@@ -40,7 +40,7 @@ export interface MeetingRecording {
   status: 'completed' | 'processing' | 'failed' | 'in_progress';
   participantCount: number;
   memberName: string;
-  aiSummary?: string;
+  ai_summary?: string;
   transcriptText?: string;
   gcsVideoUrl?: string;
   speakersMetadata?: any;
@@ -91,7 +91,10 @@ const formatDuration = (seconds: number): string => {
   if (hours > 0) {
     return `${hours}h ${minutes}m`;
   }
-  return `${minutes}m`;
+  if (minutes > 0) {
+    return `${minutes}m`;
+  } 
+  return `${Math.round(seconds)}s`;
 };
 
 // Status badge configuration
@@ -106,7 +109,8 @@ const getStatusConfig = (status: string) => {
   return configs[status as keyof typeof configs] || configs.completed;
 };
 
-export const meetingColumns: ColumnDef<MeetingRecording>[] = [
+// Change export to a function that takes onViewDetails
+export const meetingColumns = (onViewDetails: (recording: any) => void): ColumnDef<MeetingRecording>[] => [
   // Selection checkbox
   {
     id: 'select',
@@ -164,7 +168,7 @@ export const meetingColumns: ColumnDef<MeetingRecording>[] = [
     cell: ({ row }) => {
       const title = row.getValue('title') as string;
       const memberName = row.original.memberName;
-      const aiSummary = row.original.aiSummary;
+      const aiSummary = row.original.ai_summary;
       
       return (
         <div className="max-w-[300px]">
@@ -184,12 +188,12 @@ export const meetingColumns: ColumnDef<MeetingRecording>[] = [
 
   // Date and Time
   {
-    accessorKey: 'startTime',
+    accessorKey: 'start_time',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Date & Time" />
     ),
     cell: ({ row }) => {
-      const startTime = new Date(row.getValue('startTime'));
+      const startTime = new Date(row.getValue('start_time'));
       
       return (
         <div className="text-sm">
@@ -216,7 +220,7 @@ export const meetingColumns: ColumnDef<MeetingRecording>[] = [
         <div className="text-sm">
           <div className="flex items-center space-x-1">
             <Clock className="h-3 w-3 text-muted-foreground" />
-            <span>{formatDuration(duration)}</span>
+            <span>{formatDuration(duration / 1000)}</span>
           </div>
           <div className="flex items-center space-x-1 text-xs text-muted-foreground">
             <Users className="h-3 w-3" />
@@ -292,7 +296,6 @@ export const meetingColumns: ColumnDef<MeetingRecording>[] = [
       const recording = row.original;
       const canPlay = recording.status === 'completed' && recording.gcsVideoUrl;
       const canView = recording.accessType !== 'restricted';
-      
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -304,30 +307,25 @@ export const meetingColumns: ColumnDef<MeetingRecording>[] = [
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            
             {canView && (
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onViewDetails(recording)}>
                 <Eye className="mr-2 h-4 w-4" />
                 View Details
               </DropdownMenuItem>
             )}
-            
             {canPlay && (
               <DropdownMenuItem>
                 <Play className="mr-2 h-4 w-4" />
                 Play Recording
               </DropdownMenuItem>
             )}
-            
             {recording.transcriptText && (
               <DropdownMenuItem>
                 <FileText className="mr-2 h-4 w-4" />
                 View Transcript
               </DropdownMenuItem>
             )}
-            
             <DropdownMenuSeparator />
-            
             <DropdownMenuItem>
               <Download className="mr-2 h-4 w-4" />
               Export Data

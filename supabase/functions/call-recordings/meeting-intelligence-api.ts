@@ -33,7 +33,7 @@ app.use("*", extractUserAndOrgId);
 app.get("/meetings/analytics", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
-  
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -58,7 +58,8 @@ app.get("/meetings/analytics", async (c) => {
     const { data: meetingStats, error: statsError } = await supabase
       .schema(schema)
       .from("call_recordings")
-      .select(`
+      .select(
+        `
         id,
         meeting_type,
         duration,
@@ -66,7 +67,8 @@ app.get("/meetings/analytics", async (c) => {
         start_time,
         status,
         created_at
-      `)
+      `
+      )
       .not("meeting_type", "is", null);
 
     if (statsError) {
@@ -91,34 +93,44 @@ app.get("/meetings/analytics", async (c) => {
     const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     const totalMeetings = meetingStats?.length || 0;
-    const meetingsThisWeek = meetingStats?.filter(m => 
-      new Date(m.start_time) >= weekAgo
-    ).length || 0;
-    const meetingsThisMonth = meetingStats?.filter(m => 
-      new Date(m.start_time) >= monthAgo
-    ).length || 0;
+    const meetingsThisWeek =
+      meetingStats?.filter((m) => new Date(m.start_time) >= weekAgo).length ||
+      0;
+    const meetingsThisMonth =
+      meetingStats?.filter((m) => new Date(m.start_time) >= monthAgo).length ||
+      0;
 
-    const totalDuration = meetingStats?.reduce((sum, m) => sum + (m.duration || 0), 0) || 0;
+    const totalDuration =
+      meetingStats?.reduce((sum, m) => sum + (m.duration || 0), 0) || 0;
     const avgDuration = totalMeetings > 0 ? totalDuration / totalMeetings : 0;
-    const avgParticipants = totalMeetings > 0 
-      ? meetingStats.reduce((sum, m) => sum + (m.participant_count || 0), 0) / totalMeetings 
-      : 0;
+    const avgParticipants =
+      totalMeetings > 0
+        ? meetingStats.reduce((sum, m) => sum + (m.participant_count || 0), 0) /
+          totalMeetings
+        : 0;
 
     // Meeting type breakdown
-    const meetingsByType = meetingStats?.reduce((acc: any, meeting) => {
-      const type = meeting.meeting_type || 'call';
-      acc[type] = (acc[type] || 0) + 1;
-      return acc;
-    }, {}) || {};
+    const meetingsByType =
+      meetingStats?.reduce((acc: any, meeting) => {
+        const type = meeting.meeting_type || "call";
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {}) || {};
 
     // Action item completion rate
     const totalActionItems = actionItemStats?.length || 0;
-    const completedActionItems = actionItemStats?.filter(ai => ai.status === 'completed').length || 0;
-    const completionRate = totalActionItems > 0 ? (completedActionItems / totalActionItems) * 100 : 0;
+    const completedActionItems =
+      actionItemStats?.filter((ai) => ai.status === "completed").length || 0;
+    const completionRate =
+      totalActionItems > 0
+        ? (completedActionItems / totalActionItems) * 100
+        : 0;
 
     // Processing success rate
-    const completedMeetings = meetingStats?.filter(m => m.status === 'completed').length || 0;
-    const processingSuccessRate = totalMeetings > 0 ? (completedMeetings / totalMeetings) * 100 : 0;
+    const completedMeetings =
+      meetingStats?.filter((m) => m.status === "completed").length || 0;
+    const processingSuccessRate =
+      totalMeetings > 0 ? (completedMeetings / totalMeetings) * 100 : 0;
 
     return c.json({
       summary: {
@@ -133,28 +145,34 @@ app.get("/meetings/analytics", async (c) => {
       },
       breakdowns: {
         meetingsByType,
-        actionItemsByStatus: actionItemStats?.reduce((acc: any, ai) => {
-          acc[ai.status] = (acc[ai.status] || 0) + 1;
-          return acc;
-        }, {}) || {},
-        actionItemsByPriority: actionItemStats?.reduce((acc: any, ai) => {
-          acc[ai.priority] = (acc[ai.priority] || 0) + 1;
-          return acc;
-        }, {}) || {},
+        actionItemsByStatus:
+          actionItemStats?.reduce((acc: any, ai) => {
+            acc[ai.status] = (acc[ai.status] || 0) + 1;
+            return acc;
+          }, {}) || {},
+        actionItemsByPriority:
+          actionItemStats?.reduce((acc: any, ai) => {
+            acc[ai.priority] = (acc[ai.priority] || 0) + 1;
+            return acc;
+          }, {}) || {},
       },
       trends: {
         weeklyMeetings: meetingsThisWeek,
         monthlyMeetings: meetingsThisMonth,
         weeklyDuration: Math.round(
-          (meetingStats?.filter(m => new Date(m.start_time) >= weekAgo)
-            .reduce((sum, m) => sum + (m.duration || 0), 0) || 0) / (1000 * 60)
+          (meetingStats
+            ?.filter((m) => new Date(m.start_time) >= weekAgo)
+            .reduce((sum, m) => sum + (m.duration || 0), 0) || 0) /
+            (1000 * 60)
         ),
-      }
+      },
     });
-
   } catch (error) {
     console.error("Error fetching meeting analytics:", error);
-    return c.json({ error: error.message }, 500);
+    return c.json(
+      { error: error instanceof Error ? error.message : "Unknown error" },
+      500
+    );
   }
 });
 
@@ -165,7 +183,7 @@ app.get("/meetings/analytics", async (c) => {
 app.get("/meetings/:id/participants", async (c) => {
   const orgId = c.get("orgId");
   const meetingId = c.req.param("id");
-  
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -198,26 +216,37 @@ app.get("/meetings/:id/participants", async (c) => {
     }
 
     // Calculate participation metrics
-    const totalTalkTime = participants?.reduce((sum, p) => sum + (p.talk_time_seconds || 0), 0) || 0;
-    
-    const enhancedParticipants = participants?.map(p => ({
-      ...p,
-      talkTimePercentage: totalTalkTime > 0 ? Math.round((p.talk_time_seconds / totalTalkTime) * 100) : 0,
-      talkTimeFormatted: formatDuration(p.talk_time_seconds * 1000),
-    })) || [];
+    const totalTalkTime =
+      participants?.reduce((sum, p) => sum + (p.talk_time_seconds || 0), 0) ||
+      0;
+
+    const enhancedParticipants =
+      participants?.map((p) => ({
+        ...p,
+        talkTimePercentage:
+          totalTalkTime > 0
+            ? Math.round((p.talk_time_seconds / totalTalkTime) * 100)
+            : 0,
+        talkTimeFormatted: formatDuration(p.talk_time_seconds * 1000),
+      })) || [];
 
     return c.json({
       participants: enhancedParticipants,
       summary: {
         totalParticipants: participants?.length || 0,
         totalTalkTimeSeconds: totalTalkTime,
-        avgTalkTimeSeconds: participants?.length > 0 ? Math.round(totalTalkTime / participants.length) : 0,
-      }
+        avgTalkTimeSeconds:
+          participants?.length > 0
+            ? Math.round(totalTalkTime / participants.length)
+            : 0,
+      },
     });
-
   } catch (error) {
     console.error("Error fetching participants:", error);
-    return c.json({ error: error.message }, 500);
+    return c.json(
+      { error: error instanceof Error ? error.message : "Unknown error" },
+      500
+    );
   }
 });
 
@@ -228,7 +257,7 @@ app.get("/meetings/:id/participants", async (c) => {
 app.get("/meetings/:id/action-items", async (c) => {
   const orgId = c.get("orgId");
   const meetingId = c.req.param("id");
-  
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -261,10 +290,12 @@ app.get("/meetings/:id/action-items", async (c) => {
     }
 
     return c.json({ actionItems: actionItems || [] });
-
   } catch (error) {
     console.error("Error fetching action items:", error);
-    return c.json({ error: error.message }, 500);
+    return c.json(
+      { error: error instanceof Error ? error.message : "Unknown error" },
+      500
+    );
   }
 });
 
@@ -276,7 +307,7 @@ app.put("/meetings/:id/action-items/:actionId", async (c) => {
   const orgId = c.get("orgId");
   const meetingId = c.req.param("id");
   const actionId = c.req.param("actionId");
-  
+
   try {
     const body = await c.req.json();
     const { status, assignee, due_date, notes } = body;
@@ -305,9 +336,9 @@ app.put("/meetings/:id/action-items/:actionId", async (c) => {
     if (assignee) updateData.assignee_speaker_label = assignee;
     if (due_date) updateData.due_date = due_date;
     if (notes) updateData.notes = notes;
-    
+
     // Add completion timestamp if marking as completed
-    if (status === 'completed') {
+    if (status === "completed") {
       updateData.completed_at = new Date().toISOString();
     }
 
@@ -325,10 +356,12 @@ app.put("/meetings/:id/action-items/:actionId", async (c) => {
     }
 
     return c.json({ actionItem });
-
   } catch (error) {
     console.error("Error updating action item:", error);
-    return c.json({ error: error.message }, 500);
+    return c.json(
+      { error: error instanceof Error ? error.message : "Unknown error" },
+      500
+    );
   }
 });
 
@@ -339,7 +372,7 @@ app.put("/meetings/:id/action-items/:actionId", async (c) => {
 app.get("/meetings/:id/decisions", async (c) => {
   const orgId = c.get("orgId");
   const meetingId = c.req.param("id");
-  
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -372,10 +405,12 @@ app.get("/meetings/:id/decisions", async (c) => {
     }
 
     return c.json({ decisions: decisions || [] });
-
   } catch (error) {
     console.error("Error fetching decisions:", error);
-    return c.json({ error: error.message }, 500);
+    return c.json(
+      { error: error instanceof Error ? error.message : "Unknown error" },
+      500
+    );
   }
 });
 
@@ -386,7 +421,7 @@ app.get("/meetings/:id/decisions", async (c) => {
 app.get("/meetings/:id/topics", async (c) => {
   const orgId = c.get("orgId");
   const meetingId = c.req.param("id");
-  
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -419,10 +454,12 @@ app.get("/meetings/:id/topics", async (c) => {
     }
 
     return c.json({ topics: topics || [] });
-
   } catch (error) {
     console.error("Error fetching topics:", error);
-    return c.json({ error: error.message }, 500);
+    return c.json(
+      { error: error instanceof Error ? error.message : "Unknown error" },
+      500
+    );
   }
 });
 
@@ -433,10 +470,14 @@ app.get("/meetings/:id/topics", async (c) => {
 app.post("/meetings/:id/export", async (c) => {
   const orgId = c.get("orgId");
   const meetingId = c.req.param("id");
-  
+
   try {
     const body = await c.req.json();
-    const { format = 'json', includeTranscript = true, includeAnalysis = true } = body;
+    const {
+      format = "json",
+      includeTranscript = true,
+      includeAnalysis = true,
+    } = body;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -461,13 +502,15 @@ app.post("/meetings/:id/export", async (c) => {
     const { data: meeting, error } = await supabase
       .schema(schema)
       .from("call_recordings")
-      .select(`
+      .select(
+        `
         *,
         meeting_participants (*),
         meeting_action_items (*),
         meeting_decisions (*),
         meeting_topics (*)
-      `)
+      `
+      )
       .eq("id", meetingId)
       .single();
 
@@ -489,6 +532,10 @@ app.post("/meetings/:id/export", async (c) => {
       actionItems: meeting.meeting_action_items || [],
       decisions: meeting.meeting_decisions || [],
       topics: meeting.meeting_topics || [],
+      transcript: meeting.transcript_text,
+      analysis: meeting.ai_analysis,
+      sentiment: meeting.sentiment,
+      keyTopics: meeting.key_topics,
     };
 
     if (includeTranscript) {
@@ -509,35 +556,36 @@ app.post("/meetings/:id/export", async (c) => {
     }
 
     // Format response based on requested format
-    if (format === 'csv') {
+    if (format === "csv") {
       // For CSV, we'll return action items as the main export
-      const csvData = (meeting.meeting_action_items || [])
-        .map((item: any) => ({
-          Task: item.task_description,
-          Assignee: item.assignee_speaker_label || '',
-          Status: item.status,
-          Priority: item.priority,
-          'Due Date': item.due_date || '',
-          'Created At': item.created_at,
-        }));
+      const csvData = (meeting.meeting_action_items || []).map((item: any) => ({
+        Task: item.task_description,
+        Assignee: item.assignee_speaker_label || "",
+        Status: item.status,
+        Priority: item.priority,
+        "Due Date": item.due_date || "",
+        "Created At": item.created_at,
+      }));
 
-      return c.json({ 
-        format: 'csv',
+      return c.json({
+        format: "csv",
         data: csvData,
-        filename: `meeting-${meetingId}-action-items.csv`
+        filename: `meeting-${meetingId}-action-items.csv`,
       });
     }
 
     return c.json({
-      format: 'json',
+      format: "json",
       data: exportData,
       filename: `meeting-${meetingId}-export.json`,
       exportedAt: new Date().toISOString(),
     });
-
   } catch (error) {
     console.error("Error exporting meeting:", error);
-    return c.json({ error: error.message }, 500);
+    return c.json(
+      { error: error instanceof Error ? error.message : "Unknown error" },
+      500
+    );
   }
 });
 
@@ -548,7 +596,7 @@ function formatDuration(milliseconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes}m ${seconds}s`;
   } else if (minutes > 0) {

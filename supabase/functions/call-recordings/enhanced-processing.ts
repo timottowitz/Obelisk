@@ -3,17 +3,17 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
 import { GoogleCloudStorageService } from "../_shared/google-storage.ts";
-import { 
-  GeminiMeetingIntelligence, 
-  SpeakerSegment, 
-  MeetingAnalysisResult 
+import {
+  GeminiMeetingIntelligence,
+  SpeakerSegment,
+  MeetingAnalysisResult,
 } from "./gemini-meeting-intelligence.ts";
 import MeetingPromptLibrary from "./meeting-prompts.ts";
 
 export interface EnhancedProcessingOptions {
   recordingId: string;
-  taskType: 'transcribe' | 'analyze' | 'all';
-  meetingType: 'meeting' | 'call' | 'interview' | 'consultation';
+  taskType: "transcribe" | "analyze" | "all";
+  meetingType: "meeting" | "call" | "interview" | "consultation";
   analysisType?: string; // Which analysis prompt to use
   schema: string;
   supabase: any;
@@ -37,16 +37,20 @@ export class EnhancedMeetingProcessor {
 
   constructor(googleApiKey: string) {
     this.geminiAI = new GeminiMeetingIntelligence(googleApiKey);
-    this.gcsService = new GoogleCloudStorageService();
+    this.gcsService = getGcsService();
   }
 
   /**
    * Process meeting recording with enhanced intelligence
    * Maintains backward compatibility with existing legal recordings
    */
-  async processRecording(options: EnhancedProcessingOptions): Promise<ProcessingResult> {
+  async processRecording(
+    options: EnhancedProcessingOptions
+  ): Promise<ProcessingResult> {
     const startTime = Date.now();
-    console.log(`Starting enhanced processing for recording ${options.recordingId}`);
+    console.log(
+      `Starting enhanced processing for recording ${options.recordingId}`
+    );
 
     try {
       // Get recording details
@@ -58,8 +62,11 @@ export class EnhancedMeetingProcessor {
       let result: ProcessingResult = { success: true };
 
       // Step 1: Enhanced Transcription with Speaker Diarization
-      if (options.taskType === 'transcribe' || options.taskType === 'all') {
-        const transcriptResult = await this.processTranscription(recording, options);
+      if (options.taskType === "transcribe" || options.taskType === "all") {
+        const transcriptResult = await this.processTranscription(
+          recording,
+          options
+        );
         if (!transcriptResult.success) {
           return transcriptResult;
         }
@@ -67,8 +74,12 @@ export class EnhancedMeetingProcessor {
       }
 
       // Step 2: Meeting Intelligence Analysis (using existing transcript if available)
-      if (options.taskType === 'analyze' || options.taskType === 'all') {
-        const analysisResult = await this.processAnalysis(recording, options, result.transcript);
+      if (options.taskType === "analyze" || options.taskType === "all") {
+        const analysisResult = await this.processAnalysis(
+          recording,
+          options,
+          result.transcript
+        );
         if (!analysisResult.success) {
           return analysisResult;
         }
@@ -79,16 +90,17 @@ export class EnhancedMeetingProcessor {
       await this.saveEnhancedData(recording, options, result);
 
       result.processingTime = Date.now() - startTime;
-      console.log(`Enhanced processing completed in ${result.processingTime}ms`);
+      console.log(
+        `Enhanced processing completed in ${result.processingTime}ms`
+      );
 
       return result;
-
     } catch (error) {
       console.error("Enhanced processing error:", error);
       return {
         success: false,
-        error: error.message,
-        processingTime: Date.now() - startTime
+        error: error instanceof Error ? error.message : String(error),
+        processingTime: Date.now() - startTime,
       };
     }
   }
@@ -96,12 +108,15 @@ export class EnhancedMeetingProcessor {
   /**
    * Get recording details from database
    */
-  private async getRecordingDetails(options: EnhancedProcessingOptions): Promise<any> {
+  private async getRecordingDetails(
+    options: EnhancedProcessingOptions
+  ): Promise<any> {
+    console.log("options", options);
     const { data: recording, error } = await options.supabase
       .schema(options.schema)
-      .from('call_recordings')
-      .select('*')
-      .eq('id', options.recordingId)
+      .from("call_recordings")
+      .select("*")
+      .eq("id", options.recordingId)
       .single();
 
     if (error) {
@@ -116,60 +131,72 @@ export class EnhancedMeetingProcessor {
    * Process transcription with enhanced speaker diarization
    */
   private async processTranscription(
-    recording: any, 
+    recording: any,
     options: EnhancedProcessingOptions
   ): Promise<{ success: boolean; transcript?: any; error?: string }> {
     console.log("Starting enhanced transcription with speaker diarization...");
 
     try {
       // Download video from Google Cloud Storage
-      const videoBytes = await this.gcsService.downloadBlob(recording.gcs_video_blob_name);
+      const videoBytes = await this.gcsService.downloadBlob(
+        recording.gcs_video_blob_name
+      );
       const videoBlob = new Blob([videoBytes], { type: recording.mime_type });
 
       // Use enhanced Gemini processing
-      const transcriptionResult = await this.geminiAI.transcribeWithSpeakerDiarization(
-        videoBlob,
-        recording.mime_type,
-        recording.gcs_video_blob_name,
-        options.meetingType
-      );
+      const transcriptionResult =
+        await this.geminiAI.transcribeWithSpeakerDiarization(
+          videoBlob,
+          recording.mime_type,
+          recording.gcs_video_blob_name,
+          options.meetingType
+        );
+
+      console.log("transcriptionResult", transcriptionResult);
 
       // Update recording with transcript data
-      await options.supabase
+      const res = await options.supabase
         .schema(options.schema)
-        .from('call_recordings')
+        .from("call_recordings")
         .update({
           transcript_text: transcriptionResult.fullTranscript,
           transcript_segments: transcriptionResult.segments,
-          speakers_metadata: this.extractSpeakersMetadata(transcriptionResult.segments),
-          status: options.taskType === 'transcribe' ? 'completed' : 'analyzing'
+          speakers_metadata: this.extractSpeakersMetadata(
+            transcriptionResult.segments
+          ),
+          status: options.taskType === "transcribe" ? "completed" : "processing",
         })
-        .eq('id', options.recordingId);
+        .eq("id", options.recordingId);
+
+      console.log("res", res);
 
       // Save speaker segments to new participant table
-      await this.saveParticipants(recording.id, transcriptionResult.segments, options);
+      await this.saveParticipants(
+        recording.id,
+        transcriptionResult.segments,
+        options
+      );
 
       return {
         success: true,
-        transcript: transcriptionResult
+        transcript: transcriptionResult,
       };
-
     } catch (error) {
       console.error("Transcription error:", error);
-      
+
       // Update recording status to failed
       await options.supabase
         .schema(options.schema)
-        .from('call_recordings')
+        .from("call_recordings")
         .update({
-          status: 'failed',
-          processing_error: error.message
+          status: "failed",
+          processing_error: error instanceof Error ? error.message : String(error),
         })
-        .eq('id', options.recordingId);
+        .eq("id", options.recordingId);
 
       return {
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   }
@@ -181,16 +208,25 @@ export class EnhancedMeetingProcessor {
     recording: any,
     options: EnhancedProcessingOptions,
     transcriptData?: any
-  ): Promise<{ success: boolean; analysis?: MeetingAnalysisResult; error?: string }> {
+  ): Promise<{
+    success: boolean;
+    analysis?: MeetingAnalysisResult;
+    error?: string;
+  }> {
     console.log("Starting meeting intelligence analysis...");
 
     try {
       // Get transcript (either from current processing or database)
-      let transcript = transcriptData?.fullTranscript || recording.transcript_text;
-      let segments = transcriptData?.segments || recording.transcript_segments || [];
+      let transcript =
+        transcriptData?.fullTranscript || recording.transcript_text;
+      let segments =
+        transcriptData?.segments || recording.transcript_segments || [];
 
       if (!transcript) {
-        return { success: false, error: "No transcript available for analysis" };
+        return {
+          success: false,
+          error: "No transcript available for analysis",
+        };
       }
 
       // Use enhanced Gemini analysis
@@ -199,6 +235,8 @@ export class EnhancedMeetingProcessor {
         segments,
         options.meetingType
       );
+
+      console.log("analysisResult", analysisResult);
 
       // Also run specific analysis if requested
       let specificAnalysis = null;
@@ -216,42 +254,43 @@ export class EnhancedMeetingProcessor {
         ai_summary: analysisResult.summary,
         key_topics: analysisResult.keyTakeaways,
         sentiment: analysisResult.sentiment,
-        status: 'completed'
+        status: "processed",
       };
 
-      if (specificAnalysis) {
-        updateData.specific_analysis = specificAnalysis;
-      }
+      // if (specificAnalysis) {
+      //   updateData.specific_analysis = specificAnalysis;
+      // }
 
-      await options.supabase
+      const {error: updateError} = await options.supabase
         .schema(options.schema)
-        .from('call_recordings')
+        .from("call_recordings")
         .update(updateData)
-        .eq('id', options.recordingId);
+        .eq("id", options.recordingId);
+
+      console.log("updateError", updateError);
 
       // Save structured data to meeting-specific tables
       await this.saveMeetingData(recording.id, analysisResult, options);
 
       return {
         success: true,
-        analysis: analysisResult
+        analysis: analysisResult,
       };
-
     } catch (error) {
       console.error("Analysis error:", error);
-      
+
       await options.supabase
         .schema(options.schema)
-        .from('call_recordings')
+        .from("call_recordings")
         .update({
-          status: 'failed',
-          processing_error: error.message
+          status: "failed",
+          processing_error: error instanceof Error ? error.message : String(error),
         })
-        .eq('id', options.recordingId);
+        .eq("id", options.recordingId);
 
       return {
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   }
@@ -274,30 +313,35 @@ export class EnhancedMeetingProcessor {
       promptTemplate.template,
       {
         transcript,
-        date: new Date().toISOString().split('T')[0],
+        date: new Date().toISOString().split("T")[0],
         meetingType: options.meetingType,
-        duration: '45 minutes', // TODO: Calculate from recording
-        generationDate: new Date().toLocaleString()
+        duration: "45 minutes", // TODO: Calculate from recording
+        generationDate: new Date().toLocaleString(),
       }
     );
 
     // Use Gemini for specific analysis
-    const response = await this.geminiAI['genAI'].models.generateContent({
+    const response = await this.geminiAI["genAI"].models.generateContent({
       model: "gemini-1.5-flash",
-      contents: [{
-        role: "user",
-        parts: [{ text: filledPrompt }]
-      }]
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: filledPrompt }],
+        },
+      ],
     });
 
-    const responseText = response.response.text();
+    const responseText = response.text; // TODO: Fix this
 
     try {
-      return promptTemplate.outputFormat === 'json' 
-        ? JSON.parse(responseText)
-        : responseText;
+      if (promptTemplate.outputFormat === "json" && responseText) {
+        // Remove code fences and language tags
+        const cleanText = responseText.replace(/```json|```/g, '').trim();
+        return JSON.parse(cleanText || "{}");
+      }
+      return responseText;
     } catch (error) {
-      console.error("Failed to parse specific analysis:", error);
+      console.error("Failed to parse specific analysis:", error, responseText);
       return responseText; // Return raw text if JSON parsing fails
     }
   }
@@ -307,26 +351,26 @@ export class EnhancedMeetingProcessor {
    */
   private extractSpeakersMetadata(segments: SpeakerSegment[]): any {
     const speakerMap = new Map();
-    
-    segments.forEach(segment => {
+
+    segments.forEach((segment) => {
       if (!speakerMap.has(segment.speaker)) {
         speakerMap.set(segment.speaker, {
           label: segment.speaker,
           utteranceCount: 0,
           totalWords: 0,
-          estimatedTalkTime: 0
+          estimatedTalkTime: 0,
         });
       }
-      
+
       const speaker = speakerMap.get(segment.speaker);
       speaker.utteranceCount++;
-      speaker.totalWords += segment.transcription.split(' ').length;
+      speaker.totalWords += segment.transcription.split(" ").length;
       speaker.estimatedTalkTime += segment.transcription.length / 10; // rough estimate
     });
 
     return {
       totalSpeakers: speakerMap.size,
-      speakers: Array.from(speakerMap.values())
+      speakers: Array.from(speakerMap.values()),
     };
   }
 
@@ -339,18 +383,18 @@ export class EnhancedMeetingProcessor {
     options: EnhancedProcessingOptions
   ): Promise<void> {
     const speakerMap = new Map();
-    
-    segments.forEach(segment => {
+
+    segments.forEach((segment) => {
       if (!speakerMap.has(segment.speaker)) {
         speakerMap.set(segment.speaker, {
           recording_id: recordingId,
           participant_name: segment.speaker,
           speaker_label: segment.speaker,
-          role: 'participant',
-          talk_time_seconds: 0
+          role: "participant",
+          talk_time_seconds: 0,
         });
       }
-      
+
       const participant = speakerMap.get(segment.speaker);
       participant.talk_time_seconds += Math.max(
         segment.transcription.length / 10,
@@ -359,11 +403,11 @@ export class EnhancedMeetingProcessor {
     });
 
     const participants = Array.from(speakerMap.values());
-    
+
     if (participants.length > 0) {
       await options.supabase
         .schema(options.schema)
-        .from('meeting_participants')
+        .from("meeting_participants")
         .insert(participants);
     }
   }
@@ -378,49 +422,51 @@ export class EnhancedMeetingProcessor {
   ): Promise<void> {
     // Save action items
     if (analysis.actionItems && analysis.actionItems.length > 0) {
-      const actionItems = analysis.actionItems.map(item => ({
+      const actionItems = analysis.actionItems.map((item) => ({
         recording_id: recordingId,
         task_description: item.task,
         assignee_speaker_label: item.assigneeSpeakerLabel,
         priority: item.priority,
-        due_date: item.dueDate ? new Date(item.dueDate) : null
+        due_date: item.dueDate ? new Date(item.dueDate) : null,
       }));
 
       await options.supabase
         .schema(options.schema)
-        .from('meeting_action_items')
+        .from("meeting_action_items")
         .insert(actionItems);
     }
 
     // Save decisions
     if (analysis.decisions && analysis.decisions.length > 0) {
-      const decisions = analysis.decisions.map(decision => ({
+      const decisions = analysis.decisions.map((decision) => ({
         recording_id: recordingId,
         decision_text: decision.decision,
         decision_maker_speaker_label: decision.decisionMakerSpeakerLabel,
         context: decision.context,
         impact_level: decision.impact,
-        implementation_date: decision.implementationDate ? new Date(decision.implementationDate) : null
+        implementation_date: decision.implementationDate
+          ? new Date(decision.implementationDate)
+          : null,
       }));
 
       await options.supabase
         .schema(options.schema)
-        .from('meeting_decisions')
+        .from("meeting_decisions")
         .insert(decisions);
     }
 
     // Save topics
     if (analysis.topics && analysis.topics.length > 0) {
-      const topics = analysis.topics.map(topic => ({
+      const topics = analysis.topics.map((topic) => ({
         recording_id: recordingId,
         topic_name: topic.topic,
         importance_score: topic.importance,
-        speaker_labels: topic.speakers
+        speaker_labels: topic.speakers,
       }));
 
       await options.supabase
         .schema(options.schema)
-        .from('meeting_topics')
+        .from("meeting_topics")
         .insert(topics);
     }
   }
@@ -436,20 +482,39 @@ export class EnhancedMeetingProcessor {
     // Update processing queue status
     await options.supabase
       .schema(options.schema)
-      .from('processing_queue')
+      .from("processing_queue")
       .update({
-        status: 'completed',
+        status: "completed",
         completed_at: new Date().toISOString(),
-        processing_duration_ms: result.processingTime
+        processing_duration_ms: result.processingTime,
       })
-      .eq('recording_id', options.recordingId)
-      .eq('task_type', options.taskType);
+      .eq("recording_id", options.recordingId)
+      .eq("task_type", options.taskType);
 
     console.log("Enhanced data saved successfully");
   }
 }
 
+function getGcsService() {
+  const gcsKeyRaw = Deno.env.get("GCS_JSON_KEY");
+  const bucketName = Deno.env.get("GCS_BUCKET_NAME");
+  if (!gcsKeyRaw || !bucketName) {
+    throw new Error(
+      "GCS storage not configured. Please set GCS_JSON_KEY and GCS_BUCKET_NAME in environment variables."
+    );
+  }
+  let credentials;
+  try {
+    credentials = JSON.parse(gcsKeyRaw);
+  } catch (e: any) {
+    throw new Error("Invalid GCS_JSON_KEY: " + (e?.message || e));
+  }
+  return new GoogleCloudStorageService({ bucketName, credentials });
+}
+
 // Export the enhanced processor
-export function createEnhancedProcessor(googleApiKey: string): EnhancedMeetingProcessor {
+export function createEnhancedProcessor(
+  googleApiKey: string
+): EnhancedMeetingProcessor {
   return new EnhancedMeetingProcessor(googleApiKey);
 }

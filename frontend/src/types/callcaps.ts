@@ -15,8 +15,8 @@ export interface CallRecording {
     speaker: string;
     transcription: string;
   }[];
-  s3Key: string;
-  transcriptS3Key: string | null;
+  s3_key: string;
+  transcript_s3_key: string | null;
   sharing_link?: string;
   webRecording?: WebRecording;
   isShared?: boolean;
@@ -26,6 +26,29 @@ export interface CallRecording {
     permissionLevel?: 'view' | 'edit' | 'admin';
     expiresAt?: string;
   };
+  ai_analysis?: any;
+  ai_summary?: string;
+  action_items?: any[];
+  key_topics?: string[];
+  risk_analysis?: any[];
+  sentiment?: string;
+  word_count?: number;
+  created_at?: string;
+  updated_at?: string;
+  processed_at?: string;
+  processing_error?: string;
+  meeting_type?: string;
+  participant_count?: number;
+  action_item_count?: number;
+  decision_count?: number;
+  topic_count?: number;
+  meeting_duration_minutes?: number;
+  member_name?: string;
+  speakers_metadata?: any;
+  gcs_video_url?: string;
+  gcs_video_blob_name?: string;
+  start_time?: string;
+  videoUrl?: string;
 }
 
 export interface CallTranscript {

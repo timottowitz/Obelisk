@@ -6,7 +6,7 @@
 
 import { Metadata } from 'next';
 import { Suspense } from 'react';
-import { PageContainer } from '@/components/layout/page-container';
+import PageContainer from '@/components/layout/page-container';
 import { Heading } from '@/components/ui/heading';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 export default function MeetingsPage() {
   return (
     <PageContainer scrollable>
-      <div className="space-y-4">
+      <div className="w-full space-y-4">
         {/* Header Section */}
         <div className="flex items-center justify-between space-y-2">
           <Heading
@@ -53,35 +53,35 @@ export default function MeetingsPage() {
 
           {/* All Recordings Tab */}
           <TabsContent value="all" className="space-y-4">
-            <Suspense fallback={<DataTableSkeleton />}>
+            <Suspense fallback={<DataTableSkeleton columnCount={10} />}>
               <MeetingDataTable meetingType="all" />
             </Suspense>
           </TabsContent>
 
           {/* Meetings Only Tab */}
           <TabsContent value="meetings" className="space-y-4">
-            <Suspense fallback={<DataTableSkeleton />}>
+            <Suspense fallback={<DataTableSkeleton columnCount={10} />}>
               <MeetingDataTable meetingType="meeting" />
             </Suspense>
           </TabsContent>
 
           {/* Legal Calls Tab (Backward Compatibility) */}
           <TabsContent value="calls" className="space-y-4">
-            <Suspense fallback={<DataTableSkeleton />}>
+            <Suspense fallback={<DataTableSkeleton columnCount={10} />}>
               <MeetingDataTable meetingType="call" />
             </Suspense>
           </TabsContent>
 
           {/* Interviews Tab */}
           <TabsContent value="interviews" className="space-y-4">
-            <Suspense fallback={<DataTableSkeleton />}>
+            <Suspense fallback={<DataTableSkeleton columnCount={10} />}>
               <MeetingDataTable meetingType="interview" />
             </Suspense>
           </TabsContent>
 
           {/* Consultations Tab */}
           <TabsContent value="consultations" className="space-y-4">
-            <Suspense fallback={<DataTableSkeleton />}>
+            <Suspense fallback={<DataTableSkeleton columnCount={10} />}>
               <MeetingDataTable meetingType="consultation" />
             </Suspense>
           </TabsContent>

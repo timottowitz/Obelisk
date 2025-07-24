@@ -122,18 +122,23 @@ export class GeminiMeetingIntelligence {
       ],
     });
 
-    const responseText = response.response.text();
+    const responseText = response.text ?? "";
     console.log("Gemini transcription response:", responseText);
 
+    // Remove code fences and language tags if present (e.g., ```json ... ```)
+    const cleanedText = responseText.replace(/```json|```/g, '').trim();
+
     try {
-      const segments: SpeakerSegment[] = JSON.parse(responseText);
+      const segments: SpeakerSegment[] = JSON.parse(cleanedText);
       const fullTranscript = segments
         .map(segment => `${segment.speaker}: ${segment.transcription}`)
         .join('\n');
 
+      console.log("fullTranscript", fullTranscript);
+
       return { segments, fullTranscript };
     } catch (error) {
-      console.error("Failed to parse Gemini response:", error);
+      console.error("Failed to parse Gemini response:", error, cleanedText);
       throw new Error("Failed to parse transcription response");
     }
   }
@@ -160,11 +165,13 @@ export class GeminiMeetingIntelligence {
       ],
     });
 
-    const responseText = response.response.text();
+    const responseText = response.text ?? "";
     console.log("Gemini analysis response:", responseText);
 
+    const cleanedText = responseText.replace(/```json|```/g, '').trim();
+
     try {
-      const analysis: MeetingAnalysisResult = JSON.parse(responseText);
+      const analysis: MeetingAnalysisResult = JSON.parse(cleanedText);
       
       // Calculate participant talk times from segments
       analysis.participants = this.calculateParticipantMetrics(segments);
@@ -248,52 +255,52 @@ Requirements:
   private getMeetingAnalysisPrompt(meetingType: string, transcript: string): string {
     const basePrompt = `Analyze this ${meetingType} transcript and extract actionable intelligence.
 
-CRITICAL: Respond ONLY with valid JSON matching this exact structure:
+      CRITICAL: Respond ONLY with valid JSON matching this exact structure:
 
-{
-  "participants": [
-    {
-      "speakerLabel": "Speaker A",
-      "participantName": "Estimated or mentioned name",
-      "role": "host|participant|presenter|observer",
-      "talkTimeSeconds": estimated_seconds_speaking
-    }
-  ],
-  "actionItems": [
-    {
-      "task": "Specific actionable task",
-      "assignee": "Person responsible (if mentioned)",
-      "assigneeSpeakerLabel": "Speaker label of assignee",
-      "dueDate": "Due date if mentioned",
-      "priority": "low|medium|high|urgent",
-      "context": "Context around the task"
-    }
-  ],
-  "decisions": [
-    {
-      "decision": "Decision made",
-      "decisionMaker": "Person who decided",
-      "decisionMakerSpeakerLabel": "Speaker label",
-      "context": "Context of decision",
-      "impact": "low|medium|high",
-      "implementationDate": "When to implement if mentioned"
-    }
-  ],
-  "topics": [
-    {
-      "topic": "Main topic discussed",
-      "speakers": ["Speaker A", "Speaker B"],
-      "importance": 0.8,
-      "keyPoints": ["Key point 1", "Key point 2"]
-    }
-  ],
-  "summary": "Concise 2-3 sentence summary of the ${meetingType}",
-  "keyTakeaways": ["Main takeaway 1", "Main takeaway 2"],
-  "sentiment": "positive|neutral|negative"
-}
+      {
+        "participants": [
+          {
+            "speakerLabel": "Speaker A",
+            "participantName": "Estimated or mentioned name",
+            "role": "host|participant|presenter|observer",
+            "talkTimeSeconds": estimated_seconds_speaking
+          }
+        ],
+        "actionItems": [
+          {
+            "task": "Specific actionable task",
+            "assignee": "Person responsible (if mentioned)",
+            "assigneeSpeakerLabel": "Speaker label of assignee",
+            "dueDate": "Due date if mentioned",
+            "priority": "low|medium|high|urgent",
+            "context": "Context around the task"
+          }
+        ],
+        "decisions": [
+          {
+            "decision": "Decision made",
+            "decisionMaker": "Person who decided",
+            "decisionMakerSpeakerLabel": "Speaker label",
+            "context": "Context of decision",
+            "impact": "low|medium|high",
+            "implementationDate": "When to implement if mentioned"
+          }
+        ],
+        "topics": [
+          {
+            "topic": "Main topic discussed",
+            "speakers": ["Speaker A", "Speaker B"],
+            "importance": 0.8,
+            "keyPoints": ["Key point 1", "Key point 2"]
+          }
+        ],
+        "summary": "Concise 2-3 sentence summary of the ${meetingType}",
+        "keyTakeaways": ["Main takeaway 1", "Main takeaway 2"],
+        "sentiment": "positive|neutral|negative"
+      }
 
-TRANSCRIPT:
-${transcript}`;
+      TRANSCRIPT:
+      ${transcript}`;
 
     return basePrompt;
   }

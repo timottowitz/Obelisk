@@ -1,4 +1,13 @@
-import { CallRecording, CallTranscript, OrganizationMember, RecordingShare, ShareRecordingRequest, RecordingShareInfo, AccessibleRecordingsResponse, AccessibleRecordingsFilters } from '@/types/callcaps';
+import {
+  CallRecording,
+  CallTranscript,
+  OrganizationMember,
+  RecordingShare,
+  ShareRecordingRequest,
+  RecordingShareInfo,
+  AccessibleRecordingsResponse,
+  AccessibleRecordingsFilters
+} from '@/types/callcaps';
 import { API_CONFIG, getAuthHeaders, handleApiResponse } from '@/config/api';
 
 // API Configuration
@@ -56,10 +65,10 @@ export interface ListRecordingsResponse {
   offset: number;
 }
 
-
-
 export interface ProcessRecordingRequest {
   taskType?: 'transcribe' | 'analyze' | 'all';
+  meetingType?: 'meeting' | 'call' | 'interview' | 'consultation';
+  analysisType?: string;
 }
 
 export interface ErrorResponse {
@@ -70,16 +79,18 @@ export interface ErrorResponse {
 // API Service Class
 export class CallRecordingsAPI {
   // List Recordings
-  static async listRecordings(params: {
-    limit?: number;
-    offset?: number;
-    orderBy?: string;
-    orderDirection?: 'asc' | 'desc';
-    search?: string;
-    status?: string;
-    startDate?: string;
-    endDate?: string;
-  } = {}): Promise<ListRecordingsResponse> {
+  static async listRecordings(
+    params: {
+      limit?: number;
+      offset?: number;
+      orderBy?: string;
+      orderDirection?: 'asc' | 'desc';
+      search?: string;
+      status?: string;
+      startDate?: string;
+      endDate?: string;
+    } = {}
+  ): Promise<ListRecordingsResponse> {
     const searchParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
@@ -94,14 +105,14 @@ export class CallRecordingsAPI {
   }
 
   // Get Single Recording
-  static async getRecording(recordingId: string): Promise<{ recording: Recording }> {
+  static async getRecording(
+    recordingId: string
+  ): Promise<{ recording: Recording }> {
     const url = `${API_BASE_URL}/${recordingId}`;
     const headers = await getAuthHeaders();
     const response = await fetch(url, { headers });
     return handleApiResponse<{ recording: Recording }>(response);
   }
-
-
 
   // Upload Recording with FormData (for large files)
   static async uploadRecordingFile(
@@ -127,7 +138,7 @@ export class CallRecordingsAPI {
     };
   }> {
     const headers = await getAuthHeaders();
-    
+
     // Create new headers without Content-Type for FormData
     const uploadHeaders: Record<string, string> = {};
     if (typeof headers === 'object' && headers !== null) {
@@ -137,24 +148,28 @@ export class CallRecordingsAPI {
         }
       });
     }
-    
+
     const formData = new FormData();
     formData.append('file', blob, 'recording.webm');
     formData.append('metadata', JSON.stringify(metadata));
-    
+
     const response = await fetch(`${API_BASE_URL}/upload`, {
       method: 'POST',
       headers: uploadHeaders,
       body: formData
     });
-    
+
     return handleApiResponse(response);
   }
 
   // Process Recording
   static async processRecording(
-    recordingId: string, 
-    data: ProcessRecordingRequest = { taskType: 'all' }
+    recordingId: string,
+    data: ProcessRecordingRequest = {
+      taskType: 'all',
+      meetingType: 'call',
+      analysisType: 'meeting'
+    }
   ): Promise<{
     success: boolean;
     recording: {
@@ -176,12 +191,10 @@ export class CallRecordingsAPI {
     return handleApiResponse(response);
   }
 
-
-
-
-
   // Get Organization Members
-  static async getOrganizationMembers(): Promise<{ members: OrganizationMember[] }> {
+  static async getOrganizationMembers(): Promise<{
+    members: OrganizationMember[];
+  }> {
     const headers = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/organization-members`, {
       headers
@@ -190,7 +203,9 @@ export class CallRecordingsAPI {
   }
 
   // Get all accessible recordings for current user (owned + shared)
-  static async getAccessibleRecordings(params: AccessibleRecordingsFilters = {}): Promise<AccessibleRecordingsResponse> {
+  static async getAccessibleRecordings(
+    params: AccessibleRecordingsFilters = {}
+  ): Promise<AccessibleRecordingsResponse> {
     const searchParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
@@ -201,7 +216,7 @@ export class CallRecordingsAPI {
     const url = `${API_BASE_URL}/accessible?${searchParams.toString()}`;
     const headers = await getAuthHeaders();
     const response = await fetch(url, { headers });
-    const data = await handleApiResponse(response) as {
+    const data = (await handleApiResponse(response)) as {
       recordings: Recording[];
       summary: {
         total: number;
@@ -224,12 +239,12 @@ export class CallRecordingsAPI {
         accessType?: string;
       };
     };
-    
+
     // Convert API recordings to CallRecording format
-    const convertedRecordings = data.recordings.map((recording: Recording) => 
+    const convertedRecordings = data.recordings.map((recording: Recording) =>
       this.convertToCallRecording(recording)
     );
-    
+
     return {
       recordings: convertedRecordings,
       summary: data.summary,
@@ -240,7 +255,7 @@ export class CallRecordingsAPI {
 
   // Share Recording
   static async shareRecording(
-    recordingId: string, 
+    recordingId: string,
     shareData: ShareRecordingRequest
   ): Promise<{
     success: boolean;
@@ -257,7 +272,9 @@ export class CallRecordingsAPI {
   }
 
   // Get Recording Shares
-  static async getRecordingShares(recordingId: string): Promise<RecordingShareInfo> {
+  static async getRecordingShares(
+    recordingId: string
+  ): Promise<RecordingShareInfo> {
     const headers = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/${recordingId}/shares`, {
       headers
@@ -267,37 +284,46 @@ export class CallRecordingsAPI {
 
   // Remove Recording Share
   static async removeRecordingShare(
-    recordingId: string, 
+    recordingId: string,
     memberId: string
   ): Promise<{
     success: boolean;
     message: string;
   }> {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/${recordingId}/share/${memberId}`, {
-      method: 'DELETE',
-      headers
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/${recordingId}/share/${memberId}`,
+      {
+        method: 'DELETE',
+        headers
+      }
+    );
     return handleApiResponse(response);
   }
 
   // Helper: Convert API Recording to CallRecording type
   static convertToCallRecording(apiRecording: Recording): CallRecording {
     // Convert API transcript to CallTranscript type
-    const transcript: CallTranscript | null = apiRecording.transcript ? {
-      summary: apiRecording.transcript.summary,
-      actionItems: apiRecording.transcript.actionItems || [],
-      keyTopics: apiRecording.transcript.keyTopics || [],
-      sentiment: (apiRecording.transcript.sentiment as 'positive' | 'negative' | 'neutral') || 'neutral',
-      wordCount: apiRecording.transcript.wordCount || 0
-    } : null;
+    const transcript: CallTranscript | null = apiRecording.transcript
+      ? {
+          summary: apiRecording.transcript.summary,
+          actionItems: apiRecording.transcript.actionItems || [],
+          keyTopics: apiRecording.transcript.keyTopics || [],
+          sentiment:
+            (apiRecording.transcript.sentiment as
+              | 'positive'
+              | 'negative'
+              | 'neutral') || 'neutral',
+          wordCount: apiRecording.transcript.wordCount || 0
+        }
+      : null;
 
     // Convert status to match CallRecording type
-    const status: 'processed' | 'processing' | 'failed' = 
-      apiRecording.status === 'uploading' || apiRecording.status === 'uploaded' 
-        ? 'processing' 
-        : apiRecording.status === 'processed' 
-          ? 'processed' 
+    const status: 'processed' | 'processing' | 'failed' =
+      apiRecording.status === 'uploading' || apiRecording.status === 'uploaded'
+        ? 'processing'
+        : apiRecording.status === 'processed'
+          ? 'processed'
           : 'failed';
 
     return {
@@ -315,17 +341,41 @@ export class CallRecordingsAPI {
       s3Key: apiRecording.gcs_video_blob_name || '',
       transcriptS3Key: apiRecording.gcs_transcript_blob_name || null,
       sharing_link: apiRecording.gcs_video_url,
-      isShared: (apiRecording as any).is_shared,
-      accessType: (apiRecording as any).access_type || 'owner',
-      shareInfo: (apiRecording as any).access_type === 'shared' ? {
-        sharedBy: (apiRecording as any).shared_by_member_id,
-        permissionLevel: (apiRecording as any).permission_level,
-        expiresAt: (apiRecording as any).share_expires_at,
-      } : undefined,
-      transcript_text: apiRecording.transcript_text || '',
-      transcript_segments: apiRecording.transcript_segments || [],
+      isShared: apiRecording.is_shared,
+      accessType: apiRecording.access_type || 'owner',
+      shareInfo:
+        apiRecording.access_type === 'shared'
+          ? {
+              sharedBy: apiRecording.shared_by_member_id,
+              permissionLevel: apiRecording.permission_level,
+              expiresAt: apiRecording.share_expires_at
+            }
+          : undefined,
+      transcriptText: apiRecording.transcript_text || '',
+      transcriptSegments: apiRecording.transcript_segments || [],
+      aiAnalysis: apiRecording.ai_analysis,
+      aiSummary: apiRecording.ai_summary,
+      actionItems: apiRecording.action_items,
+      keyTopics: apiRecording.key_topics,
+      riskAnalysis: apiRecording.risk_analysis,
+      sentiment: apiRecording.sentiment,
+      wordCount: apiRecording.word_count,
+      createdAt: apiRecording.created_at,
+      updatedAt: apiRecording.updated_at,
+      processedAt: apiRecording.processed_at,
+      processingError: apiRecording.processing_error,
+      meetingType: apiRecording.meeting_type,
+      participantCount: apiRecording.participant_count,
+      actionItemCount: apiRecording.action_item_count,
+      decisionCount: apiRecording.decision_count,
+      topicCount: apiRecording.topic_count,
+      meetingDurationMinutes: apiRecording.meeting_duration_minutes,
+      memberName: apiRecording.member_name,
+      speakersMetadata: apiRecording.speakers_metadata,
+      gcsVideoUrl: apiRecording.gcs_video_url,
+      // Add any other fields as needed
     };
   }
 }
 
-export const callRecordingsAPI = new CallRecordingsAPI(); 
+export const callRecordingsAPI = new CallRecordingsAPI();
