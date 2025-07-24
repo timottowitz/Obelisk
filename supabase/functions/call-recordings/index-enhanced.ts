@@ -295,7 +295,7 @@ app.get("/call-recordings", async (c) => {
 
     // Parse query params for pagination, search, and filters
     const url = new URL(c.req.url);
-    const limit = parseInt(url.searchParams.get("limit") || "20");
+    const limit = parseInt(url.searchParams.get("limit") || "10");
     const offset = parseInt(url.searchParams.get("offset") || "0");
     const orderBy = url.searchParams.get("orderBy") || "start_time";
     const orderDirection = (url.searchParams.get("orderDirection") || "desc") as "asc" | "desc";

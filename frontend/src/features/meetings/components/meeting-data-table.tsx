@@ -44,6 +44,10 @@ export function MeetingDataTable({ meetingType }: MeetingDataTableProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
 
+  // Get initial pagination from URL parameters
+  const initialPage = parseInt(searchParams.get('page') || '1', 10);
+  const initialPerPage = parseInt(searchParams.get('perPage') || '10', 10);
+
   // Extend existing call recordings hook to support meeting types
   const {
     recordings: meetings,
@@ -59,7 +63,9 @@ export function MeetingDataTable({ meetingType }: MeetingDataTableProps) {
     setFilters
   } = useCallRecordings({
     meetingType: meetingType === 'all' ? undefined : meetingType,
-    enhanced: true // Flag to get enhanced meeting data
+    enhanced: true, // Flag to get enhanced meeting data
+    limit: initialPerPage, // Use URL-based pagination
+    offset: (initialPage - 1) * initialPerPage // Calculate offset from URL
   });
 
   // State for enhanced filters
@@ -87,39 +93,26 @@ export function MeetingDataTable({ meetingType }: MeetingDataTableProps) {
     columns: meetingColumns(
       handleViewDetails
     ) as ColumnDef<EnhancedCallRecording>[],
-    pageCount: Math.ceil((totalCount || 0) / (pagination.limit || 20)),
+    pageCount: Math.ceil((totalCount || 0) / initialPerPage),
     initialState: {
       pagination: {
-        pageIndex: (pagination.page || 1) - 1,
-        pageSize: pagination.limit || 20
+        pageIndex: initialPage - 1,
+        pageSize: initialPerPage
       }
     }
   });
 
-  // Sync table pagination with API pagination
+  // Sync URL-based pagination with API calls
   useEffect(() => {
-    table.setOptions((prev) => ({
-      ...prev,
-      onPaginationChange: (updater) => {
-        let pageIndex, pageSize;
-        if (typeof updater === 'function') {
-          const newState = updater({
-            pageIndex: (pagination.page || 1) - 1,
-            pageSize: pagination.limit || 20
-          });
-          pageIndex = newState.pageIndex;
-          pageSize = newState.pageSize;
-        } else {
-          pageIndex = updater.pageIndex;
-          pageSize = updater.pageSize;
-        }
-        setPagination({
-          page: pageIndex + 1,
-          limit: pageSize
-        });
-      }
-    }));
-  }, [table, setPagination, pagination.page, pagination.limit]);
+    const urlPage = parseInt(searchParams.get('page') || '1', 10);
+    const urlPerPage = parseInt(searchParams.get('perPage') || '10', 10);
+    
+    // Update useCallRecordings pagination when URL changes
+    setPagination({
+      page: urlPage,
+      limit: urlPerPage
+    });
+  }, [searchParams, setPagination]);
 
   // Meeting type badge configuration
   const getMeetingTypeBadge = (type: string) => {
