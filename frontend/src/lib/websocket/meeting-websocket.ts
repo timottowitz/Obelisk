@@ -6,7 +6,7 @@
 
 'use client';
 
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 
 export interface MeetingWebSocketEvent {
   type: 'meeting_started' | 'meeting_ended' | 'participant_joined' | 'participant_left' | 
@@ -198,43 +198,23 @@ class MeetingWebSocketClient {
   private showNotificationIfNeeded(event: MeetingWebSocketEvent): void {
     switch (event.type) {
       case 'meeting_started':
-        toast({
-          title: 'Meeting Started',
-          description: `${event.data.title} has begun`,
-          duration: 5000,
-        });
+        toast.success(`Meeting Started: ${event.data.title} has begun`);
         break;
 
       case 'meeting_ended':
-        toast({
-          title: 'Meeting Ended',
-          description: `${event.data.title} has concluded`,
-          duration: 5000,
-        });
+        toast.info(`Meeting Ended: ${event.data.title} has concluded`);
         break;
 
       case 'ai_analysis_complete':
-        toast({
-          title: 'AI Analysis Complete',
-          description: `Analysis ready for ${event.data.title}`,
-          duration: 5000,
-        });
+        toast.success(`AI Analysis Complete: Analysis ready for ${event.data.title}`);
         break;
 
       case 'action_item_created':
-        toast({
-          title: 'New Action Item',
-          description: `"${event.data.task_description}" assigned`,
-          duration: 5000,
-        });
+        toast.info(`New Action Item: "${event.data.task_description}" assigned`);
         break;
 
       case 'processing_complete':
-        toast({
-          title: 'Processing Complete',
-          description: `${event.data.title} is ready for review`,
-          duration: 5000,
-        });
+        toast.success(`Processing Complete: ${event.data.title} is ready for review`);
         break;
     }
   }

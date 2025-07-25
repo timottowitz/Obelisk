@@ -422,7 +422,7 @@ export function MeetingTypesManagementModal({
                   <p className="text-xs text-muted-foreground mt-1">
                     Define how the AI should analyze meetings of this type. The base output structure is provided automatically - 
                     focus on specific analysis requirements, key areas to emphasize, and unique aspects of this meeting type.
-                    For example: "Focus on legal compliance issues and client concerns" or "Emphasize sales progression and next steps".
+                    For example: &quot;Focus on legal compliance issues and client concerns&quot; or &quot;Emphasize sales progression and next steps&quot;.
                   </p>
                   
                   <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
@@ -433,8 +433,8 @@ export function MeetingTypesManagementModal({
                         <ul className="space-y-1 list-disc list-inside">
                           <li>The system provides a standard output format (summary, action items, participants, etc.)</li>
                           <li>Your custom instructions tell the AI what to focus on for this specific meeting type</li>
-                          <li>Think of it as "special instructions" rather than defining the entire output structure</li>
-                          <li>Examples: "Prioritize compliance risks", "Track sales objections", "Monitor team blockers"</li>
+                          <li>Think of it as &quot;special instructions&quot; rather than defining the entire output structure</li>
+                          <li>Examples: &quot;Prioritize compliance risks&quot;, &quot;Track sales objections&quot;, &quot;Monitor team blockers&quot;</li>
                         </ul>
                       </div>
                     </div>

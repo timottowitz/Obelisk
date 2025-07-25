@@ -145,7 +145,7 @@ export function RecordingProcessModal({
               </Select>
               {meetingTypes.length === 0 && !loading && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  No meeting types found. Click "Manage" to create one.
+                  No meeting types found. Click &quot;Manage&quot; to create one.
                 </p>
               )}
             </div>

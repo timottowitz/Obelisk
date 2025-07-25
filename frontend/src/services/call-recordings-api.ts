@@ -336,37 +336,26 @@ export class CallRecordingsAPI {
       hasAudio: apiRecording.has_audio,
       transcript,
       sharing_link: apiRecording.gcs_video_url,
-      shareInfo:
-        apiRecording.access_type === 'shared'
-          ? {
-              sharedBy: apiRecording.shared_by_member_id,
-              permissionLevel: apiRecording.permission_level,
-              expiresAt: apiRecording.share_expires_at
-            }
-          : undefined,
-      transcriptText: apiRecording.transcript_text || '',
-      transcriptSegments: apiRecording.transcript_segments || [],
-      aiAnalysis: apiRecording.ai_analysis,
-      aiSummary: apiRecording.ai_summary,
-      actionItems: apiRecording.action_items,
-      keyTopics: apiRecording.key_topics,
-      riskAnalysis: apiRecording.risk_analysis,
+      shareInfo: undefined, // Sharing functionality not implemented
+      transcript_text: apiRecording.transcript_text || '',
+      transcript_segments: apiRecording.transcript_segments || [],
+      ai_analysis: apiRecording.ai_analysis,
+      ai_summary: apiRecording.ai_summary,
+      action_items: apiRecording.action_items,
+      key_topics: apiRecording.key_topics,
+      risk_analysis: apiRecording.risk_analysis,
       sentiment: apiRecording.sentiment,
-      wordCount: apiRecording.word_count,
-      createdAt: apiRecording.created_at,
-      updatedAt: apiRecording.updated_at,
-      processedAt: apiRecording.processed_at,
-      processingError: apiRecording.processing_error,
-      meetingType: apiRecording.meeting_type,
-      participantCount: apiRecording.participant_count,
-      actionItemCount: apiRecording.action_item_count,
-      decisionCount: apiRecording.decision_count,
-      topicCount: apiRecording.topic_count,
-      meetingDurationMinutes: apiRecording.meeting_duration_minutes,
-      memberName: apiRecording.member_name,
-      speakersMetadata: apiRecording.speakers_metadata,
-      gcsVideoUrl: apiRecording.gcs_video_url,
-      // Add any other fields as needed
+      word_count: apiRecording.word_count,
+      created_at: apiRecording.created_at,
+      updated_at: apiRecording.updated_at,
+      processed_at: apiRecording.processed_at,
+      processing_error: apiRecording.processing_error,
+      // Add missing properties with fallback values
+      s3_key: apiRecording.gcs_video_blob_name || '',
+      transcript_s3_key: apiRecording.gcs_transcript_blob_name || null,
+      gcs_video_url: apiRecording.gcs_video_url,
+      start_time: apiRecording.start_time,
+      // Add other fields as needed
     };
   }
 }

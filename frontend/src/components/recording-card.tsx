@@ -90,7 +90,7 @@ const RecordingCard = ({
     e.preventDefault();
     e.stopPropagation();
 
-    if (!recording.s3Key) {
+    if (!recording.s3_key) {
       console.log('No video URL available for recording');
       return;
     }
@@ -100,7 +100,7 @@ const RecordingCard = ({
 
     console.log('=== Starting video load process ===');
     console.log('Recording ID:', recording.id);
-    console.log('Recording s3Key:', recording.s3Key);
+    console.log('Recording s3_key:', recording.s3_key);
     console.log('Proxy URL:', proxyUrl);
 
     try {

@@ -285,7 +285,7 @@ export function useLiveMeetingUpdates(meetingId: string) {
         break;
 
       case 'meeting_status_changed':
-        setMeetingData(prev => ({
+        setMeetingData((prev: any) => ({
           ...prev,
           status: event.data.status
         }));
