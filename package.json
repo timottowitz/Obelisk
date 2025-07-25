@@ -2,6 +2,12 @@
   "scripts": {
     "migrate": "tsx scripts/inAppMigrationRunner.ts all-tenants",
     "upload-migrations": "tsx scripts/uploadTenantMigrationsToDb.ts",
+    "meeting-intelligence:migrate": "tsx scripts/runMeetingIntelligenceMigrations.ts migrate",
+    "meeting-intelligence:validate": "tsx scripts/runMeetingIntelligenceMigrations.ts validate", 
+    "meeting-intelligence:rollback": "tsx scripts/runMeetingIntelligenceMigrations.ts rollback",
+    "meeting-intelligence:rollback-confirm": "tsx scripts/runMeetingIntelligenceMigrations.ts rollback-confirm",
+    "meeting-intelligence:test": "tsx scripts/testMeetingIntelligenceIntegration.ts",
+    "meeting-intelligence:validate-integration": "tsx scripts/validateMeetingIntelligenceIntegration.ts",
     "start": "cd frontend && npm start",
     "build": "cd frontend && npm run build",
     "dev": "cd frontend && npm run dev"

@@ -9,7 +9,7 @@ import { Hono } from "jsr:@hono/hono";
 import { cors } from "jsr:@hono/hono/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
 import { extractUserAndOrgId } from "../_shared/index.ts";
-import { GoogleCloudStorageService } from "../_shared/google-storage.ts";
+import { GeminiMeetingIntelligence } from "./gemini-meeting-intelligence.ts";
 import {
   GoogleGenAI,
   createUserContent,
@@ -199,6 +199,8 @@ app.use("/call-recordings/:id/shares", extractUserAndOrgId);
 app.use("/call-recordings/upload", extractUserAndOrgId);
 app.use("/call-recordings/organization-members", extractUserAndOrgId);
 app.use("/call-recordings/accessible", extractUserAndOrgId);
+app.use("/call-recordings/meeting-types", extractUserAndOrgId);
+app.use("/call-recordings/meeting-types/:id", extractUserAndOrgId);
 
 app.options("*", (c) => {
   return c.text("", 200);
@@ -404,6 +406,7 @@ app.post("/call-recordings", async (c) => {
       endTime,
       title,
       participants,
+      meetingTypeId
     } = body;
 
     if (!recordingBlob || !mimeType || !duration || !startTime || !title) {
@@ -434,6 +437,7 @@ app.post("/call-recordings", async (c) => {
         status: "uploading",
         has_video: true,
         has_audio: true,
+        meeting_type_id: meetingTypeId,
       })
       .select()
       .single();
@@ -608,7 +612,7 @@ app.post("/call-recordings/upload", async (c) => {
       );
     }
 
-    const { mimeType, duration, startTime, endTime, title, participants } =
+    const { mimeType, duration, startTime, endTime, title, participants, meetingTypeId } =
       metadata;
 
     if (!mimeType || !duration || !startTime || !title) {
@@ -640,6 +644,7 @@ app.post("/call-recordings/upload", async (c) => {
         status: "uploading",
         has_video: true,
         has_audio: true,
+        meeting_type_id: meetingTypeId,
       })
       .select()
       .single();
@@ -794,15 +799,11 @@ app.post("/call-recordings/:id/process", async (c) => {
       return c.json({ error: "Recording ID required" }, 400);
     }
 
-    // Parse request body
-    const body = await c.req.json();
-    const { taskType = "all" } = body;
-
     const recordingsTable = `call_recordings`;
     const settingsTable = `user_settings`;
     const queueTable = `processing_queue`;
 
-    // Get recording details
+    // Get recording details including processing preferences
     const { data: recording, error: recordingError } = await supabase
       .schema(schema)
       .from(recordingsTable)
@@ -814,6 +815,9 @@ app.post("/call-recordings/:id/process", async (c) => {
     if (recordingError || !recording) {
       return c.json({ error: "Recording not found" }, 404);
     }
+
+    // Extract processing configuration from the recording
+    const meetingTypeId = recording.meeting_type_id;
 
     // Get user settings for API keys, fallback to environment variables
     const { data: settings, error: settingsError } = await supabase
@@ -852,7 +856,7 @@ app.post("/call-recordings/:id/process", async (c) => {
       );
     }
 
-    // Update recording status
+    // Update recording status to processing
     await supabase
       .schema(schema)
       .from(recordingsTable)
@@ -864,10 +868,7 @@ app.post("/call-recordings/:id/process", async (c) => {
       let transcriptSegments = recording.transcript_segments;
 
       // Step 1: Transcribe if needed
-      if (
-        (taskType === "transcribe" || taskType === "all") &&
-        !transcriptText
-      ) {
+      if (!transcriptText) {
         console.log("Starting transcription...");
 
         const gcsService = getGcsService();
@@ -974,91 +975,45 @@ Do not include any commentary, explanation, or markdown formatting. The output m
 
       // Step 2: Analyze transcript if needed
       let analysis = recording.ai_analysis;
-      if (
-        (taskType === "analyze" || taskType === "all") &&
-        transcriptText &&
-        !analysis
-      ) {
+      if (transcriptText && !analysis) {
         console.log("Starting AI analysis...");
 
-        const systemPrompt =
-          settings?.custom_prompts?.analysis ||
-          `You are an AI assistant that analyzes meeting recordings and call transcripts for legal professionals. 
-        Provide a structured analysis including:
-        1. Executive summary
-        2. Key points and decisions
-        3. Action items with clear ownership
-        4. Risk analysis and compliance notes
-        5. Follow-up tasks
+        // Get meeting type system prompt and output format if meetingTypeId is available
+        let systemPrompt;
+        let outputFormat = "json";
         
-        IMPORTANT: Return ONLY a valid JSON object. Do not wrap your response in markdown code blocks or any other formatting. Your response should start with { and end with }.
-        
-        Use exactly this JSON structure:
-        {
-          "summary": "Brief executive summary",
-          "keyPoints": ["point 1", "point 2"],
-          "actionItems": [{"task": "task description", "assignee": "person", "dueDate": "date"}],
-          "decisions": ["decision 1", "decision 2"],
-          "risks": [{"risk": "description", "severity": "high/medium/low", "mitigation": "steps"}],
-          "compliance": ["note 1", "note 2"],
-          "followUp": ["task 1", "task 2"],
-          "sentiment": "positive|neutral|negative",
-          "topics": ["topic 1", "topic 2"]
-        }`;
-
-        // Call OpenAI GPT for analysis
-        const gptResponse = await fetch(
-          "https://api.openai.com/v1/chat/completions",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: settings?.ai_model || "gpt-4o-mini",
-              messages: [
-                {
-                  role: "system",
-                  content: systemPrompt,
-                },
-                {
-                  role: "user",
-                  content: `Please analyze this legal meeting transcript:\n\n${transcriptText}`,
-                },
-              ],
-              temperature: settings?.temperature || 0.3,
-              max_tokens: 2000,
-            }),
+        if (meetingTypeId) {
+          const { data: meetingTypeData, error: meetingTypeError } = await supabase
+            .schema(schema)
+            .rpc('get_meeting_type_prompt', { meeting_type_id_param: meetingTypeId });
+          
+          if (!meetingTypeError && meetingTypeData && meetingTypeData.length > 0) {
+            systemPrompt = meetingTypeData[0].system_prompt;
+            outputFormat = meetingTypeData[0].output_format || "json";
+            console.log("Using custom meeting type prompt for:", meetingTypeData[0].display_name);
+          } else {
+            return c.json({ error: "Meeting type not found or inactive" }, 400);
           }
-        );
-
-        if (!gptResponse.ok) {
-          const error = await gptResponse.text();
-          throw new Error(`GPT API error: ${error}`);
+        } else {
+          // If no meeting type provided, return error
+          return c.json({ error: "Meeting type is required. Please create and select a meeting type to process this recording." }, 400);
         }
 
-        const gptResult = await gptResponse.json();
-        const analysisText = gptResult.choices[0].message.content;
-
+        // Use Gemini Meeting Intelligence for analysis with custom prompt
+        const geminiIntelligence = new GeminiMeetingIntelligence(googleApiKey);
+        
         try {
-          analysis = JSON.parse(analysisText);
-        } catch (parseError) {
-          console.error("JSON parsing error:", parseError);
-          console.error("Raw analysis text:", analysisText);
-
-          // Fallback if JSON parsing fails
-          analysis = {
-            summary: analysisText,
-            keyPoints: [],
-            actionItems: [],
-            decisions: [],
-            risks: [],
-            compliance: [],
-            followUp: [],
-            sentiment: "neutral",
-            topics: [],
-          };
+          analysis = await geminiIntelligence.analyzeWithCustomPrompt(
+            transcriptText,
+            transcriptSegments || [],
+            systemPrompt,
+            outputFormat
+          );
+          
+          console.log("Gemini analysis completed:", analysis);
+        } catch (analysisError) {
+          console.error("Gemini analysis failed:", analysisError);
+          throw new Error(`AI analysis failed: ${analysisError instanceof Error ? analysisError.message : 'Unknown error'}`);
         }
 
         // Update recording with analysis
@@ -1118,7 +1073,7 @@ Do not include any commentary, explanation, or markdown formatting. The output m
           completed_at: new Date().toISOString(),
         })
         .eq("recording_id", recordingId)
-        .eq("task_type", taskType === "all" ? "transcribe" : taskType);
+        .eq("task_type", "transcribe");
 
       return c.json(
         {
@@ -1562,11 +1517,14 @@ app.get("/call-recordings/accessible", async (c) => {
   }
 });
 
-// Share a recording with specific members
-app.post("/call-recordings/:id/share", async (c) => {
+// Meeting Types endpoints
+app.use("/call-recordings/meeting-types", extractUserAndOrgId);
+app.use("/call-recordings/meeting-types/:id", extractUserAndOrgId);
+
+// Get all meeting types for current user
+app.get("/call-recordings/meeting-types", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
-  const recordingId = c.req.param("id");
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -1585,6 +1543,9 @@ app.post("/call-recordings/:id/share", async (c) => {
       return c.json({ error: "Organization not found" }, 404);
     }
     const schema = org.data?.schema_name.toLowerCase();
+    if (!schema) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
 
     const user = await supabase
       .schema("private")
@@ -1595,7 +1556,138 @@ app.post("/call-recordings/:id/share", async (c) => {
     if (user.error) {
       return c.json({ error: "User not found" }, 404);
     }
+    const member = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("*")
+      .eq("user_id", user.data?.id)
+      .eq("organization_id", org.data?.id)
+      .single();
+    if (member.error) {
+      return c.json({ error: "Member not found" }, 404);
+    }
 
+    // Get meeting types for current user
+    const { data: meetingTypes, error } = await supabase
+      .schema(schema)
+      .from("meeting_types")
+      .select("*")
+      .eq("member_id", member.data?.id)
+      .eq("is_active", true)
+      .order("display_name");
+
+    if (error) {
+      return c.json({ error: "Failed to fetch meeting types", details: error }, 500);
+    }
+
+    return c.json({ meetingTypes: meetingTypes || [] }, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get a specific meeting type by ID
+app.get("/call-recordings/meeting-types/:id", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const meetingTypeId = c.req.param("id");
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
+
+    const org = await supabase
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+    if (org.error) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+    const schema = org.data?.schema_name.toLowerCase();
+    if (!schema) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+
+    const user = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+    if (user.error) {
+      return c.json({ error: "User not found" }, 404);
+    }
+    const member = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("*")
+      .eq("user_id", user.data?.id)
+      .eq("organization_id", org.data?.id)
+      .single();
+    if (member.error) {
+      return c.json({ error: "Member not found" }, 404);
+    }
+
+    // Get specific meeting type
+    const { data: meetingType, error } = await supabase
+      .schema(schema)
+      .from("meeting_types")
+      .select("*")
+      .eq("id", meetingTypeId)
+      .eq("member_id", member.data?.id)
+      .eq("is_active", true)
+      .single();
+
+    if (error || !meetingType) {
+      return c.json({ error: "Meeting type not found" }, 404);
+    }
+
+    return c.json({ meetingType }, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Create a new meeting type
+app.post("/call-recordings/meeting-types", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
+
+    const org = await supabase
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+    if (org.error) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+    const schema = org.data?.schema_name.toLowerCase();
+    if (!schema) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+
+    const user = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+    if (user.error) {
+      return c.json({ error: "User not found" }, 404);
+    }
     const member = await supabase
       .schema("private")
       .from("organization_members")
@@ -1609,86 +1701,65 @@ app.post("/call-recordings/:id/share", async (c) => {
 
     // Parse request body
     const body = await c.req.json();
-    const { memberIds, permissionLevel = "view", expiresAt } = body;
+    const { name, display_name, description, system_prompt, output_format = 'json' } = body;
 
-    if (!memberIds || !Array.isArray(memberIds) || memberIds.length === 0) {
-      return c.json({ error: "Member IDs are required" }, 400);
+    if (!name || !display_name || !system_prompt) {
+      return c.json({
+        error: "Missing required fields: name, display_name, system_prompt"
+      }, 400);
     }
 
-    // Verify recording exists and user owns it
-    const { data: recording, error: recordingError } = await supabase
+    // Validate name format (no spaces, lowercase, underscores allowed)
+    const nameRegex = /^[a-z0-9_]+$/;
+    if (!nameRegex.test(name)) {
+      return c.json({
+        error: "Name must contain only lowercase letters, numbers, and underscores"
+      }, 400);
+    }
+
+    // Check if name is unique for this user
+    const { data: existing } = await supabase
       .schema(schema)
-      .from("call_recordings")
-      .select("*")
-      .eq("id", recordingId)
-      .eq("member_id", member.data?.id)
-      .single();
-
-    if (recordingError || !recording) {
-      return c.json({ error: "Recording not found or access denied" }, 404);
-    }
-
-    // Verify all member IDs belong to the same organization
-    const { data: orgMembers, error: orgMembersError } = await supabase
-      .schema("private")
-      .from("organization_members")
+      .from("meeting_types")
       .select("id")
-      .eq("organization_id", org.data?.id)
-      .in("id", memberIds);
+      .eq("member_id", member.data?.id)
+      .eq("name", name)
+      .eq("is_active", true);
 
-    if (orgMembersError || orgMembers.length !== memberIds.length) {
-      return c.json({ error: "Invalid member IDs" }, 400);
+    if (existing && existing.length > 0) {
+      return c.json({ error: "A meeting type with this name already exists" }, 400);
     }
 
-    // Create share records
-    const shareRecords = memberIds.map((memberId: string) => ({
-      recording_id: recordingId,
-      shared_by_member_id: member.data?.id,
-      shared_with_member_id: memberId,
-      permission_level: permissionLevel,
-      expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
-    }));
-
-    const { data: shares, error: sharesError } = await supabase
+    // Create meeting type
+    const { data: meetingType, error } = await supabase
       .schema(schema)
-      .from("recording_shares")
-      .upsert(shareRecords, {
-        onConflict: "recording_id,shared_with_member_id",
+      .from("meeting_types")
+      .insert({
+        name,
+        display_name,
+        description,
+        system_prompt,
+        output_format,
+        member_id: member.data?.id
       })
-      .select();
+      .select()
+      .single();
 
-    if (sharesError) {
-      return c.json(
-        { error: "Failed to create shares", details: sharesError },
-        500
-      );
+    if (error) {
+      return c.json({ error: "Failed to create meeting type", details: error }, 500);
     }
 
-    // Update recording to mark as shared
-    await supabase
-      .schema(schema)
-      .from("call_recordings")
-      .update({ is_shared: true })
-      .eq("id", recordingId);
-
-    return c.json(
-      {
-        success: true,
-        message: `Recording shared with ${memberIds.length} member(s)`,
-        shares: shares,
-      },
-      200
-    );
+    return c.json({ meetingType }, 201);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
 });
 
-// Get sharing information for a recording
-app.get("/call-recordings/:id/shares", async (c) => {
+// Update a meeting type
+app.put("/call-recordings/meeting-types/:id", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
-  const recordingId = c.req.param("id");
+  const meetingTypeId = c.req.param("id");
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -1707,139 +1778,9 @@ app.get("/call-recordings/:id/shares", async (c) => {
       return c.json({ error: "Organization not found" }, 404);
     }
     const schema = org.data?.schema_name.toLowerCase();
-
-    const user = await supabase
-      .schema("private")
-      .from("users")
-      .select("*")
-      .eq("clerk_user_id", userId)
-      .single();
-    if (user.error) {
-      return c.json({ error: "User not found" }, 404);
-    }
-
-    const member = await supabase
-      .schema("private")
-      .from("organization_members")
-      .select("*")
-      .eq("user_id", user.data?.id)
-      .eq("organization_id", org.data?.id)
-      .single();
-    if (member.error) {
-      return c.json({ error: "Member not found" }, 404);
-    }
-
-    // Verify recording exists and user has access (owner or shared with)
-    const { data: recording, error: recordingError } = await supabase
-      .schema(schema)
-      .from("accessible_recordings")
-      .select("*")
-      .eq("id", recordingId)
-      .or(
-        `member_id.eq.${member.data?.id},shared_with_member_id.eq.${member.data?.id}`
-      )
-      .single();
-
-    if (recordingError || !recording) {
-      return c.json({ error: "Recording not found or access denied" }, 404);
-    }
-
-    // Get all shares for this recording
-    const { data: shares, error: sharesError } = await supabase
-      .schema(schema)
-      .from("recording_shares")
-      .select(
-        `
-        id,
-        permission_level,
-        expires_at,
-        created_at,
-        updated_at,
-        shared_with_member:shared_with_member_id (
-          id,
-          role,
-          users:user_id (
-            email,
-            full_name
-          )
-        ),
-        shared_by_member:shared_by_member_id (
-          id,
-          role,
-          users:user_id (
-            email,
-            full_name
-          )
-        )
-      `
-      )
-      .eq("recording_id", recordingId)
-      .or("expires_at.is.null,expires_at.gt.now()");
-
-    if (sharesError) {
-      return c.json(
-        { error: "Failed to fetch shares", details: sharesError },
-        500
-      );
-    }
-
-    const formattedShares = shares.map((share: any) => ({
-      id: share.id,
-      permissionLevel: share.permission_level,
-      expiresAt: share.expires_at,
-      createdAt: share.created_at,
-      updatedAt: share.updated_at,
-      sharedWith: {
-        id: share.shared_with_member.id,
-        email: share.shared_with_member.users.email,
-        fullName: share.shared_with_member.users.full_name,
-        role: share.shared_with_member.role,
-      },
-      sharedBy: {
-        id: share.shared_by_member.id,
-        email: share.shared_by_member.users.email,
-        fullName: share.shared_by_member.users.full_name,
-        role: share.shared_by_member.role,
-      },
-    }));
-
-    return c.json(
-      {
-        recordingId: recordingId,
-        isOwner: recording.member_id === member.data?.id,
-        shares: formattedShares,
-      },
-      200
-    );
-  } catch (error: any) {
-    return c.json({ error: error.message }, 500);
-  }
-});
-
-// Remove sharing for a recording
-app.delete("/call-recordings/:id/share/:memberId", async (c) => {
-  const orgId = c.get("orgId");
-  const userId = c.get("userId");
-  const recordingId = c.req.param("id");
-  const sharedMemberId = c.req.param("memberId");
-
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { persistSession: false },
-    });
-
-    const org = await supabase
-      .schema("private")
-      .from("organizations")
-      .select("*")
-      .eq("clerk_organization_id", orgId)
-      .single();
-    if (org.error) {
+    if (!schema) {
       return c.json({ error: "Organization not found" }, 404);
     }
-    const schema = org.data?.schema_name.toLowerCase();
 
     const user = await supabase
       .schema("private")
@@ -1850,7 +1791,6 @@ app.delete("/call-recordings/:id/share/:memberId", async (c) => {
     if (user.error) {
       return c.json({ error: "User not found" }, 404);
     }
-
     const member = await supabase
       .schema("private")
       .from("organization_members")
@@ -1862,62 +1802,125 @@ app.delete("/call-recordings/:id/share/:memberId", async (c) => {
       return c.json({ error: "Member not found" }, 404);
     }
 
-    // Verify recording exists and user owns it
-    const { data: recording, error: recordingError } = await supabase
-      .schema(schema)
-      .from("call_recordings")
-      .select("*")
-      .eq("id", recordingId)
-      .eq("member_id", member.data?.id)
-      .single();
+    // Parse request body
+    const body = await c.req.json();
+    const { name, display_name, description, system_prompt, output_format, is_active } = body;
 
-    if (recordingError || !recording) {
-      return c.json({ error: "Recording not found or access denied" }, 404);
-    }
+    // If name is being updated, validate it
+    if (name) {
+      const nameRegex = /^[a-z0-9_]+$/;
+      if (!nameRegex.test(name)) {
+        return c.json({
+          error: "Name must contain only lowercase letters, numbers, and underscores"
+        }, 400);
+      }
 
-    // Remove the share
-    const { error: deleteError } = await supabase
-      .schema(schema)
-      .from("recording_shares")
-      .delete()
-      .eq("recording_id", recordingId)
-      .eq("shared_with_member_id", sharedMemberId);
-
-    if (deleteError) {
-      return c.json(
-        { error: "Failed to remove share", details: deleteError },
-        500
-      );
-    }
-
-    // Check if there are any remaining shares
-    const { data: remainingShares, error: remainingError } = await supabase
-      .schema(schema)
-      .from("recording_shares")
-      .select("id")
-      .eq("recording_id", recordingId)
-      .limit(1);
-
-    if (remainingError) {
-      console.error("Error checking remaining shares:", remainingError);
-    }
-
-    // Update recording's is_shared status if no shares remain
-    if (!remainingShares || remainingShares.length === 0) {
-      await supabase
+      // Check if name is unique for this user (excluding current record)
+      const { data: existing } = await supabase
         .schema(schema)
-        .from("call_recordings")
-        .update({ is_shared: false })
-        .eq("id", recordingId);
+        .from("meeting_types")
+        .select("id")
+        .eq("member_id", member.data?.id)
+        .eq("name", name)
+        .eq("is_active", true)
+        .neq("id", meetingTypeId);
+
+      if (existing && existing.length > 0) {
+        return c.json({ error: "A meeting type with this name already exists" }, 400);
+      }
     }
 
-    return c.json(
-      {
-        success: true,
-        message: "Recording share removed successfully",
-      },
-      200
-    );
+    // Update meeting type
+    const updateData: any = { updated_at: new Date().toISOString() };
+    if (name !== undefined) updateData.name = name;
+    if (display_name !== undefined) updateData.display_name = display_name;
+    if (description !== undefined) updateData.description = description;
+    if (system_prompt !== undefined) updateData.system_prompt = system_prompt;
+    if (output_format !== undefined) updateData.output_format = output_format;
+    if (is_active !== undefined) updateData.is_active = is_active;
+
+    const { data: meetingType, error } = await supabase
+      .schema(schema)
+      .from("meeting_types")
+      .update(updateData)
+      .eq("id", meetingTypeId)
+      .eq("member_id", member.data?.id)
+      .select()
+      .single();
+
+    if (error || !meetingType) {
+      return c.json({ error: "Meeting type not found or update failed", details: error }, 404);
+    }
+
+    return c.json({ meetingType }, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Delete a meeting type (soft delete)
+app.delete("/call-recordings/meeting-types/:id", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const meetingTypeId = c.req.param("id");
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
+
+    const org = await supabase
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+    if (org.error) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+    const schema = org.data?.schema_name.toLowerCase();
+    if (!schema) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+
+    const user = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+    if (user.error) {
+      return c.json({ error: "User not found" }, 404);
+    }
+    const member = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("*")
+      .eq("user_id", user.data?.id)
+      .eq("organization_id", org.data?.id)
+      .single();
+    if (member.error) {
+      return c.json({ error: "Member not found" }, 404);
+    }
+
+    // Soft delete meeting type
+    const { error } = await supabase
+      .schema(schema)
+      .from("meeting_types")
+      .update({ 
+        is_active: false, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq("id", meetingTypeId)
+      .eq("member_id", member.data?.id);
+
+    if (error) {
+      return c.json({ error: "Failed to delete meeting type", details: error }, 500);
+    }
+
+    return c.json({ success: true }, 200);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
