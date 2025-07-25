@@ -152,7 +152,7 @@ const RecordingDetailModal = ({
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className='bg-card h-[80vh] w-full !max-w-7xl overflow-hidden rounded-[var(--radius)] p-0'>
+      <DialogContent showCloseButton={false} className='bg-card h-[80vh] w-full !max-w-7xl overflow-hidden rounded-[var(--radius)] p-0'>
         {/* Header */}
         <div className='border-border flex items-center justify-between border-b p-6'>
           <div className='flex-1'>

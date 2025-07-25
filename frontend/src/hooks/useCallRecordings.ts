@@ -35,7 +35,7 @@ interface UseCallRecordingsOptions {
   startDate?: string;
   endDate?: string;
   // Enhanced options for meeting intelligence
-  meetingType?: 'all' | 'meeting' | 'call' | 'interview' | 'consultation';
+  meetingType?: string;
   enhanced?: boolean;
   filters?: {
     status?: string[];
@@ -84,7 +84,7 @@ interface UseCallRecordingsReturn {
 
 export interface ProcessingOptions {
   taskType?: 'transcribe' | 'analyze' | 'all';
-  meetingType?: 'meeting' | 'call' | 'interview' | 'consultation';
+  meetingType?: string;
   analysisType?: string;
 }
 

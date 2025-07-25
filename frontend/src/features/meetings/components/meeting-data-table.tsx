@@ -37,10 +37,10 @@ import {
 import RecordingDetailModal from '@/components/recording-detail-modal';
 
 interface MeetingDataTableProps {
-  meetingType: 'all' | 'meeting' | 'call' | 'interview' | 'consultation';
+  meetingType?: 'all' | string; // Made more flexible to support custom meeting types
 }
 
-export function MeetingDataTable({ meetingType }: MeetingDataTableProps) {
+export function MeetingDataTable({ meetingType = 'all' }: MeetingDataTableProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -62,7 +62,7 @@ export function MeetingDataTable({ meetingType }: MeetingDataTableProps) {
     filters,
     setFilters
   } = useCallRecordings({
-    meetingType: meetingType === 'all' ? undefined : meetingType,
+    meetingType,
     enhanced: true, // Flag to get enhanced meeting data
     limit: initialPerPage, // Use URL-based pagination
     offset: (initialPage - 1) * initialPerPage // Calculate offset from URL
@@ -87,11 +87,27 @@ export function MeetingDataTable({ meetingType }: MeetingDataTableProps) {
     setDetailModalOpen(true);
   };
 
+  // Handle processing existing recordings
+  const handleProcessRecording = async (recording: EnhancedCallRecording) => {
+    try {
+      await CallRecordingsAPI.processRecording(recording.id, {
+        taskType: 'all'
+      });
+      refetch();
+    } catch (error) {
+      alert(
+        'Failed to process recording: ' +
+          (error instanceof Error ? error.message : 'Unknown error')
+      );
+    }
+  };
+
   // Enhanced data table configuration
   const { table } = useDataTable<EnhancedCallRecording>({
     data: meetings || [],
     columns: meetingColumns(
-      handleViewDetails
+      handleViewDetails,
+      handleProcessRecording
     ) as ColumnDef<EnhancedCallRecording>[],
     pageCount: Math.ceil((totalCount || 0) / initialPerPage),
     initialState: {
@@ -113,18 +129,6 @@ export function MeetingDataTable({ meetingType }: MeetingDataTableProps) {
       limit: urlPerPage
     });
   }, [searchParams, setPagination]);
-
-  // Meeting type badge configuration
-  const getMeetingTypeBadge = (type: string) => {
-    const config = {
-      meeting: { variant: 'default' as const, label: 'Meeting' },
-      call: { variant: 'secondary' as const, label: 'Legal Call' },
-      interview: { variant: 'outline' as const, label: 'Interview' },
-      consultation: { variant: 'destructive' as const, label: 'Consultation' }
-    };
-
-    return config[type as keyof typeof config] || config.meeting;
-  };
 
   // Handle bulk actions
   const handleBulkExport = () => {
@@ -178,19 +182,13 @@ export function MeetingDataTable({ meetingType }: MeetingDataTableProps) {
           startTime: pendingRecording.startTime,
           endTime: pendingRecording.endTime,
           title: opts.title,
-          participants: ['Current User']
+          participants: ['Current User'],
+          meetingTypeId: opts.meetingTypeId
         }
       );
       // Process the recording with modal options
       await CallRecordingsAPI.processRecording(newRecording.recording.id, {
-        taskType: opts.taskType as 'all' | 'transcribe' | 'analyze' | undefined,
-        meetingType: opts.meetingType as
-          | 'meeting'
-          | 'call'
-          | 'interview'
-          | 'consultation'
-          | undefined,
-        analysisType: opts.analysisType
+        taskType: opts.taskType as 'all' | 'transcribe' | 'analyze' | undefined
       });
       refetch();
     } catch (error) {
@@ -296,38 +294,8 @@ export function MeetingDataTable({ meetingType }: MeetingDataTableProps) {
           </div>
         </div>
 
-        {/* Enhanced Filters Panel */}
-        {showFilters && (
-          <MeetingFilters
-            filters={filters}
-            onFiltersChange={setFilters}
-            meetingType={meetingType}
-          />
-        )}
-
         {/* Enhanced Data Table */}
         <DataTable table={table} />
-
-        {/* Meeting Type Summary */}
-        {meetingType === 'all' && meetings && meetings.length > 0 && (
-          <div className='text-muted-foreground flex items-center space-x-4 text-sm'>
-            <span>Types:</span>
-            {['meeting', 'call', 'interview', 'consultation'].map((type) => {
-              const count = meetings.filter(
-                (m) => m.meetingType === type
-              ).length;
-              if (count === 0) return null;
-
-              const badge = getMeetingTypeBadge(type);
-              return (
-                <Badge key={type} variant={badge.variant} className='text-xs'>
-                  {count} {badge.label}
-                  {count !== 1 ? 's' : ''}
-                </Badge>
-              );
-            })}
-          </div>
-        )}
       </div>
     </>
   );

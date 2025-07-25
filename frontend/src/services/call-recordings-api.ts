@@ -67,8 +67,6 @@ export interface ListRecordingsResponse {
 
 export interface ProcessRecordingRequest {
   taskType?: 'transcribe' | 'analyze' | 'all';
-  meetingType?: 'meeting' | 'call' | 'interview' | 'consultation';
-  analysisType?: string;
 }
 
 export interface ErrorResponse {
@@ -124,6 +122,7 @@ export class CallRecordingsAPI {
       endTime?: string;
       title: string;
       participants?: string[];
+      meetingTypeId?: string;
     }
   ): Promise<{
     success: boolean;
@@ -166,9 +165,7 @@ export class CallRecordingsAPI {
   static async processRecording(
     recordingId: string,
     data: ProcessRecordingRequest = {
-      taskType: 'all',
-      meetingType: 'call',
-      analysisType: 'meeting'
+      taskType: 'all'
     }
   ): Promise<{
     success: boolean;
@@ -338,11 +335,7 @@ export class CallRecordingsAPI {
       hasVideo: apiRecording.has_video,
       hasAudio: apiRecording.has_audio,
       transcript,
-      s3Key: apiRecording.gcs_video_blob_name || '',
-      transcriptS3Key: apiRecording.gcs_transcript_blob_name || null,
       sharing_link: apiRecording.gcs_video_url,
-      isShared: apiRecording.is_shared,
-      accessType: apiRecording.access_type || 'owner',
       shareInfo:
         apiRecording.access_type === 'shared'
           ? {

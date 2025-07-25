@@ -306,6 +306,202 @@ Requirements:
   }
 
   /**
+   * Analyze transcript with custom system prompt from meeting type
+   */
+  async analyzeWithCustomPrompt(
+    transcript: string,
+    segments: SpeakerSegment[],
+    systemPrompt: string,
+    outputFormat: string = "json"
+  ): Promise<any> {
+    try {
+      // Format segments for better context
+      const segmentedTranscript = segments
+        .map((seg) => `**${seg.speaker}**: ${seg.transcription}`)
+        .join("\n\n");
+
+      const fullTranscript = `
+MEETING TRANSCRIPT:
+${segmentedTranscript}
+
+FULL TRANSCRIPT TEXT:
+${transcript}
+      `.trim();
+
+      // Create base prompt that enforces output format
+      const basePrompt = this.getBasePromptForFormat(outputFormat);
+      
+      // Combine base prompt with custom system prompt
+      const combinedPrompt = `${basePrompt}
+
+CUSTOM ANALYSIS INSTRUCTIONS:
+${systemPrompt}
+
+${fullTranscript}`;
+
+      const result = await this.genAI.models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: combinedPrompt
+              }
+            ]
+          }
+        ]
+      });
+
+      const responseText = result.text ?? "";
+      console.log("Custom prompt analysis response:", responseText);
+
+      // Try to parse based on output format
+      if (outputFormat === "json") {
+        try {
+          // Remove code fences if present
+          const cleanedText = responseText.replace(/```json|```/g, '').trim();
+          return JSON.parse(cleanedText);
+        } catch (parseError) {
+          console.error("Failed to parse JSON response, returning as structured object:", parseError);
+          return { 
+            analysis: responseText,
+            parseError: true,
+            rawResponse: responseText 
+          };
+        }
+      } else {
+        // Return as structured object for other formats
+        return {
+          analysis: responseText,
+          outputFormat: outputFormat,
+          rawResponse: responseText
+        };
+      }
+    } catch (error) {
+      console.error("Custom prompt analysis failed:", error);
+      throw new Error(`Custom analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get base prompt that enforces output format structure
+   */
+  private getBasePromptForFormat(outputFormat: string): string {
+    switch (outputFormat) {
+      case "json":
+        return `Analyze the meeting transcript provided below. You must respond with ONLY valid JSON in this exact structure (no markdown code blocks, no extra text):
+
+{
+  "participants": [
+          {
+            "speakerLabel": "Speaker A",
+            "participantName": "Estimated or mentioned name",
+            "role": "host|participant|presenter|observer",
+            "talkTimeSeconds": estimated_seconds_speaking
+          }
+        ],
+        "actionItems": [
+          {
+            "task": "Specific actionable task",
+            "assignee": "Person responsible (if mentioned)",
+            "assigneeSpeakerLabel": "Speaker label of assignee",
+            "dueDate": "Due date if mentioned",
+            "priority": "low|medium|high|urgent",
+            "context": "Context around the task"
+          }
+        ],
+        "decisions": [
+          {
+            "decision": "Decision made",
+            "decisionMaker": "Person who decided",
+            "decisionMakerSpeakerLabel": "Speaker label",
+            "context": "Context of decision",
+            "impact": "low|medium|high",
+            "implementationDate": "When to implement if mentioned"
+          }
+        ],
+        "topics": [
+          {
+            "topic": "Main topic discussed",
+            "speakers": ["Speaker A", "Speaker B"],
+            "importance": 0.8,
+            "keyPoints": ["Key point 1", "Key point 2"]
+          }
+        ],
+        "summary": "Concise 2-3 sentence summary of the meeting",
+        "keyTakeaways": ["Main takeaway 1", "Main takeaway 2"],
+        "sentiment": "positive|neutral|negative"
+      }
+}
+
+CRITICAL: Ensure all JSON is properly formatted and escaped. No text outside the JSON structure.`;
+
+      case "markdown":
+        return `Analyze the meeting transcript and provide a well-structured markdown report. Use the following structure:
+
+# Meeting Analysis
+
+## Summary
+[Brief summary of the meeting]
+
+## Key Points
+- [Key point 1]
+- [Key point 2]
+
+## Action Items
+- [ ] [Action item 1] - *Assigned to: [Person] | Due: [Date]*
+- [ ] [Action item 2] - *Assigned to: [Person] | Due: [Date]*
+
+## Participants
+- **[Name/Role]**: [Brief contribution summary]
+
+## Decisions Made
+- [Decision 1]
+- [Decision 2]
+
+## Follow-up Items
+- [Follow-up item 1]
+- [Follow-up item 2]
+
+## Custom Analysis
+[Additional analysis based on custom instructions]`;
+
+      case "text":
+      default:
+        return `Analyze the meeting transcript and provide a clear, structured text report. Use the following format:
+
+MEETING ANALYSIS REPORT
+=======================
+
+SUMMARY:
+[Brief summary of the meeting]
+
+KEY POINTS:
+- [Key point 1]
+- [Key point 2]
+
+ACTION ITEMS:
+- [Action item 1] (Assigned to: [Person], Due: [Date])
+- [Action item 2] (Assigned to: [Person], Due: [Date])
+
+PARTICIPANTS:
+- [Name/Role]: [Brief contribution summary]
+
+DECISIONS MADE:
+- [Decision 1]
+- [Decision 2]
+
+FOLLOW-UP ITEMS:
+- [Follow-up item 1]
+- [Follow-up item 2]
+
+CUSTOM ANALYSIS:
+[Additional analysis based on custom instructions]`;
+    }
+  }
+
+  /**
    * Calculate participant metrics from transcript segments
    */
   private calculateParticipantMetrics(segments: SpeakerSegment[]): MeetingParticipant[] {

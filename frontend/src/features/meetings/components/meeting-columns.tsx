@@ -27,7 +27,8 @@ import {
   Eye, 
   Users, 
   Clock,
-  FileText
+  FileText,
+  Zap
 } from 'lucide-react';
 
 // Extended interface for meeting recordings
@@ -37,7 +38,7 @@ export interface MeetingRecording {
   meetingType: 'meeting' | 'call' | 'interview' | 'consultation';
   startTime: string;
   duration: number; // in seconds
-  status: 'completed' | 'processing' | 'failed' | 'in_progress';
+  status: 'processed' | 'uploaded' | 'processing' | 'failed' | 'in_progress';
   participantCount: number;
   memberName: string;
   ai_summary?: string;
@@ -109,8 +110,11 @@ const getStatusConfig = (status: string) => {
   return configs[status as keyof typeof configs] || configs.completed;
 };
 
-// Change export to a function that takes onViewDetails
-export const meetingColumns = (onViewDetails: (recording: any) => void): ColumnDef<MeetingRecording>[] => [
+// Change export to a function that takes onViewDetails and onProcessRecording
+export const meetingColumns = (
+  onViewDetails: (recording: any) => void,
+  onProcessRecording?: (recording: any) => void
+): ColumnDef<MeetingRecording>[] => [
   // Selection checkbox
   {
     id: 'select',
@@ -294,8 +298,10 @@ export const meetingColumns = (onViewDetails: (recording: any) => void): ColumnD
     enableHiding: false,
     cell: ({ row }) => {
       const recording = row.original;
-      const canPlay = recording.status === 'completed' && recording.gcsVideoUrl;
+      const canPlay = recording.status === 'processed' && recording.gcsVideoUrl;
       const canView = recording.accessType !== 'restricted';
+      const needsProcessing = recording.status === 'uploaded' || recording.status === 'failed';
+      
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -307,6 +313,12 @@ export const meetingColumns = (onViewDetails: (recording: any) => void): ColumnD
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuSeparator />
+            {needsProcessing && onProcessRecording && (
+              <DropdownMenuItem onClick={() => onProcessRecording(recording)}>
+                <Zap className="mr-2 h-4 w-4" />
+                Process Recording
+              </DropdownMenuItem>
+            )}
             {canView && (
               <DropdownMenuItem onClick={() => onViewDetails(recording)}>
                 <Eye className="mr-2 h-4 w-4" />

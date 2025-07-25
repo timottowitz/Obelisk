@@ -13,8 +13,8 @@ import MeetingPromptLibrary from "./meeting-prompts.ts";
 export interface EnhancedProcessingOptions {
   recordingId: string;
   taskType: "transcribe" | "analyze" | "all";
-  meetingType: "meeting" | "call" | "interview" | "consultation";
-  analysisType?: string; // Which analysis prompt to use
+  systemPrompt?: string; // Custom system prompt from meeting type
+  outputFormat?: string; // Output format from meeting type
   schema: string;
   supabase: any;
   googleApiKey: string;
@@ -149,7 +149,7 @@ export class EnhancedMeetingProcessor {
           videoBlob,
           recording.mime_type,
           recording.gcs_video_blob_name,
-          options.meetingType
+          "meeting" // default type for transcription
         );
 
       console.log("transcriptionResult", transcriptionResult);
@@ -229,31 +229,33 @@ export class EnhancedMeetingProcessor {
         };
       }
 
-      // Use enhanced Gemini analysis
-      const analysisResult = await this.geminiAI.analyzeMeetingIntelligence(
-        transcript,
-        segments,
-        options.meetingType
-      );
-
-      console.log("analysisResult", analysisResult);
-
-      // Also run specific analysis if requested
-      let specificAnalysis = null;
-      if (options.analysisType) {
-        specificAnalysis = await this.runSpecificAnalysis(
+      // Use custom system prompt if provided, otherwise use default analysis
+      let analysisResult;
+      if (options.systemPrompt) {
+        // Use custom system prompt from meeting type
+        analysisResult = await this.geminiAI.analyzeWithCustomPrompt(
           transcript,
-          options.analysisType,
-          options
+          segments,
+          options.systemPrompt,
+          options.outputFormat || "json"
+        );
+      } else {
+        // Fallback to default meeting analysis
+        analysisResult = await this.geminiAI.analyzeMeetingIntelligence(
+          transcript,
+          segments,
+          "meeting" // default type
         );
       }
 
+      console.log("analysisResult", analysisResult);
+
       // Update recording with analysis results
-      const updateData: any = {
+      const updateData = {
         ai_analysis: analysisResult,
-        ai_summary: analysisResult.summary,
-        key_topics: analysisResult.keyTakeaways,
-        sentiment: analysisResult.sentiment,
+        ai_summary: analysisResult.summary || (typeof analysisResult === 'string' ? analysisResult : JSON.stringify(analysisResult)),
+        key_topics: analysisResult.keyTakeaways || [],
+        sentiment: analysisResult.sentiment || 'neutral',
         status: "processed",
       };
 
@@ -314,7 +316,7 @@ export class EnhancedMeetingProcessor {
       {
         transcript,
         date: new Date().toISOString().split("T")[0],
-        meetingType: options.meetingType,
+        meetingType: "meeting", // default type
         duration: "45 minutes", // TODO: Calculate from recording
         generationDate: new Date().toLocaleString(),
       }
