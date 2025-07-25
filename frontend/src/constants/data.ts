@@ -71,7 +71,7 @@ export const navItems: NavItem[] = [
   },
   {
     title: 'Call Recordings',
-    url: '/dashboard/callcaps',
+    url: '/dashboard/meetings',
     icon: 'callcaps',
     isActive: false,
     shortcut: ['c', 'r'],
