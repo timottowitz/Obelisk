@@ -1,0 +1,119 @@
+[
+  {
+    "name": "tax_law",
+    "display_name": "Tax Law",
+    "description": "Tax planning, compliance, and dispute resolution",
+    "color": "#059669",
+    "icon": "calculator",
+    "folder_templates": [
+      {
+        "name": "Tax Returns",
+        "path": "/tax-returns",
+        "sort_order": 1,
+        "is_required": true
+      },
+      {
+        "name": "IRS Correspondence",
+        "path": "/irs-correspondence",
+        "sort_order": 2,
+        "is_required": true
+      },
+      {
+        "name": "Tax Planning Documents",
+        "path": "/tax-planning",
+        "sort_order": 3,
+        "is_required": false
+      },
+      {
+        "name": "Audit Defense",
+        "path": "/audit-defense",
+        "sort_order": 4,
+        "is_required": false
+      }
+    ]
+  },
+  {
+    "name": "immigration_law",
+    "display_name": "Immigration Law",
+    "description": "Immigration and naturalization matters",
+    "color": "#7C2D12",
+    "icon": "globe-alt",
+    "folder_templates": [
+      {
+        "name": "Visa Applications",
+        "path": "/visa-applications",
+        "sort_order": 1,
+        "is_required": true
+      },
+      {
+        "name": "Supporting Documents",
+        "path": "/supporting-documents",
+        "sort_order": 2,
+        "is_required": true
+      },
+      {
+        "name": "USCIS Correspondence",
+        "path": "/uscis-correspondence",
+        "sort_order": 3,
+        "is_required": true
+      },
+      {
+        "name": "Client Documentation",
+        "path": "/client-documentation",
+        "sort_order": 4,
+        "is_required": true
+      },
+      {
+        "name": "Court Proceedings",
+        "path": "/court-proceedings",
+        "sort_order": 5,
+        "is_required": false
+      }
+    ]
+  },
+  {
+    "name": "personal_injury",
+    "display_name": "Personal Injury",
+    "description": "Personal injury and tort claims",
+    "color": "#B91C1C",
+    "icon": "exclamation-triangle",
+    "folder_templates": [
+      {
+        "name": "Incident Documentation",
+        "path": "/incident-documentation",
+        "sort_order": 1,
+        "is_required": true
+      },
+      {
+        "name": "Medical Records",
+        "path": "/medical-records",
+        "sort_order": 2,
+        "is_required": true
+      },
+      {
+        "name": "Insurance Communications",
+        "path": "/insurance-communications",
+        "sort_order": 3,
+        "is_required": true
+      },
+      {
+        "name": "Expert Witness Reports",
+        "path": "/expert-witness-reports",
+        "sort_order": 4,
+        "is_required": false
+      },
+      {
+        "name": "Settlement Negotiations",
+        "path": "/settlement-negotiations",
+        "sort_order": 5,
+        "is_required": false
+      },
+      {
+        "name": "Trial Preparation",
+        "path": "/trial-preparation",
+        "sort_order": 6,
+        "is_required": false
+      }
+    ]
+  }
+]

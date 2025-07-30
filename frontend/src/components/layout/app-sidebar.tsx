@@ -1,10 +1,5 @@
 'use client';
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger
-} from '@/components/ui/collapsible';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
@@ -22,18 +17,16 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarRail
 } from '@/components/ui/sidebar';
 import { UserAvatarProfile } from '@/components/user-avatar-profile';
-import { navItems } from '@/constants/data';
+import { navItems, practiceAreaItems, footerItems } from '@/constants/data';
 import { useMediaQuery } from '@/hooks/use-media-query';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useUser, useOrganizationList, useAuth } from '@clerk/nextjs';
 import {
   IconBell,
-  IconChevronRight,
   IconChevronsDown,
   IconCreditCard,
   IconLogout,
@@ -105,47 +98,20 @@ export default function AppSidebar() {
         )}
       </SidebarHeader>
       <SidebarContent className='overflow-x-hidden'>
+        {/* File a New Case Button */}
+        <div className='px-3 py-2'>
+          <Button className='w-full bg-black text-white hover:bg-gray-800 rounded-lg' size='sm'>
+            <Icons.add className='mr-2 h-4 w-4' />
+            File a New Case
+          </Button>
+        </div>
+
+        {/* Main Navigation */}
         <SidebarGroup>
           <SidebarMenu>
             {navItems.map((item) => {
               const Icon = item.icon ? Icons[item.icon] : Icons.logo;
-              return item?.items && item?.items?.length > 0 ? (
-                <Collapsible
-                  key={item.title}
-                  asChild
-                  defaultOpen={item.isActive}
-                  className='group/collapsible'
-                >
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
-                        tooltip={item.title}
-                        isActive={pathname === item.url}
-                      >
-                        {item.icon && <Icon />}
-                        <span>{item.title}</span>
-                        <IconChevronRight className='ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90' />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {item.items?.map((subItem) => (
-                          <SidebarMenuSubItem key={subItem.title}>
-                            <SidebarMenuSubButton
-                              asChild
-                              isActive={pathname === subItem.url}
-                            >
-                              <Link href={subItem.url}>
-                                <span>{subItem.title}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              ) : (
+              return (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
@@ -162,6 +128,67 @@ export default function AppSidebar() {
             })}
           </SidebarMenu>
         </SidebarGroup>
+
+        {/* Practice Areas Section */}
+        <SidebarGroup>
+          <SidebarMenu>
+            {practiceAreaItems.map((item) => {
+              const Icon = item.icon ? Icons[item.icon] : Icons.logo;
+              return (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip={item.title}
+                    isActive={pathname === item.url}
+                  >
+                    <Link href={item.url} className='flex items-center justify-between w-full'>
+                      <div className='flex items-center'>
+                        <Icon />
+                        <span>{item.title}</span>
+                      </div>
+                      {item.label && (
+                        <Badge variant='secondary' className='ml-auto text-xs'>
+                          {item.label}
+                        </Badge>
+                      )}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        {/* Footer Navigation */}
+        <SidebarGroup className='mt-auto'>
+          <SidebarMenu>
+            {footerItems.map((item) => {
+              const Icon = item.icon ? Icons[item.icon] : Icons.logo;
+              return (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip={item.title}
+                    isActive={pathname === item.url}
+                  >
+                    <Link href={item.url}>
+                      <Icon />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        {/* Support Section */}
+        <div className='px-3 py-4 text-xs text-muted-foreground'>
+          <p className='mb-2'>For case-related questions and assistance, please contact your case manager. For other questions, please email Customer Service at:</p>
+          <a href='mailto:CustomerService@adr.org' className='text-blue-400 hover:text-blue-300'>
+            CustomerService@adr.org
+          </a>
+        </div>
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
