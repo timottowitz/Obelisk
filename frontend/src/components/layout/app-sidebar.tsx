@@ -100,10 +100,12 @@ export default function AppSidebar() {
       <SidebarContent className='overflow-x-hidden'>
         {/* File a New Case Button */}
         <div className='px-3 py-2'>
-          <Button className='w-full bg-black text-white hover:bg-gray-800 rounded-lg' size='sm'>
-            <Icons.add className='mr-2 h-4 w-4' />
-            File a New Case
-          </Button>
+          <Link href='/dashboard/cases/create'>
+            <Button className='w-full bg-black text-white hover:bg-gray-800 rounded-lg cursor-pointer' size='sm'>
+              <Icons.add className='mr-2 h-4 w-4' />
+              File a New Case
+            </Button>
+          </Link>
         </div>
 
         {/* Main Navigation */}

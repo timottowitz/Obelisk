@@ -360,7 +360,7 @@ entrypoint = "./functions/members/index.ts"
 
 [functions.cases]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/cases/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
