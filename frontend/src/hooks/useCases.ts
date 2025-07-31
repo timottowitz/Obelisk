@@ -225,7 +225,7 @@ export function useUpdateCaseTask() {
         queryKey: [...QUERY_KEYS.tasks, caseId]
       });
       queryClient.invalidateQueries({
-        queryKey: [...QUERY_KEYS.events, caseId]
+        queryKey: [...QUERY_KEYS.events]
       });
     },
     onError: (error) => {
@@ -252,7 +252,7 @@ export function useDeleteCaseTask() {
         queryKey: [...QUERY_KEYS.tasks, caseId]
       });
       queryClient.invalidateQueries({
-        queryKey: [...QUERY_KEYS.events, caseId]
+        queryKey: [...QUERY_KEYS.events]
       });
     },
     onError: (error) => {

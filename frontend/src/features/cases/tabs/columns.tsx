@@ -45,13 +45,10 @@ export const tasksColumns = [
 ];
 
 export const eventsColumns = [
-  { key: 'date', label: 'Date' },
-  { key: 'time', label: 'Time' },
   { key: 'event_type', label: 'Event Type' },
-  { key: 'method', label: 'Method' },
-  { key: 'status', label: 'Status' },
-  { key: 'location', label: 'Location' },
-  { key: 'address', label: 'Address' }
+  { key: 'description', label: 'Description' },
+  { key: 'date', label: 'Date' },
+  { key: 'time', label: 'Time' }
 ];
 
 export const hearingExhibitColumns = [

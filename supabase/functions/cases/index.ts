@@ -1320,7 +1320,7 @@ app.post("/cases/:id/tasks", async (c) => {
       .select()
       .single();
 
-    if (insertError || !newTask) {
+    if (insertError) {
       return c.json(
         { error: "Failed to create task", details: insertError },
         500
@@ -1333,10 +1333,7 @@ app.post("/cases/:id/tasks", async (c) => {
       .insert({
         case_id: case_id,
         event_type: "task_created",
-        method: "POST",
-        status: "success",
-        location: "case_tasks",
-        address: name,
+        description: `Task ${name} created`,
         date: new Date().toISOString().split("T")[0],
         time: new Date().toISOString().split("T")[1].split(".")[0],
       })
@@ -1385,19 +1382,23 @@ app.put("/cases/:id/tasks/:taskId", async (c) => {
       );
     }
 
-    await supabase
+    const { error: eventError } = await supabase
       .schema(schema)
       .from("case_events")
       .insert({
         case_id: caseId,
         event_type: "task_updated",
-        method: "PUT",
-        status: "success",
-        location: "case_tasks",
-        address: name,
+        description: `Task ${name} updated`,
         date: new Date().toISOString().split("T")[0],
         time: new Date().toISOString().split("T")[1].split(".")[0],
       });
+
+    if (eventError) {
+      return c.json(
+        { error: "Failed to create event", details: eventError },
+        500
+      );
+    }
 
     return c.json(updatedTask, 200);
   } catch (error: any) {
@@ -1441,19 +1442,23 @@ app.delete("/cases/:id/tasks/:taskId", async (c) => {
       );
     }
 
-    await supabase
+    const { error: eventError } = await supabase
       .schema(schema)
       .from("case_events")
       .insert({
         case_id: caseId,
         event_type: "task_deleted",
-        method: "DELETE",
-        status: "success",
-        location: "case_tasks",
-        address: task.name,
+        description: `Task ${task.name} deleted`,
         date: new Date().toISOString().split("T")[0],
         time: new Date().toISOString().split("T")[1].split(".")[0],
       });
+
+    if (eventError) {
+      return c.json(
+        { error: "Failed to create event", details: eventError },
+        500
+      );
+    }
 
     return c.json({ success: true, message: "Task deleted successfully" }, 200);
   } catch (error: any) {
@@ -1474,9 +1479,10 @@ app.get("/cases/:id/events", async (c) => {
       .schema(schema)
       .from("case_events")
       .select("*")
-      .eq("case_id", caseId);
+      .eq("case_id", caseId)
+      .order("created_at", { ascending: false });
 
-    if (selectError || !events) {
+    if (selectError) {
       return c.json(
         { error: "Failed to fetch events", details: selectError },
         500
