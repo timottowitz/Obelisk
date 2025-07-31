@@ -1449,9 +1449,18 @@ async function handleCreateFolderCase(
 
   const { data: folderCase, error: folderCaseError } = await supabaseClient
     .schema(schema)
-    .from("folder_cases")
+    .from("cases")
     .insert({
-      name: folderCaseName,
+      title: folderCaseName,
+      case_number: `CASE-${Date.now()}`,
+      status: "active",
+      client_name_encrypted: folderCaseName,
+      lead_attorney_id: userId,
+      team_member_ids: [userId],
+      client_portal_enabled: false,
+      retention_policy: "standard",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     })
     .select()
     .single();
@@ -1489,8 +1498,8 @@ async function handleCreateFolderCase(
       await supabaseClient.schema(schema).from("storage_folders").insert({
         name: folder.name,
         path: folder.path,
-        case: folderCase.id,
         created_by: userId,
+        case_id: folderCase.id,
       });
     } catch (error) {
       console.error("Error creating default folder:", error);
@@ -1512,7 +1521,7 @@ async function handleGetFolderCases(
 
   const { data: folderCases, error: folderCasesError } = await supabaseClient
     .schema(schema)
-    .from("folder_cases")
+    .from("cases")
     .select("*");
 
   if (folderCasesError) throw folderCasesError;

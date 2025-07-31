@@ -9,7 +9,10 @@ import { Hono } from "jsr:@hono/hono";
 import { cors } from "jsr:@hono/hono/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
 import { extractUserAndOrgId } from "../_shared/index.ts";
-import { seedCaseTypes, DEFAULT_CASE_TYPES } from "./seeders/default-case-types.ts";
+import {
+  seedCaseTypes,
+  DEFAULT_CASE_TYPES,
+} from "./seeders/default-case-types.ts";
 
 console.log("Hello from Cases Functions!");
 
@@ -78,7 +81,13 @@ async function getSupabaseAndOrgInfo(orgId: string, userId: string) {
     throw new Error("Member not found");
   }
 
-  return { supabase, schema, user: user.data, member: member.data, org: org.data };
+  return {
+    supabase,
+    schema,
+    user: user.data,
+    member: member.data,
+    org: org.data,
+  };
 }
 
 // SEEDER ENDPOINTS
@@ -92,19 +101,25 @@ app.get("/cases/seed/preview", async (c) => {
     await getSupabaseAndOrgInfo(orgId, userId); // Just for auth validation
 
     // Return the default configuration without creating anything
-    return c.json({ 
-      message: "Preview of default case types and templates",
-      case_types: DEFAULT_CASE_TYPES.map(ct => ({
-        name: ct.name,
-        display_name: ct.display_name,
-        description: ct.description,
-        color: ct.color,
-        icon: ct.icon,
-        template_count: ct.folder_templates.length
-      })),
-      total_case_types: DEFAULT_CASE_TYPES.length,
-      total_templates: DEFAULT_CASE_TYPES.reduce((sum, ct) => sum + ct.folder_templates.length, 0)
-    }, 200);
+    return c.json(
+      {
+        message: "Preview of default case types and templates",
+        case_types: DEFAULT_CASE_TYPES.map((ct) => ({
+          name: ct.name,
+          display_name: ct.display_name,
+          description: ct.description,
+          color: ct.color,
+          icon: ct.icon,
+          template_count: ct.folder_templates.length,
+        })),
+        total_case_types: DEFAULT_CASE_TYPES.length,
+        total_templates: DEFAULT_CASE_TYPES.reduce(
+          (sum, ct) => sum + ct.folder_templates.length,
+          0
+        ),
+      },
+      200
+    );
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -116,10 +131,13 @@ app.post("/cases/seed/run", async (c) => {
   const userId = c.get("userId");
 
   try {
-    const { supabase, schema, member } = await getSupabaseAndOrgInfo(orgId, userId);
+    const { supabase, schema, member } = await getSupabaseAndOrgInfo(
+      orgId,
+      userId
+    );
 
     // Check if user has admin privileges (optional - you might want to restrict this)
-    if (member.role !== 'admin' && member.role !== 'owner') {
+    if (member.role !== "admin" && member.role !== "owner") {
       return c.json({ error: "Only administrators can run seeders" }, 403);
     }
 
@@ -129,46 +147,58 @@ app.post("/cases/seed/run", async (c) => {
     // Check if there are already case types
     const { data: existingCaseTypes, error: countError } = await supabase
       .schema(schema)
-      .from('case_types')
-      .select('id', { count: 'exact' });
+      .from("case_types")
+      .select("id", { count: "exact" });
 
     if (countError) {
-      return c.json({ error: "Failed to check existing case types", details: countError }, 500);
+      return c.json(
+        { error: "Failed to check existing case types", details: countError },
+        500
+      );
     }
 
     if (existingCaseTypes && existingCaseTypes.length > 0 && !force) {
-      return c.json({ 
-        error: "Case types already exist. Use 'force: true' to seed anyway",
-        existing_count: existingCaseTypes.length
-      }, 400);
+      return c.json(
+        {
+          error: "Case types already exist. Use 'force: true' to seed anyway",
+          existing_count: existingCaseTypes.length,
+        },
+        400
+      );
     }
 
     // Run the seeder
     try {
       await seedCaseTypes(supabase, schema);
-      
+
       // Get the newly created case types count
       const { data: newCaseTypes, error: newCountError } = await supabase
         .schema(schema)
-        .from('case_types')
-        .select('id, name, display_name', { count: 'exact' });
+        .from("case_types")
+        .select("id, name, display_name", { count: "exact" });
 
       if (newCountError) {
         console.error("Error getting seeded case types count:", newCountError);
       }
 
-      return c.json({ 
-        success: true,
-        message: "Default case types and templates seeded successfully",
-        seeded_case_types: newCaseTypes?.length || 0,
-        case_types: newCaseTypes || []
-      }, 200);
+      return c.json(
+        {
+          success: true,
+          message: "Default case types and templates seeded successfully",
+          seeded_case_types: newCaseTypes?.length || 0,
+          case_types: newCaseTypes || [],
+        },
+        200
+      );
     } catch (seedError: any) {
       console.error("Seeding error:", seedError);
-      return c.json({ 
-        error: "Failed to seed case types", 
-        details: seedError.message 
-      }, 500);
+      return c.json(
+        {
+          error: "Failed to seed case types",
+          details: seedError.message,
+        },
+        500
+      );
     }
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
@@ -181,11 +211,17 @@ app.post("/cases/seed/custom", async (c) => {
   const userId = c.get("userId");
 
   try {
-    const { supabase, schema, member } = await getSupabaseAndOrgInfo(orgId, userId);
+    const { supabase, schema, member } = await getSupabaseAndOrgInfo(
+      orgId,
+      userId
+    );
 
     // Check if user has admin privileges
-    if (member.role !== 'admin' && member.role !== 'owner') {
-      return c.json({ error: "Only administrators can create custom case types" }, 403);
+    if (member.role !== "admin" && member.role !== "owner") {
+      return c.json(
+        { error: "Only administrators can create custom case types" },
+        403
+      );
     }
 
     const body = await c.req.json();
@@ -196,15 +232,15 @@ app.post("/cases/seed/custom", async (c) => {
     }
 
     const results = [];
-    
+
     for (const caseTypeConfig of case_types) {
       try {
         // Validate required fields
         if (!caseTypeConfig.name || !caseTypeConfig.display_name) {
           results.push({
-            name: caseTypeConfig.name || 'unknown',
+            name: caseTypeConfig.name || "unknown",
             success: false,
-            error: 'Missing required fields: name and display_name'
+            error: "Missing required fields: name and display_name",
           });
           continue;
         }
@@ -212,16 +248,16 @@ app.post("/cases/seed/custom", async (c) => {
         // Check if case type already exists
         const { data: existingCaseType } = await supabase
           .schema(schema)
-          .from('case_types')
-          .select('id')
-          .eq('name', caseTypeConfig.name)
+          .from("case_types")
+          .select("id")
+          .eq("name", caseTypeConfig.name)
           .single();
 
         if (existingCaseType) {
           results.push({
             name: caseTypeConfig.name,
             success: false,
-            error: 'Case type already exists'
+            error: "Case type already exists",
           });
           continue;
         }
@@ -229,34 +265,37 @@ app.post("/cases/seed/custom", async (c) => {
         // Create case type
         const { data: newCaseType, error: caseTypeError } = await supabase
           .schema(schema)
-          .from('case_types')
+          .from("case_types")
           .insert({
             name: caseTypeConfig.name,
             display_name: caseTypeConfig.display_name,
             description: caseTypeConfig.description || null,
-            color: caseTypeConfig.color || '#3B82F6',
-            icon: caseTypeConfig.icon || 'folder',
+            color: caseTypeConfig.color || "#3B82F6",
+            icon: caseTypeConfig.icon || "folder",
           })
-          .select('id')
+          .select("id")
           .single();
 
         if (caseTypeError) {
           results.push({
             name: caseTypeConfig.name,
             success: false,
-            error: caseTypeError.message
+            error: caseTypeError.message,
           });
           continue;
         }
 
         // Create folder templates if provided
         let templatesCreated = 0;
-        if (caseTypeConfig.folder_templates && Array.isArray(caseTypeConfig.folder_templates)) {
+        if (
+          caseTypeConfig.folder_templates &&
+          Array.isArray(caseTypeConfig.folder_templates)
+        ) {
           for (const template of caseTypeConfig.folder_templates) {
             try {
               await supabase
                 .schema(schema)
-                .from('folder_templates')
+                .from("folder_templates")
                 .insert({
                   case_type_id: newCaseType.id,
                   name: template.name,
@@ -267,7 +306,10 @@ app.post("/cases/seed/custom", async (c) => {
                 });
               templatesCreated++;
             } catch (templateError) {
-              console.error(`Failed to create template ${template.name}:`, templateError);
+              console.error(
+                `Failed to create template ${template.name}:`,
+                templateError
+              );
             }
           }
         }
@@ -276,32 +318,33 @@ app.post("/cases/seed/custom", async (c) => {
           name: caseTypeConfig.name,
           success: true,
           case_type_id: newCaseType.id,
-          templates_created: templatesCreated
+          templates_created: templatesCreated,
         });
-
       } catch (error: any) {
         results.push({
-          name: caseTypeConfig.name || 'unknown',
+          name: caseTypeConfig.name || "unknown",
           success: false,
-          error: error.message
+          error: error.message,
         });
       }
     }
 
-    const successCount = results.filter(r => r.success).length;
-    const failureCount = results.filter(r => !r.success).length;
+    const successCount = results.filter((r) => r.success).length;
+    const failureCount = results.filter((r) => !r.success).length;
 
-    return c.json({
-      success: successCount > 0,
-      message: `Seeded ${successCount} case types, ${failureCount} failed`,
-      results,
-      summary: {
-        total: results.length,
-        successful: successCount,
-        failed: failureCount
-      }
-    }, 200);
-
+    return c.json(
+      {
+        success: successCount > 0,
+        message: `Seeded ${successCount} case types, ${failureCount} failed`,
+        results,
+        summary: {
+          total: results.length,
+          successful: successCount,
+          failed: failureCount,
+        },
+      },
+      200
+    );
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -325,7 +368,10 @@ app.get("/cases/types", async (c) => {
       .order("name");
 
     if (error) {
-      return c.json({ error: "Failed to fetch case types", details: error }, 500);
+      return c.json(
+        { error: "Failed to fetch case types", details: error },
+        500
+      );
     }
 
     return c.json({ caseTypes: caseTypes || [] }, 200);
@@ -346,7 +392,8 @@ app.get("/cases/types/:id", async (c) => {
     const { data: caseType, error } = await supabase
       .schema(schema)
       .from("case_types")
-      .select(`
+      .select(
+        `
         *,
         folder_templates(
           id,
@@ -356,7 +403,8 @@ app.get("/cases/types/:id", async (c) => {
           sort_order,
           is_required
         )
-      `)
+      `
+      )
       .eq("id", caseTypeId)
       .eq("is_active", true)
       .single();
@@ -380,18 +428,26 @@ app.post("/cases/types", async (c) => {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
 
     const body = await c.req.json();
-    const { name, display_name, description, color, icon, folder_templates } = body;
+    const { name, display_name, description, color, icon, folder_templates } =
+      body;
 
     if (!name || !display_name) {
-      return c.json({ error: "Missing required fields: name, display_name" }, 400);
+      return c.json(
+        { error: "Missing required fields: name, display_name" },
+        400
+      );
     }
 
     // Validate name format (no spaces, lowercase, underscores allowed)
     const nameRegex = /^[a-z0-9_]+$/;
     if (!nameRegex.test(name)) {
-      return c.json({
-        error: "Name must contain only lowercase letters, numbers, and underscores"
-      }, 400);
+      return c.json(
+        {
+          error:
+            "Name must contain only lowercase letters, numbers, and underscores",
+        },
+        400
+      );
     }
 
     // Check if case type name already exists
@@ -403,7 +459,10 @@ app.post("/cases/types", async (c) => {
       .single();
 
     if (existingType) {
-      return c.json({ error: "A case type with this name already exists" }, 400);
+      return c.json(
+        { error: "A case type with this name already exists" },
+        400
+      );
     }
 
     // Create case type
@@ -414,14 +473,17 @@ app.post("/cases/types", async (c) => {
         name,
         display_name,
         description: description || null,
-        color: color || '#3B82F6',
-        icon: icon || 'folder',
+        color: color || "#3B82F6",
+        icon: icon || "folder",
       })
       .select()
       .single();
 
     if (insertError || !newCaseType) {
-      return c.json({ error: "Failed to create case type", details: insertError }, 500);
+      return c.json(
+        { error: "Failed to create case type", details: insertError },
+        500
+      );
     }
 
     // Create folder templates if provided
@@ -469,9 +531,13 @@ app.put("/cases/types/:id", async (c) => {
     if (name) {
       const nameRegex = /^[a-z0-9_]+$/;
       if (!nameRegex.test(name)) {
-        return c.json({
-          error: "Name must contain only lowercase letters, numbers, and underscores"
-        }, 400);
+        return c.json(
+          {
+            error:
+              "Name must contain only lowercase letters, numbers, and underscores",
+          },
+          400
+        );
       }
 
       // Check if name is unique (excluding current record)
@@ -484,7 +550,10 @@ app.put("/cases/types/:id", async (c) => {
         .single();
 
       if (existingType) {
-        return c.json({ error: "A case type with this name already exists" }, 400);
+        return c.json(
+          { error: "A case type with this name already exists" },
+          400
+        );
       }
     }
 
@@ -506,7 +575,10 @@ app.put("/cases/types/:id", async (c) => {
       .single();
 
     if (updateError || !updatedCaseType) {
-      return c.json({ error: "Case type not found or update failed", details: updateError }, 404);
+      return c.json(
+        { error: "Case type not found or update failed", details: updateError },
+        404
+      );
     }
 
     return c.json({ caseType: updatedCaseType }, 200);
@@ -528,14 +600,17 @@ app.delete("/cases/types/:id", async (c) => {
     const { error } = await supabase
       .schema(schema)
       .from("case_types")
-      .update({ 
-        is_active: false, 
-        updated_at: new Date().toISOString() 
+      .update({
+        is_active: false,
+        updated_at: new Date().toISOString(),
       })
       .eq("id", caseTypeId);
 
     if (error) {
-      return c.json({ error: "Failed to delete case type", details: error }, 500);
+      return c.json(
+        { error: "Failed to delete case type", details: error },
+        500
+      );
     }
 
     return c.json({ success: true }, 200);
@@ -563,7 +638,10 @@ app.get("/cases/types/:id/templates", async (c) => {
       .order("sort_order");
 
     if (error) {
-      return c.json({ error: "Failed to fetch folder templates", details: error }, 500);
+      return c.json(
+        { error: "Failed to fetch folder templates", details: error },
+        500
+      );
     }
 
     return c.json({ templates: templates || [] }, 200);
@@ -616,7 +694,10 @@ app.post("/cases/types/:id/templates", async (c) => {
       .single();
 
     if (insertError || !newTemplate) {
-      return c.json({ error: "Failed to create folder template", details: insertError }, 500);
+      return c.json(
+        { error: "Failed to create folder template", details: insertError },
+        500
+      );
     }
 
     return c.json({ template: newTemplate }, 201);
@@ -653,7 +734,10 @@ app.put("/cases/templates/:templateId", async (c) => {
       .single();
 
     if (updateError || !updatedTemplate) {
-      return c.json({ error: "Template not found or update failed", details: updateError }, 404);
+      return c.json(
+        { error: "Template not found or update failed", details: updateError },
+        404
+      );
     }
 
     return c.json({ template: updatedTemplate }, 200);
@@ -678,7 +762,10 @@ app.delete("/cases/templates/:templateId", async (c) => {
       .eq("id", templateId);
 
     if (deleteError) {
-      return c.json({ error: "Failed to delete template", details: deleteError }, 500);
+      return c.json(
+        { error: "Failed to delete template", details: deleteError },
+        500
+      );
     }
 
     return c.json({ success: true }, 200);
@@ -702,7 +789,8 @@ app.get("/cases", async (c) => {
     const limit = parseInt(url.searchParams.get("limit") || "20");
     const offset = parseInt(url.searchParams.get("offset") || "0");
     const orderBy = url.searchParams.get("orderBy") || "created_at";
-    const orderDirection = (url.searchParams.get("orderDirection") || "desc") as "asc" | "desc";
+    const orderDirection = (url.searchParams.get("orderDirection") ||
+      "desc") as "asc" | "desc";
     const search = url.searchParams.get("search") || undefined;
     const caseTypeId = url.searchParams.get("caseTypeId") || undefined;
 
@@ -713,8 +801,9 @@ app.get("/cases", async (c) => {
     if (caseId && caseId !== "cases") {
       const { data: case_, error } = await supabase
         .schema(schema)
-        .from("folder_cases")
-        .select(`
+        .from("cases")
+        .select(
+          `
           *,
           case_types(
             id,
@@ -724,22 +813,24 @@ app.get("/cases", async (c) => {
             color,
             icon
           )
-        `)
+        `
+        )
         .eq("id", caseId)
         .single();
-      
+
       if (error || !case_) {
         return c.json({ error: "Case not found" }, 404);
       }
-      
+
       return c.json({ case: case_ }, 200);
     }
 
     // Build query for listing cases
     let query = supabase
       .schema(schema)
-      .from("folder_cases")
-      .select(`
+      .from("cases")
+      .select(
+        `
         *,
         case_types(
           id,
@@ -749,7 +840,9 @@ app.get("/cases", async (c) => {
           color,
           icon
         )
-      `, { count: "exact" });
+      `,
+        { count: "exact" }
+      );
 
     // Apply filters
     if (search) {
@@ -769,12 +862,15 @@ app.get("/cases", async (c) => {
       return c.json({ error: "Failed to fetch cases", details: error }, 500);
     }
 
-    return c.json({
-      cases: cases || [],
-      total: count || 0,
-      limit,
-      offset,
-    }, 200);
+    return c.json(
+      {
+        cases: cases || [],
+        total: count || 0,
+        limit,
+        offset,
+      },
+      200
+    );
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -791,8 +887,9 @@ app.get("/cases/:id", async (c) => {
 
     const { data: case_, error } = await supabase
       .schema(schema)
-      .from("folder_cases")
-      .select(`
+      .from("cases")
+      .select(
+        `
         *,
         case_types(
           id,
@@ -802,7 +899,8 @@ app.get("/cases/:id", async (c) => {
           color,
           icon
         )
-      `)
+      `
+      )
       .eq("id", caseId)
       .single();
 
@@ -836,20 +934,26 @@ async function createFoldersFromTemplates(
     console.error("Failed to fetch folder templates:", templatesError);
     return;
   }
-
   // Create folders from templates
   for (const template of templates) {
     try {
-      await supabase
+      const { data: folder, error: folderError } = await supabase
         .schema(schema)
         .from("storage_folders")
         .insert({
           name: template.name,
           path: template.path,
-          case: caseId,
+          case_id: caseId,
           created_by: userId,
           parent_folder_id: null, // We'll handle nesting in a future enhancement
-        });
+        })
+        .select()
+        .single();
+      if (folderError) {
+        console.error("Failed to create folder:", folderError);
+        throw new Error("Failed to create folder", folderError);
+      }
+      console.log("Folder created:", folder);
     } catch (error) {
       console.error(`Failed to create folder ${template.name}:`, error);
     }
@@ -862,13 +966,32 @@ app.post("/cases", async (c) => {
   const userId = c.get("userId");
 
   try {
-    const { supabase, schema, user, member } = await getSupabaseAndOrgInfo(orgId, userId);
+    const { supabase, schema, user, member } = await getSupabaseAndOrgInfo(
+      orgId,
+      userId
+    );
 
     const body = await c.req.json();
-    const { name, description, case_type_id } = body;
+    const {
+      full_name,
+      phone,
+      email,
+      case_type_id,
+      special_notes,
+      filing_fee,
+      case_number,
+      adr_process,
+      applicable_rules,
+      track,
+      claim_amount,
+      hearing_locale,
+      claimant,
+      respondent,
+      case_manager,
+    } = body;
 
-    if (!name) {
-      return c.json({ error: "Missing required field: name" }, 400);
+    if (!full_name) {
+      return c.json({ error: "Missing required field: full_name" }, 400);
     }
 
     if (!case_type_id) {
@@ -891,9 +1014,9 @@ app.post("/cases", async (c) => {
     // Check if case name already exists
     const { data: existingCase } = await supabase
       .schema(schema)
-      .from("folder_cases")
+      .from("cases")
       .select("id")
-      .eq("name", name)
+      .eq("full_name", full_name)
       .single();
 
     if (existingCase) {
@@ -903,27 +1026,52 @@ app.post("/cases", async (c) => {
     // Create new case
     const { data: newCase, error: insertError } = await supabase
       .schema(schema)
-      .from("folder_cases")
+      .from("cases")
       .insert({
-        name,
-        description: description || null,
-        case_type_id,
+        full_name,
+        phone,
+        email,
+        status: "inactive",
+        case_type: case_type_id,
+        special_notes,
+        filing_fee,
+        case_number,
+        adr_process,
+        applicable_rules,
+        track,
+        claim_amount,
+        hearing_locale,
+        claimant,
+        respondent,
+        case_manager,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .select()
       .single();
 
     if (insertError || !newCase) {
-      return c.json({ error: "Failed to create case", details: insertError }, 500);
+      return c.json(
+        { error: "Failed to create case", details: insertError },
+        500
+      );
     }
 
     // Create folder structure from template
-    await createFoldersFromTemplates(supabase, schema, case_type_id, newCase.id, member.id);
+    await createFoldersFromTemplates(
+      supabase,
+      schema,
+      case_type_id,
+      newCase.id,
+      user.id
+    );
 
     // Fetch the created case with case type information
     const { data: caseWithType } = await supabase
       .schema(schema)
-      .from("folder_cases")
-      .select(`
+      .from("cases")
+      .select(
+        `
         *,
         case_types(
           id,
@@ -933,7 +1081,8 @@ app.post("/cases", async (c) => {
           color,
           icon
         )
-      `)
+      `
+      )
       .eq("id", newCase.id)
       .single();
 
@@ -953,18 +1102,38 @@ app.put("/cases/:id", async (c) => {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
 
     const body = await c.req.json();
-    const { name, description, case_type_id } = body;
+    const {
+      full_name,
+      phone,
+      email,
+      case_type_id,
+      special_notes,
+      filing_fee,
+      case_number,
+      adr_process,
+      applicable_rules,
+      track,
+      claim_amount,
+      hearing_locale,
+      claimant,
+      respondent,
+      case_manager,
+    } = body;
 
-    if (!name && description === undefined && !case_type_id) {
-      return c.json({
-        error: "At least one field (name, description, or case_type_id) must be provided"
-      }, 400);
+    if (!full_name && !case_type_id) {
+      return c.json(
+        {
+          error:
+            "At least one field (full_name, or case_type_id) must be provided",
+        },
+        400
+      );
     }
 
     // Check if case exists
     const { data: existingCase } = await supabase
       .schema(schema)
-      .from("folder_cases")
+      .from("cases")
       .select("*")
       .eq("id", caseId)
       .single();
@@ -974,12 +1143,12 @@ app.put("/cases/:id", async (c) => {
     }
 
     // If name is being updated, check for uniqueness
-    if (name && name !== existingCase.name) {
+    if (full_name && full_name !== existingCase.full_name) {
       const { data: duplicateName } = await supabase
         .schema(schema)
-        .from("folder_cases")
+        .from("cases")
         .select("id")
-        .eq("name", name)
+        .eq("full_name", full_name)
         .neq("id", caseId)
         .single();
 
@@ -1005,16 +1174,29 @@ app.put("/cases/:id", async (c) => {
 
     // Build update object
     const updateData: any = { updated_at: new Date().toISOString() };
-    if (name !== undefined) updateData.name = name;
-    if (description !== undefined) updateData.description = description;
-    if (case_type_id !== undefined) updateData.case_type_id = case_type_id;
-
+    if (full_name !== undefined) updateData.full_name = full_name;
+    if (phone !== undefined) updateData.phone = phone;
+    if (email !== undefined) updateData.email = email;
+    if (case_type_id !== undefined) updateData.case_type = case_type_id;
+    if (special_notes !== undefined) updateData.special_notes = special_notes;
+    if (filing_fee !== undefined) updateData.filing_fee = filing_fee;
+    if (case_number !== undefined) updateData.case_number = case_number;
+    if (adr_process !== undefined) updateData.adr_process = adr_process;
+    if (applicable_rules !== undefined) updateData.applicable_rules = applicable_rules;
+    if (track !== undefined) updateData.track = track;
+    if (claim_amount !== undefined) updateData.claim_amount = claim_amount;
+    if (hearing_locale !== undefined) updateData.hearing_locale = hearing_locale;
+    if (claimant !== undefined) updateData.claimant = claimant;
+    if (respondent !== undefined) updateData.respondent = respondent;
+    if (case_manager !== undefined) updateData.case_manager = case_manager;
+    
     const { data: updatedCase, error: updateError } = await supabase
       .schema(schema)
-      .from("folder_cases")
+      .from("cases")
       .update(updateData)
       .eq("id", caseId)
-      .select(`
+      .select(
+        `
         *,
         case_types(
           id,
@@ -1024,11 +1206,15 @@ app.put("/cases/:id", async (c) => {
           color,
           icon
         )
-      `)
+      `
+      )
       .single();
 
     if (updateError || !updatedCase) {
-      return c.json({ error: "Failed to update case", details: updateError }, 500);
+      return c.json(
+        { error: "Failed to update case", details: updateError },
+        500
+      );
     }
 
     return c.json({ case: updatedCase }, 200);
@@ -1049,7 +1235,7 @@ app.delete("/cases/:id", async (c) => {
     // Check if case exists
     const { data: existingCase } = await supabase
       .schema(schema)
-      .from("folder_cases")
+      .from("cases")
       .select("*")
       .eq("id", caseId)
       .single();
@@ -1068,12 +1254,15 @@ app.delete("/cases/:id", async (c) => {
     // Delete case
     const { error: deleteError } = await supabase
       .schema(schema)
-      .from("folder_cases")
+      .from("cases")
       .delete()
       .eq("id", caseId);
 
     if (deleteError) {
-      return c.json({ error: "Failed to delete case", details: deleteError }, 500);
+      return c.json(
+        { error: "Failed to delete case", details: deleteError },
+        500
+      );
     }
 
     return c.json({ success: true, message: "Case deleted successfully" }, 200);
