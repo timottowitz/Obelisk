@@ -14,16 +14,15 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { UploadIcon, CircleAlertIcon, Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import dyajs from 'dayjs';
 import { useCasesOperations } from '@/hooks/useCases';
 
-export function CaseForm({
-  caseTypes,
-  isLoading
-}: {
-  caseTypes: any[];
-  isLoading: boolean;
-}) {
+export function CaseForm({ initialData }: { initialData?: any }) {
+  const { caseTypes: caseTypesData } = useCasesOperations();
+  const caseTypes = caseTypesData.data || [];
+  const caseTypesLoading = caseTypesData.isLoading;
+
   const [formData, setFormData] = useState<{
     full_name: string;
     phone: string;
@@ -32,44 +31,52 @@ export function CaseForm({
     special_notes: string;
     filing_fee: string;
     case_number: string;
+    claimant: string;
+    respondent: string;
+    case_manager: string;
+    adr_process: string;
+    applicable_rules: string;
+    track: string;
+    claim_amount: string;
+    hearing_locale: string;
   }>({
-    full_name: '',
-    phone: '',
-    email: '',
-    case_type_id: '',
-    special_notes: '',
-    filing_fee: '',
-    case_number: ''
+    full_name: initialData?.full_name || '',
+    phone: initialData?.phone || '',
+    email: initialData?.email || '',
+    case_type_id: initialData?.case_type || '',
+    special_notes: initialData?.special_notes || '',
+    filing_fee: initialData?.filing_fee || '',
+    case_number: initialData?.case_number || '',
+    claimant: initialData?.claimant || '',
+    respondent: initialData?.respondent || '',
+    case_manager: initialData?.case_manager || '',
+    adr_process: initialData?.adr_process || '',
+    applicable_rules: initialData?.applicable_rules || '',
+    track: initialData?.track || '',
+    claim_amount: initialData?.claim_amount || '',
+    hearing_locale: initialData?.hearing_locale || ''
   });
 
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const { createCase } = useCasesOperations();
-
+  const { createCase, updateCase } = useCasesOperations();
+  const router = useRouter();
+  const [createLoading, setCreateLoading] = useState(false);
   // Set default case type ID when case types are loaded
   useEffect(() => {
-    if (caseTypes.length > 0 && !formData.case_type_id) {
+    if (caseTypes.length > 0 && !formData.case_type_id && !initialData) {
       setFormData((prev) => ({
         ...prev,
         case_type_id: caseTypes[0].id
       }));
     }
-  }, [caseTypes]);
+  }, [caseTypes, formData.case_type_id, initialData]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    setUploadedFiles((prev) => [...prev, ...files]);
-  };
-
-  const handleRemoveFile = (index: number) => {
-    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    setCreateLoading(true);
     const case_number =
       dyajs().format('DD-MM') +
       '-' +
@@ -78,15 +85,23 @@ export function CaseForm({
         .replace(/(\d{4})(\d{4})/, '$1-$2');
 
     try {
-      const response = await createCase.mutateAsync({
-        ...formData,
-        case_number
-      });
-      if (response) {
-        console.log('Case created successfully:', response);
+      if (initialData) {
+        await updateCase.mutateAsync({
+          caseId: initialData.id,
+          formData: formData
+        });
+      } else {
+        await createCase.mutateAsync({
+          ...formData,
+          case_number
+        });
       }
+      console.log(`Case ${initialData ? 'updated' : 'created'} successfully`);
+      router.push(`/dashboard/cases`);
     } catch (error) {
       console.error('Case creation failed:', error);
+    } finally {
+      setCreateLoading(false);
     }
   };
 
@@ -149,9 +164,9 @@ export function CaseForm({
                 <Label htmlFor='case_type_id'>
                   Case Type <span className='text-red-500'>*</span>
                 </Label>
-                {!isLoading && caseTypes.length > 0 ? (
+                {!caseTypesLoading && caseTypes.length > 0 ? (
                   <Select
-                    defaultValue={caseTypes[0].id}
+                    value={formData.case_type_id}
                     onValueChange={(value) =>
                       handleInputChange('case_type_id', value)
                     }
@@ -163,7 +178,7 @@ export function CaseForm({
                       {caseTypes.map((type) => {
                         return (
                           <SelectItem key={type.id} value={type.id}>
-                            {type.name}
+                            {type.display_name}
                           </SelectItem>
                         );
                       })}
@@ -216,78 +231,124 @@ export function CaseForm({
               <span>Enter $0.00 if fee is unknown.</span>
             </div>
           </div>
-
-          {/* Upload Filing Documents */}
-          <div className='space-y-4'>
-            <div className='flex gap-2'>
-              <Label>
-                Upload Filing Documents
-                <span className='text-red-500'>*</span>
-              </Label>
-              <Button
-                type='button'
-                variant='outline'
-                size='sm'
-                onClick={() => document.getElementById('fileUpload')?.click()}
-              >
-                <UploadIcon className='mr-2 h-4 w-4' />
-                Upload
-              </Button>
-              <input
-                id='fileUpload'
-                type='file'
-                multiple
-                className='hidden'
-                onChange={handleFileUpload}
-                accept='.pdf,.doc,.docx,.txt'
+          <div className='flex flex-row justify-between gap-4'>
+            {/* Claimant */}
+            <div className='space-y-2'>
+              <Label htmlFor='claimant'>Claimant</Label>
+              <Input
+                id='claimant'
+                value={formData.claimant}
+                onChange={(e) => handleInputChange('claimant', e.target.value)}
+                placeholder='Enter claimant name'
               />
             </div>
 
-            {/* File Upload Table */}
-            <div className='rounded-lg border'>
-              <div className='grid grid-cols-3 gap-4 border-b bg-gray-50 p-3 text-sm font-medium'>
-                <span>File Name</span>
-                <span>Description</span>
-                <span>Action</span>
-              </div>
-              <div className='p-4'>
-                {uploadedFiles.length === 0 ? (
-                  <p className='text-sm text-gray-500'>No data to display.</p>
-                ) : (
-                  <div className='space-y-2'>
-                    {uploadedFiles.map((file, index) => (
-                      <div
-                        key={index}
-                        className='grid grid-cols-3 items-center gap-4 py-2'
-                      >
-                        <span className='text-sm'>{file.name}</span>
-                        <span className='text-sm text-gray-500'>
-                          Uploaded document
-                        </span>
-                        <Button
-                          type='button'
-                          variant='outline'
-                          size='sm'
-                          onClick={() => handleRemoveFile(index)}
-                          className='text-red-600 hover:text-red-700'
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+            {/* Respondent */}
+            <div className='space-y-2'>
+              <Label htmlFor='respondent'>Respondent</Label>
+              <Input
+                id='respondent'
+                value={formData.respondent}
+                onChange={(e) =>
+                  handleInputChange('respondent', e.target.value)
+                }
+                placeholder='Enter respondent name'
+              />
+            </div>
+
+            {/* Case Manager */}
+            <div className='space-y-2'>
+              <Label htmlFor='case_manager'>Case Manager</Label>
+              <Input
+                id='case_manager'
+                value={formData.case_manager}
+                onChange={(e) =>
+                  handleInputChange('case_manager', e.target.value)
+                }
+                placeholder='Enter case manager name'
+              />
+            </div>
+          </div>
+          <div className='flex flex-row justify-between gap-4'>
+            {/* ADR Process */}
+            <div className='space-y-2'>
+              <Label htmlFor='adr_process'>ADR Process</Label>
+              <Input
+                id='adr_process'
+                value={formData.adr_process}
+                onChange={(e) =>
+                  handleInputChange('adr_process', e.target.value)
+                }
+                placeholder='Enter ADR process'
+              />
+            </div>
+
+            {/* Applicable Rules */}
+            <div className='space-y-2'>
+              <Label htmlFor='applicable_rules'>Applicable Rules</Label>
+              <Input
+                id='applicable_rules'
+                value={formData.applicable_rules}
+                onChange={(e) =>
+                  handleInputChange('applicable_rules', e.target.value)
+                }
+                placeholder='Enter applicable rules'
+              />
+            </div>
+
+            {/* Track */}
+            <div className='space-y-2'>
+              <Label htmlFor='track'>Track</Label>
+              <Input
+                id='track'
+                value={formData.track}
+                onChange={(e) => handleInputChange('track', e.target.value)}
+                placeholder='Enter track'
+              />
+            </div>
+
+            {/* Claim Amount */}
+            <div className='space-y-2'>
+              <Label htmlFor='claim_amount'>Claim Amount</Label>
+              <Input
+                id='claim_amount'
+                value={formData.claim_amount}
+                onChange={(e) =>
+                  handleInputChange('claim_amount', e.target.value)
+                }
+                placeholder='Enter claim amount'
+              />
+            </div>
+
+            {/* Hearing Locale */}
+            <div className='space-y-2'>
+              <Label htmlFor='hearing_locale'>Hearing Locale</Label>
+              <Input
+                id='hearing_locale'
+                value={formData.hearing_locale}
+                onChange={(e) =>
+                  handleInputChange('hearing_locale', e.target.value)
+                }
+                placeholder='Enter hearing locale'
+              />
             </div>
           </div>
 
           {/* Action Buttons */}
           <div className='flex justify-end gap-3 pt-4'>
-            <Button variant='outline' className='px-6'>
+            <Button
+              variant='outline'
+              className='px-6'
+              onClick={() => router.push('/dashboard/cases')}
+            >
               Cancel
             </Button>
-            <Button type='submit' className='bg-red-600 px-6 hover:bg-red-700'>
-              Create
+            <Button
+              type='submit'
+              className='bg-red-600 px-6 hover:bg-red-700'
+              disabled={createLoading}
+            >
+              {createLoading ? 'Loading...' : 'Save'}
             </Button>
           </div>
         </CardContent>

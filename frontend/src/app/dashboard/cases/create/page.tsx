@@ -1,15 +1,10 @@
 'use client';
 
-import { GavelIcon, CircleAlertIcon } from 'lucide-react';
+import { GavelIcon, CircleAlertIcon, Link } from 'lucide-react';
 import { CaseForm } from '@/features/cases/create/case-form';
 import { CaseSidebar } from '@/features/cases/create/case-sidebar';
-import { useCasesOperations } from '@/hooks/useCases';
 
 export default function CreateCasePage() {
-  const { caseTypes } = useCasesOperations();
-  const caseTypesData = caseTypes.data || [];
-  const caeTypesLoading = caseTypes.isLoading;
-
   return (
     <div className='h-[calc(100vh-4rem)] overflow-y-auto'>
       <div className='container mx-auto px-4 py-6'>
@@ -31,11 +26,11 @@ export default function CreateCasePage() {
         <div className='grid grid-cols-1 gap-6 lg:grid-cols-3'>
           {/* Main Form - Left Side */}
           <div className='lg:col-span-2'>
-            <CaseForm caseTypes={caseTypesData} isLoading={caeTypesLoading} />
+            <CaseForm />
           </div>
 
           {/* Right Sidebar */}
-          <div>
+          <div className='hidden lg:block'>
             <CaseSidebar />
           </div>
         </div>

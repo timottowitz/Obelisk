@@ -19,7 +19,8 @@ export interface Folder {
   name: string;
   parentId: string | null;
   createdBy: string;
-  case: string;
+  case_id: string;
+  case_type_id: string;
   createdAt: string;
   children?: Folder[];
   documents?: Document[];
@@ -45,49 +46,49 @@ export interface ApiResponse<T> {
 // Query keys
 const QUERY_KEYS = {
   documents: ['documents'] as const,
-  folders: ['folders'] as const,
-  folderCases: ['folderCases'] as const,
+  folders: ['folders'] as const
 } as const;
 
 // Hooks for querying data
 export function useDocuments() {
-  const { orgId } = useAuth();
-
   return useQuery({
-    queryKey: [...QUERY_KEYS.documents, orgId],
+    queryKey: [...QUERY_KEYS.documents],
     queryFn: async () => {
-      const response = await StoreDocumentsAPI.getDocuments() as ApiResponse<Document[]>;
+      const response = (await StoreDocumentsAPI.getDocuments()) as ApiResponse<
+        Document[]
+      >;
       return response.data || [];
     },
-    enabled: !!orgId,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 2,
+    retry: 2
   });
 }
 
-export function useFolders() {
-  const { orgId } = useAuth();
-
+export function useFolders(caseId: string) {
   return useQuery({
-    queryKey: [...QUERY_KEYS.folders, orgId],
+    queryKey: [...QUERY_KEYS.folders, caseId],
     queryFn: async () => {
-      const response = await StoreDocumentsAPI.getFolders() as ApiResponse<Folder[]>;
+      const response = (await StoreDocumentsAPI.getFolders(
+        caseId
+      )) as ApiResponse<Folder[]>;
       return response.data || [];
     },
-    enabled: !!orgId,
+    enabled: !!caseId,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 2,
+    retry: 2
   });
 }
 
 // Mutation hooks
 export function useUploadDocument() {
   const queryClient = useQueryClient();
-  const { orgId } = useAuth();
 
   return useMutation({
     mutationFn: async ({ file, folderId }: UploadDocumentData) => {
-      const response = await StoreDocumentsAPI.uploadDocument(file, folderId) as ApiResponse<any>;
+      const response = (await StoreDocumentsAPI.uploadDocument(
+        file,
+        folderId
+      )) as ApiResponse<any>;
       if (!response.success) {
         throw new Error(response.error || 'Upload failed');
       }
@@ -95,22 +96,24 @@ export function useUploadDocument() {
     },
     onSuccess: () => {
       // Invalidate and refetch both documents and folders
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.documents, orgId] });
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.folders, orgId] });
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.documents] });
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.folders] });
     },
     onError: (error) => {
       console.error('Upload failed:', error);
-    },
+    }
   });
 }
 
 export function useCreateFolder() {
   const queryClient = useQueryClient();
-  const { orgId } = useAuth();
 
   return useMutation({
     mutationFn: async ({ folderName, parentId }: CreateFolderData) => {
-      const response = await StoreDocumentsAPI.createFolder(folderName, parentId) as ApiResponse<any>;
+      const response = (await StoreDocumentsAPI.createFolder(
+        folderName,
+        parentId
+      )) as ApiResponse<any>;
       if (!response.success) {
         throw new Error(response.error || 'Create folder failed');
       }
@@ -118,18 +121,20 @@ export function useCreateFolder() {
     },
     onSuccess: () => {
       // Invalidate and refetch folders
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.folders, orgId] });
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.folders] });
     },
     onError: (error) => {
       console.error('Create folder failed:', error);
-    },
+    }
   });
 }
 
 export function useDownloadFile() {
   return useMutation({
     mutationFn: async (fileId: string) => {
-      const response = await StoreDocumentsAPI.downloadFile(fileId) as ApiResponse<{ sasUrl: string }>;
+      const response = (await StoreDocumentsAPI.downloadFile(
+        fileId
+      )) as ApiResponse<{ sasUrl: string }>;
       if (!response.success) {
         throw new Error(response.error || 'Download failed');
       }
@@ -137,17 +142,18 @@ export function useDownloadFile() {
     },
     onError: (error) => {
       console.error('Download failed:', error);
-    },
+    }
   });
 }
 
 export function useDeleteFile() {
   const queryClient = useQueryClient();
-  const { orgId } = useAuth();
 
   return useMutation({
     mutationFn: async (fileId: string) => {
-      const response = await StoreDocumentsAPI.deleteFile(fileId) as ApiResponse<any>;
+      const response = (await StoreDocumentsAPI.deleteFile(
+        fileId
+      )) as ApiResponse<any>;
       if (!response.success) {
         throw new Error(response.error || 'Delete file failed');
       }
@@ -155,22 +161,23 @@ export function useDeleteFile() {
     },
     onSuccess: () => {
       // Invalidate and refetch both documents and folders
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.documents, orgId] });
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.folders, orgId] });
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.documents] });
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.folders] });
     },
     onError: (error) => {
       console.error('Delete file failed:', error);
-    },
+    }
   });
 }
 
 export function useDeleteFolder() {
   const queryClient = useQueryClient();
-  const { orgId } = useAuth();
 
   return useMutation({
     mutationFn: async (folderId: string) => {
-      const response = await StoreDocumentsAPI.deleteFolder(folderId) as ApiResponse<any>;
+      const response = (await StoreDocumentsAPI.deleteFolder(
+        folderId
+      )) as ApiResponse<any>;
       if (!response.success) {
         throw new Error(response.error || 'Delete folder failed');
       }
@@ -178,65 +185,28 @@ export function useDeleteFolder() {
     },
     onSuccess: () => {
       // Invalidate and refetch folders
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.folders, orgId] });
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.folders] });
     },
     onError: (error) => {
       console.error('Delete folder failed:', error);
-    },
-  });
-}
-
-export function useCreateFolderCase() {
-  const queryClient = useQueryClient();
-  const { orgId } = useAuth();
-
-  return useMutation({
-    mutationFn: async (folderCaseName: string) => {
-      const response = await StoreDocumentsAPI.createFolderCase(folderCaseName) as ApiResponse<any>;
-      if (!response.success) {
-        throw new Error(response.error || 'Create folder case failed');
-      }
-      return response;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.folders, orgId] });
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.folderCases, orgId] });
-    },
-    onError: (error) => {
-      console.error('Create folder case failed:', error);
-    },
-  })
-}
-
-export function useFolderCases() {
-  const { orgId } = useAuth();
-
-  return useQuery({
-    queryKey: [...QUERY_KEYS.folderCases, orgId],
-    queryFn: async () => {
-      const response = await StoreDocumentsAPI.getFolderCases() as ApiResponse<any>;
-      return response.data || [];
-    },
-    enabled: !!orgId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 2,
+    }
   });
 }
 
 // Compound hook for all storage operations
 export function useStorageOperations() {
   return {
-    // Queries
-    // documents: useDocuments(),
-    folders: useFolders(),
-    folderCases: useFolderCases(),
     // Mutations
-    createFolderCase: useCreateFolderCase(),
     uploadDocument: useUploadDocument(),
     createFolder: useCreateFolder(),
     downloadFile: useDownloadFile(),
     deleteFile: useDeleteFile(),
-    deleteFolder: useDeleteFolder(),
-
+    deleteFolder: useDeleteFolder()
   };
-} 
+}
+
+export function useFoldersOperations(caseId: string) {
+  return {
+    folders: useFolders(caseId)
+  };
+}

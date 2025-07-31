@@ -258,8 +258,8 @@ app.post("/storage/folder-cases", async (c) => {
   }
 });
 
-// Get folder cases endpoint
-app.get("/storage/folder-cases", async (c) => {
+// Get case types endpoint
+app.get("/storage/case-types", async (c) => {
   try {
     const orgId = c.get("orgId");
     const userId = c.get("userId");
@@ -280,7 +280,7 @@ app.get("/storage/folder-cases", async (c) => {
       .eq("clerk_organization_id", orgId)
       .single();
 
-    const result = await handleGetFolderCases(supabaseClient, {
+    const result = await handleGetCaseTypes(supabaseClient, {
       userId: user.data?.id,
       schema: org.data?.schema_name.toLowerCase(),
     });
@@ -335,10 +335,11 @@ app.post("/storage/folders", async (c) => {
   }
 });
 
-app.get("/storage/folders/tree", async (c) => {
+app.get("/storage/folders/:caseId/tree", async (c) => {
   try {
     const orgId = c.get("orgId");
     const userId = c.get("userId");
+    const caseId = c.req.param("caseId");
 
     const supabaseClient = await getSupabaseClient();
 
@@ -360,7 +361,8 @@ app.get("/storage/folders/tree", async (c) => {
       supabaseClient,
       user.data?.id,
       org.data?.schema_name.toLowerCase(),
-      org.data?.id
+      org.data?.id,
+      caseId
     );
 
     return c.json({ success: true, data: result });
@@ -1348,13 +1350,15 @@ async function handleGetFolders(
   supabaseClient: any,
   userId: string,
   schema: string,
-  orgId: string
+  orgId: string,
+  caseId: string
 ) {
   const { data: folders, error: foldersError } = await supabaseClient
     .schema(schema)
     .from("storage_folders")
     .select("*")
     .eq("created_by", userId)
+    .eq("case_id", caseId)
     .is("deleted_at", null);
 
   const member = await supabaseClient
@@ -1445,7 +1449,6 @@ async function handleCreateFolderCase(
   }
 ) {
   const { folderCaseName, schema, userId } = params;
-  console.log("handleCreateFolderCase", folderCaseName, schema, userId);
 
   const { data: folderCase, error: folderCaseError } = await supabaseClient
     .schema(schema)
@@ -1465,52 +1468,11 @@ async function handleCreateFolderCase(
     .select()
     .single();
 
-  const defaultFolders = [
-    {
-      name: "Contracts",
-      path: "/contracts",
-    },
-    {
-      name: "Financial",
-      path: "/financial",
-    },
-    {
-      name: "Documents",
-      path: "/documents",
-    },
-    {
-      name: "Evidence Documentation",
-      path: "/evidence-documentation",
-    },
-    {
-      name: "Correspondence",
-      path: "/correspondence",
-    },
-    {
-      name: "Legal Documents",
-      path: "/legal-documents",
-    },
-  ];
-
-  for (const folder of defaultFolders) {
-    console.log("Creating default folder:", folder);
-    try {
-      await supabaseClient.schema(schema).from("storage_folders").insert({
-        name: folder.name,
-        path: folder.path,
-        created_by: userId,
-        case_id: folderCase.id,
-      });
-    } catch (error) {
-      console.error("Error creating default folder:", error);
-    }
-  }
-
   if (folderCaseError) throw folderCaseError;
   return folderCase;
 }
 
-async function handleGetFolderCases(
+async function handleGetCaseTypes(
   supabaseClient: any,
   params: {
     userId: string;
@@ -1519,14 +1481,14 @@ async function handleGetFolderCases(
 ) {
   const { userId, schema } = params;
 
-  const { data: folderCases, error: folderCasesError } = await supabaseClient
+  const { data: caseTypes, error: caseTypesError } = await supabaseClient
     .schema(schema)
-    .from("cases")
+    .from("case_types")
     .select("*");
 
-  if (folderCasesError) throw folderCasesError;
+  if (caseTypesError) throw caseTypesError;
 
-  return folderCases;
+  return caseTypes;
 }
 
 export default app;
