@@ -25,6 +25,7 @@ export interface Case {
   phone: string;
   email: string;
   case_type: string;
+  case_types: CaseType;
   special_notes: string;
   filing_fee: string;
   claimant: string;

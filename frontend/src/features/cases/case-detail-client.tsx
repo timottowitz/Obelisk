@@ -193,7 +193,7 @@ export default function CaseDetailClient({
                 </TabsContent>
 
                 <TabsContent value='documents' className='space-y-6'>
-                  <Documents caseId={caseId} />
+                  <Documents caseId={caseId} caseTypeName={caseData!.case_types.display_name} />
                 </TabsContent>
 
                 <TabsContent value='hearing-exhibits' className='space-y-6'>
