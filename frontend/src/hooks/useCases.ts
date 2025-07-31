@@ -14,7 +14,8 @@ const QUERY_KEYS = {
   cases: ['cases'] as const,
   case: ['case'] as const,
   tasks: ['tasks'] as const,
-  folders: ['folders'] as const
+  folders: ['folders'] as const,
+  events: ['events'] as const
 };
 
 export function useCaseTypes() {
@@ -194,6 +195,9 @@ export function useCreateCaseTask() {
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.tasks, caseId]
       });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.events, caseId]
+      });
     },
     onError: (error) => {
       console.error('Case task creation failed:', error);
@@ -220,6 +224,9 @@ export function useUpdateCaseTask() {
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.tasks, caseId]
       });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.events, caseId]
+      });
     },
     onError: (error) => {
       console.error('Case task update failed:', error);
@@ -243,6 +250,9 @@ export function useDeleteCaseTask() {
     onSuccess: (_, { caseId }) => {
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.tasks, caseId]
+      });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.events, caseId]
       });
     },
     onError: (error) => {
@@ -311,6 +321,19 @@ export function useDeleteFolderTemplate() {
     onError: (error) => {
       console.error('Folder template deletion failed:', error);
     }
+  });
+}
+
+export function useGetCaseEvents(caseId: string) {
+  return useQuery({
+    queryKey: [...QUERY_KEYS.events, caseId],
+    queryFn: async () => {
+      const response = await CasesAPI.getCaseEvents(caseId);
+      return response;
+    },
+    enabled: !!caseId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 2
   });
 }
 

@@ -25,8 +25,8 @@ interface CaseDetailsTableProps {
   className?: string;
   isLoading?: boolean;
   error?: any;
-  onEdit: (row: any) => void;
-  onDelete: (row: any) => void;
+  onEdit?: (row: any) => void;
+  onDelete?: (row: any) => void;
 }
 
 export default function CaseDetailsTable({
@@ -72,7 +72,7 @@ export default function CaseDetailsTable({
                   {column.render
                     ? column.key === 'actions'
                       ? column.render(row, onEdit, onDelete)
-                      : column.render(column.key)
+                      : column.render(row[column.key])
                     : row[column.key]}
                 </TableCell>
               ))}

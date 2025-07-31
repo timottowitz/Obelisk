@@ -49,3 +49,17 @@ export interface Task {
   created_at: string;
   updated_at: string;
 }
+
+export interface CaseEvent {
+  id: string;
+  case_id: string;
+  event_type: string;
+  method: string;
+  status: string;
+  location: string;
+  address: string;
+  date: string;
+  time: string;
+  created_at: string;
+  updated_at: string;
+}

@@ -1327,6 +1327,29 @@ app.post("/cases/:id/tasks", async (c) => {
       );
     }
 
+    const { error: eventError } = await supabase
+      .schema(schema)
+      .from("case_events")
+      .insert({
+        case_id: case_id,
+        event_type: "task_created",
+        method: "POST",
+        status: "success",
+        location: "case_tasks",
+        address: name,
+        date: new Date().toISOString().split("T")[0],
+        time: new Date().toISOString().split("T")[1].split(".")[0],
+      })
+      .select()
+      .single();
+
+    if (eventError) {
+      return c.json(
+        { error: "Failed to create event", details: eventError },
+        500
+      );
+    }
+
     return c.json(newTask, 201);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
@@ -1362,6 +1385,20 @@ app.put("/cases/:id/tasks/:taskId", async (c) => {
       );
     }
 
+    await supabase
+      .schema(schema)
+      .from("case_events")
+      .insert({
+        case_id: caseId,
+        event_type: "task_updated",
+        method: "PUT",
+        status: "success",
+        location: "case_tasks",
+        address: name,
+        date: new Date().toISOString().split("T")[0],
+        time: new Date().toISOString().split("T")[1].split(".")[0],
+      });
+
     return c.json(updatedTask, 200);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
@@ -1378,6 +1415,18 @@ app.delete("/cases/:id/tasks/:taskId", async (c) => {
   try {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
 
+    const { data: task } = await supabase
+      .schema(schema)
+      .from("case_tasks")
+      .select("*")
+      .eq("id", taskId)
+      .eq("case_id", caseId)
+      .single();
+
+    if (!task) {
+      return c.json({ error: "Task not found" }, 404);
+    }
+
     const { error: deleteError } = await supabase
       .schema(schema)
       .from("case_tasks")
@@ -1392,7 +1441,49 @@ app.delete("/cases/:id/tasks/:taskId", async (c) => {
       );
     }
 
+    await supabase
+      .schema(schema)
+      .from("case_events")
+      .insert({
+        case_id: caseId,
+        event_type: "task_deleted",
+        method: "DELETE",
+        status: "success",
+        location: "case_tasks",
+        address: task.name,
+        date: new Date().toISOString().split("T")[0],
+        time: new Date().toISOString().split("T")[1].split(".")[0],
+      });
+
     return c.json({ success: true, message: "Task deleted successfully" }, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+//GET /cases/:id/events - Get events for case
+app.get("/cases/:id/events", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const caseId = c.req.param("id");
+
+  try {
+    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
+
+    const { data: events, error: selectError } = await supabase
+      .schema(schema)
+      .from("case_events")
+      .select("*")
+      .eq("case_id", caseId);
+
+    if (selectError || !events) {
+      return c.json(
+        { error: "Failed to fetch events", details: selectError },
+        500
+      );
+    }
+
+    return c.json(events, 200);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }

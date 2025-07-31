@@ -185,7 +185,7 @@ export default function CaseDetailClient({
                 </TabsContent>
 
                 <TabsContent value='events' className='space-y-6'>
-                  <Events />
+                  <Events caseId={caseId} />
                 </TabsContent>
 
                 <TabsContent value='forms' className='space-y-6'>

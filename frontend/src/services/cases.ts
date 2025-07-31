@@ -1,5 +1,5 @@
 import { API_CONFIG, getAuthHeaders, handleApiResponse } from '@/config/api';
-import { Case, CaseType, FolderTemplate, Task } from '@/types/cases';
+import { Case, CaseEvent, CaseType, Task } from '@/types/cases';
 
 // Utility function to create upload headers
 function createUploadHeaders(headers: HeadersInit): Record<string, string> {
@@ -201,5 +201,16 @@ export default class CasesAPI {
       headers: uploadHeaders
     });
     return handleApiResponse(response);
+  }
+
+  static async getCaseEvents(caseId: string) {
+    const headers = await getAuthHeaders();
+    const uploadHeaders = createUploadHeaders(headers);
+
+    const response = await fetch(`${API_BASE_URL}/${caseId}/events`, {
+      method: 'GET',
+      headers: uploadHeaders
+    });
+    return handleApiResponse<CaseEvent[]>(response);
   }
 }
