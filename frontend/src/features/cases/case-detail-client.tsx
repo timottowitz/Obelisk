@@ -13,7 +13,7 @@ import Documents from '@/features/cases/tabs/documents';
 import HearingExhibits from '@/features/cases/tabs/hearing-exhibits';
 import Finances from '@/features/cases/tabs/finances';
 import OfferHistory from '@/features/cases/tabs/offer-history';
-import { useCaseOperations } from '@/hooks/useCases';
+import { useGetCase } from '@/hooks/useCases';
 
 interface CaseDetail {
   id: string;
@@ -41,12 +41,7 @@ export default function CaseDetailClient({
   caseId
 }: CaseDetailClientProps) {
   const [activeTab, setActiveTab] = useState('case-information');
-  const { getCase } = useCaseOperations(caseId);
-  const caseDataLoading = getCase.isLoading;
-  const caseDataError = getCase.error;
-
-  // Extract case data from API response or use mock data
-  const caseData = getCase.data;
+  const { data: caseData, isLoading: caseDataLoading, error: caseDataError } = useGetCase(caseId);
 
   return (
     <div className='h-[calc(100vh-4rem)] overflow-y-auto bg-gray-50'>

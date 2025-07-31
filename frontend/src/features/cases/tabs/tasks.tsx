@@ -3,32 +3,35 @@ import { tasksColumns } from './columns';
 import { Button } from '@/components/ui/button';
 import CreateTaskModal from './components/create-task-modal';
 import { useState } from 'react';
-import { useCaseOperations, useCasesOperations } from '@/hooks/useCases';
+import { useCasesOperations, useGetCaseTasks } from '@/hooks/useCases';
 import { toast } from 'sonner';
+import { useCallback } from 'react';
 
 export default function Tasks({ caseId }: { caseId: string }) {
   const [isOpen, setIsOpen] = useState(false);
-  const { getCaseTasks } = useCaseOperations(caseId);
+  const { data: tasks, isLoading, error } = useGetCaseTasks(caseId);
   const { createCaseTask } = useCasesOperations();
-  const { data: tasks, isLoading, error } = getCaseTasks;
 
-  const handleSave = async (taskData: any) => {
-    try {
-      const response = await createCaseTask.mutateAsync({
-        caseId,
-        formData: taskData
-      });
-      if (response) {
-        toast.success('Task created successfully');
-      } else {
+  const handleSave = useCallback(
+    async (taskData: any) => {
+      try {
+        const response = await createCaseTask.mutateAsync({
+          caseId,
+          formData: taskData
+        });
+        if (response) {
+          toast.success('Task created successfully');
+        } else {
+          toast.error('Failed to create task');
+        }
+      } catch (error: any) {
+        console.log(error);
         toast.error('Failed to create task');
       }
-    } catch (error: any) {
-      console.log(error);
-      toast.error('Failed to create task');
-    }
-    setIsOpen(false);
-  };
+      setIsOpen(false);
+    },
+    [caseId, createCaseTask]
+  );
 
   return (
     <div className='flex flex-col gap-4'>

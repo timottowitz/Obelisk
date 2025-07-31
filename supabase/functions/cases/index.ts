@@ -413,7 +413,7 @@ app.get("/cases/types/:id", async (c) => {
       return c.json({ error: "Case type not found" }, 404);
     }
 
-    return c.json({ caseType }, 200);
+    return c.json(caseType, 200);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }

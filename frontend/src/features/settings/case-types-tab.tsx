@@ -1,16 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Folder, Plus, Loader2 } from 'lucide-react';
-import { CreateCaseTypeDialog } from './create-case-type-dialog';
-import { CaseTypeCard } from './case-type-card';
+import { CreateCaseTypeDialog } from './components/create-case-type-dialog';
+import { CaseTypeCard } from './components/case-type-card';
 import { CaseType } from '@/types/cases';
-import { DeleteCaseTypeDialog } from './delete-case-type-dialog';
+import { DeleteCaseTypeDialog } from './components/delete-case-type-dialog';
 import { useCasesOperations } from '@/hooks/useCases';
-import { toast } from 'sonner';
-
 interface CaseTypesTabProps {
   caseTypes: CaseType[] | undefined;
   isLoading: boolean;
@@ -25,32 +23,37 @@ export function CaseTypesTab({ caseTypes, isLoading }: CaseTypesTabProps) {
   const { createCaseType, deleteCaseType, updateCaseType } =
     useCasesOperations();
 
-  const handleCreateCaseType = async (caseType: any) => {
-    try {
+  const handleCreateCaseType = useCallback(
+    async (caseType: any) => {
       await createCaseType.mutateAsync(caseType);
-      toast.success('Case type created successfully');
-    } catch (error) {
-      toast.error('Failed to create case type');
-    }
-  };
+    },
+    [createCaseType]
+  );
 
-  const handleUpdateCaseType = async (caseTypeId: string, caseType: any) => {
-    await updateCaseType.mutateAsync({ caseTypeId, caseType });
-  };
+  const handleUpdateCaseType = useCallback(
+    async (caseTypeId: string, caseType: any) => {
+      await updateCaseType.mutateAsync({ caseTypeId, caseType });
+    },
+    [updateCaseType]
+  );
 
-  const handleDeleteCaseType = async (id: string) => {
-    await deleteCaseType.mutateAsync(id);
-  };
+  const handleDeleteCaseType = useCallback(
+    async (id: string) => {
+      await deleteCaseType.mutateAsync(id);
+      setShowDeleteDialog(false);
+    },
+    [deleteCaseType]
+  );
 
-  const handleSelectDeleteCaseType = (caseType: CaseType) => {
+  const handleSelectDeleteCaseType = useCallback((caseType: CaseType) => {
     setSelectedCaseType(caseType);
     setShowDeleteDialog(true);
-  };
+  }, []);
 
-  const handleSelectEditCaseType = (caseType: CaseType) => {
+  const handleSelectEditCaseType = useCallback((caseType: CaseType) => {
     setSelectedCaseType(caseType);
     setShowCreateDialog(true);
-  };
+  }, []);
 
   return (
     <div className='space-y-6'>
@@ -102,7 +105,7 @@ export function CaseTypesTab({ caseTypes, isLoading }: CaseTypesTabProps) {
             </p>
             <Button
               onClick={() => setShowCreateDialog(true)}
-              className='bg-blue-600 hover:bg-blue-700'
+              className='cursor-pointer bg-blue-600 hover:bg-blue-700'
             >
               <Plus className='mr-2 h-4 w-4' />
               Create Case Type

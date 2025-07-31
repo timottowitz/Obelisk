@@ -1,3 +1,9 @@
+export interface FolderTemplate {
+  id: string;
+  name: string;
+  sort_order: number;
+}
+
 export interface CaseType {
   id: string;
   name: string;
@@ -6,7 +12,7 @@ export interface CaseType {
   display_name: string;
   description: string;
   is_active: boolean;
-  folder_templates: { name: string }[];
+  folder_templates: FolderTemplate[];
   created_at: string;
   updated_at: string;
 }

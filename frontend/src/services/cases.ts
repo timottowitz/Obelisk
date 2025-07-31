@@ -1,5 +1,5 @@
 import { API_CONFIG, getAuthHeaders, handleApiResponse } from '@/config/api';
-import { Case, Task } from '@/types/cases';
+import { Case, CaseType, FolderTemplate, Task } from '@/types/cases';
 
 const API_BASE_URL = API_CONFIG.CASES_BASE_URL;
 export default class CasesAPI {
@@ -10,6 +10,15 @@ export default class CasesAPI {
       headers
     });
     return handleApiResponse(response);
+  }
+
+  static async getCaseType(caseTypeId: string) {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/types/${caseTypeId}`, {
+      method: 'GET',
+      headers
+    });
+    return handleApiResponse<CaseType>(response);
   }
 
   static async createCaseType(formData: any) {
@@ -201,6 +210,44 @@ export default class CasesAPI {
       });
     }
     const response = await fetch(`${API_BASE_URL}/types/${caseTypeId}`, {
+      method: 'DELETE',
+      headers: uploadHeaders
+    });
+    return handleApiResponse(response);
+  }
+
+  static async updateFolderTemplates(caseTypeId: string, formData: any) {
+    const headers = await getAuthHeaders();
+    const uploadHeaders: Record<string, string> = {};
+    if (typeof headers === 'object' && headers !== null) {
+      Object.entries(headers).forEach(([key, value]) => {
+        if (key.toLowerCase() !== 'content-type') {
+          uploadHeaders[key] = value as string;
+        }
+      });
+    }
+    const response = await fetch(
+      `${API_BASE_URL}/types/${caseTypeId}/templates`,
+      {
+        method: 'POST',
+        headers: uploadHeaders,
+        body: JSON.stringify(formData)
+      }
+    );
+    return handleApiResponse(response);
+  }
+
+  static async deleteFolderTemplate(templateId: string) {
+    const headers = await getAuthHeaders();
+    const uploadHeaders: Record<string, string> = {};
+    if (typeof headers === 'object' && headers !== null) {
+      Object.entries(headers).forEach(([key, value]) => {
+        if (key.toLowerCase() !== 'content-type') {
+          uploadHeaders[key] = value as string;
+        }
+      });
+    }
+    const response = await fetch(`${API_BASE_URL}/templates/${templateId}`, {
       method: 'DELETE',
       headers: uploadHeaders
     });

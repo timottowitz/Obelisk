@@ -1,19 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
-  DialogTrigger
+  DialogTitle
 } from '@/components/ui/dialog';
-import { DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 interface TaskDetailModalProps {
   isOpen: boolean;
@@ -38,18 +35,24 @@ export default function CreateTaskModal({
     description: ''
   });
 
-  const handleInputChange = (field: keyof TaskData, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  const handleInputChange = useCallback(
+    (field: keyof TaskData, value: string) => {
+      setFormData((prev) => ({
+        ...prev,
+        [field]: value
+      }));
+    },
+    []
+  );
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave(formData);
-    onClose();
-  };
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      onSave(formData);
+      onClose();
+    },
+    [formData, onSave, onClose]
+  );
 
   if (!isOpen) return null;
 
