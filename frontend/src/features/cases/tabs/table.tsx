@@ -6,7 +6,6 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
-import { Card, CardContent } from '@/components/ui/card';
 
 interface TableColumn {
   key: string;
@@ -20,9 +19,11 @@ interface CaseDetailsTableProps {
   columns: TableColumn[];
   data: any[];
   className?: string;
+  isLoading?: boolean;
+  error?: any;
 }
 
-export default function CaseDetailsTable({ columns, data }: CaseDetailsTableProps) {
+export default function CaseDetailsTable({ columns, data, isLoading, error }: CaseDetailsTableProps) {
   return (
     <Table className='w-full text-xs border border-gray-200 rounded-md'>
       <TableHeader className='bg-gray-100'>
@@ -38,7 +39,13 @@ export default function CaseDetailsTable({ columns, data }: CaseDetailsTableProp
         </TableRow>
       </TableHeader>
       <TableBody>
-        {data && data.length > 0 ? (
+        {isLoading ? (
+          <TableRow>
+            <TableCell colSpan={columns.length} className='py-4 text-center text-xs text-gray-500'>
+              Loading...
+            </TableCell>
+          </TableRow>
+        ) : data && data.length > 0 ? (
           data.map((row, rowIndex) => (
             <TableRow key={rowIndex}>
               {columns.map((column) => (

@@ -1,37 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
-import CaseDetailsTable from './table';
-import { casePanelistsColumns, caseParticipantsColumns } from './columns';
+import dayjs from 'dayjs';
 
-interface CaseInfoProps {
-  caseData: {
-    adrProcess: string;
-    applicableRules: string;
-    fileDate: string;
-    track: string;
-    claimAmount: string;
-    hearingLocale: string;
-    caseManager: {
-      name: string;
-      address: string;
-      phone: string;
-      email: string;
-    };
-    panelists: {
-      name: string;
-      phone: string;
-      email: string;
-    }[];
-    caseParticipants: {
-      party_name: string;
-      position: string;
-      lead_representative: string;
-      secondary_representative: string;
-      claim_information: string;
-    }[];
-  };
-}
-
-export default function CaseInfo({ caseData }: CaseInfoProps) {
+export default function CaseInfo({ caseData }: any) {
   return (
     <div className='space-y-6'>
       {/* Case Details Section */}
@@ -44,7 +14,7 @@ export default function CaseInfo({ caseData }: CaseInfoProps) {
             {/* ADR Process */}
             <div className='grid grid-cols-2 border-b border-gray-100 py-4'>
               <span className='font-medium text-gray-600'>ADR Process</span>
-              <span className='text-gray-900'>{caseData.adrProcess}</span>
+              <span className='text-gray-900'>{caseData.adr_process}</span>
             </div>
 
             {/* Applicable Rules */}
@@ -56,14 +26,16 @@ export default function CaseInfo({ caseData }: CaseInfoProps) {
                 href='#'
                 className='text-blue-600 underline hover:text-blue-800'
               >
-                {caseData.applicableRules}
+                {caseData.applicable_rules}
               </a>
             </div>
 
             {/* File Date */}
             <div className='grid grid-cols-2 border-b border-gray-100 py-4'>
               <span className='font-medium text-gray-600'>File Date</span>
-              <span className='text-gray-900'>{caseData.fileDate}</span>
+              <span className='text-gray-900'>
+                {dayjs(caseData.created_at).format('DD/MM/YYYY')}
+              </span>
             </div>
 
             {/* Track */}
@@ -75,9 +47,9 @@ export default function CaseInfo({ caseData }: CaseInfoProps) {
             {/* Claim Amount */}
             <div className='grid grid-cols-2 border-b border-gray-100 py-4'>
               <span className='font-medium text-gray-600'>Claim Amount</span>
-              <div className='flex flex-col items-start'>
+              <div className='flex flex-row items-start gap-2'>
                 <span className='font-semibold text-gray-900'>
-                  {caseData.claimAmount}
+                  {caseData.claim_amount}
                 </span>
                 <br />
                 <a
@@ -92,29 +64,13 @@ export default function CaseInfo({ caseData }: CaseInfoProps) {
             {/* Hearing Locale */}
             <div className='grid grid-cols-2 border-b border-gray-100 py-4'>
               <span className='font-medium text-gray-600'>Hearing Locale</span>
-              <span className='text-gray-900'>{caseData.hearingLocale}</span>
+              <span className='text-gray-900'>{caseData.hearing_locale}</span>
             </div>
-
+            
             {/* Case Manager */}
-            <div className='grid grid-cols-2 py-4'>
+            <div className='grid grid-cols-2 border-b border-gray-100 py-4'>
               <span className='font-medium text-gray-600'>Case Manager</span>
-              <div className='flex flex-col items-start'>
-                <div className='font-semibold text-gray-900'>
-                  {caseData.caseManager.name}
-                </div>
-                <div className='text-gray-900'>
-                  {caseData.caseManager.address}
-                </div>
-                <div className='text-gray-900'>
-                  {caseData.caseManager.phone},{' '}
-                  <a
-                    href={`mailto:${caseData.caseManager.email}`}
-                    className='text-blue-600 underline hover:text-blue-800'
-                  >
-                    {caseData.caseManager.email}
-                  </a>
-                </div>
-              </div>
+              <span className='text-gray-900'>{caseData.case_manager}</span>
             </div>
           </div>
         </CardContent>
@@ -128,20 +84,6 @@ export default function CaseInfo({ caseData }: CaseInfoProps) {
           </h3>
         </CardContent>
       </Card>
-
-      {/* Panelist(s) Section */}
-      <CaseDetailsTable
-        title='Panelist(s)'
-        data={caseData.panelists}
-        columns={casePanelistsColumns}
-      />
-
-      {/* Case Participants Section */}
-      <CaseDetailsTable
-        title='Case Participants'
-        data={caseData.caseParticipants}
-        columns={caseParticipantsColumns}
-      />
     </div>
   );
 }

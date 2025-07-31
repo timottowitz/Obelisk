@@ -908,7 +908,7 @@ app.get("/cases/:id", async (c) => {
       return c.json({ error: "Case not found" }, 404);
     }
 
-    return c.json({ case: case_ }, 200);
+    return c.json(case_, 200);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -944,6 +944,7 @@ async function createFoldersFromTemplates(
           name: template.name,
           path: template.path,
           case_id: caseId,
+          case_type_id: caseTypeId,
           created_by: userId,
           parent_folder_id: null, // We'll handle nesting in a future enhancement
         })
@@ -1109,7 +1110,6 @@ app.put("/cases/:id", async (c) => {
       case_type_id,
       special_notes,
       filing_fee,
-      case_number,
       adr_process,
       applicable_rules,
       track,
@@ -1180,16 +1180,17 @@ app.put("/cases/:id", async (c) => {
     if (case_type_id !== undefined) updateData.case_type = case_type_id;
     if (special_notes !== undefined) updateData.special_notes = special_notes;
     if (filing_fee !== undefined) updateData.filing_fee = filing_fee;
-    if (case_number !== undefined) updateData.case_number = case_number;
     if (adr_process !== undefined) updateData.adr_process = adr_process;
-    if (applicable_rules !== undefined) updateData.applicable_rules = applicable_rules;
+    if (applicable_rules !== undefined)
+      updateData.applicable_rules = applicable_rules;
     if (track !== undefined) updateData.track = track;
     if (claim_amount !== undefined) updateData.claim_amount = claim_amount;
-    if (hearing_locale !== undefined) updateData.hearing_locale = hearing_locale;
+    if (hearing_locale !== undefined)
+      updateData.hearing_locale = hearing_locale;
     if (claimant !== undefined) updateData.claimant = claimant;
     if (respondent !== undefined) updateData.respondent = respondent;
     if (case_manager !== undefined) updateData.case_manager = case_manager;
-    
+
     const { data: updatedCase, error: updateError } = await supabase
       .schema(schema)
       .from("cases")
@@ -1266,6 +1267,67 @@ app.delete("/cases/:id", async (c) => {
     }
 
     return c.json({ success: true, message: "Case deleted successfully" }, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// GET /cases/:id/tasks - Get tasks for case
+app.get("/cases/:id/tasks", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const caseId = c.req.param("id");
+
+  try {
+    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
+
+    const { data: tasks, error: selectError } = await supabase
+      .schema(schema)
+      .from("case_tasks")
+      .select("*")
+      .eq("case_id", caseId)
+      .order("due_date", { ascending: true });
+
+    if (selectError || !tasks) {
+      return c.json(
+        { error: "Failed to fetch tasks", details: selectError },
+        500
+      );
+    }
+
+    return c.json(tasks, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// POST /cases/:id/tasks - Create task for case
+app.post("/cases/:id/tasks", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const case_id = c.req.param("id");
+
+  try {
+    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
+    const body = await c.req.json();
+
+    const { name, description, due_date } = body;
+
+    const { data: newTask, error: insertError } = await supabase
+      .schema(schema)
+      .from("case_tasks")
+      .insert({ case_id, name, description, due_date })
+      .select()
+      .single();
+
+    if (insertError || !newTask) {
+      return c.json(
+        { error: "Failed to create task", details: insertError },
+        500
+      );
+    }
+
+    return c.json(newTask, 201);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }

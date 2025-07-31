@@ -3,12 +3,31 @@ import { tasksColumns } from './columns';
 import { Button } from '@/components/ui/button';
 import CreateTaskModal from './components/create-task-modal';
 import { useState } from 'react';
+import { useCaseOperations, useCasesOperations } from '@/hooks/useCases';
+import { toast } from 'sonner';
 
-export default function Tasks() {
+export default function Tasks({ caseId }: { caseId: string }) {
   const [isOpen, setIsOpen] = useState(false);
+  const { getCaseTasks } = useCaseOperations(caseId);
+  const { createCaseTask } = useCasesOperations();
+  const { data: tasks, isLoading, error } = getCaseTasks;
 
-  const handleSave = (taskData: any) => {
-    console.log(taskData);
+  const handleSave = async (taskData: any) => {
+    try {
+      const response = await createCaseTask.mutateAsync({
+        caseId,
+        formData: taskData
+      });
+      if (response) {
+        toast.success('Task created successfully');
+      } else {
+        toast.error('Failed to create task');
+      }
+    } catch (error: any) {
+      console.log(error);
+      toast.error('Failed to create task');
+    }
+    setIsOpen(false);
   };
 
   return (
@@ -22,7 +41,13 @@ export default function Tasks() {
       >
         Create A Task
       </Button>
-      <CaseDetailsTable title='' columns={tasksColumns} data={[]} />
+      <CaseDetailsTable
+        title='Tasks'
+        columns={tasksColumns}
+        data={tasks || []}
+        isLoading={isLoading}
+        error={error}
+      />
       <CreateTaskModal
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}

@@ -1,3 +1,5 @@
+import dayjs from 'dayjs';
+
 export const caseParticipantsColumns = [
   { key: 'party_name', label: 'Party Name' },
   { key: 'position', label: 'Position' },
@@ -13,9 +15,9 @@ export const casePanelistsColumns = [
 ];
 
 export const tasksColumns = [
-  { key: 'task_name', label: 'Task Name' },
-  { key: 'task_description', label: 'Task Description' },
-  { key: 'due_date', label: 'Due Date' }
+  { key: 'name', label: 'Task Name' },
+  { key: 'description', label: 'Task Description' },
+  { key: 'due_date', label: 'Due Date', render: (value: string) => dayjs(value).format('YYYY-MM-DD') }
 ];
 
 export const eventsColumns = [
@@ -26,22 +28,6 @@ export const eventsColumns = [
   { key: 'status', label: 'Status' },
   { key: 'location', label: 'Location' },
   { key: 'address', label: 'Address' }
-];
-
-export const documentsColumns = [
-  { key: 'view', label: 'View' },
-  { key: 'smart_summary', label: 'Smart Summary' },
-  { key: 'new', label: 'New' },
-  { key: 'date', label: 'Date Uploaded' },
-  { key: 'description', label: 'Description' },
-  { key: 'document_group', label: 'Document Group' },
-  { key: 'document_type', label: 'Document Type' },
-  { key: 'status', label: 'Status' },
-  { key: 'name', label: 'Name' },
-  { key: 'claimant_viewing', label: 'Claimant Viewing' },
-  { key: 'respondent_viewing', label: 'Respondent Viewing' },
-  { key: 'neutral_viewing', label: 'Neutral Viewing' },
-  { key: 'flagged', label: 'Flagged' }
 ];
 
 export const hearingExhibitColumns = [

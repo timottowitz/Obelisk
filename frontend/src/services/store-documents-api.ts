@@ -47,7 +47,7 @@ export default class StoreDocumentsAPI {
     return handleApiResponse(response);
   }
 
-  static async getFolders() {
+  static async getFolders(caseId: string) {
     const headers = await getAuthHeaders();
     const uploadHeaders: Record<string, string> = {};
     if (typeof headers === 'object' && headers !== null) {
@@ -57,7 +57,7 @@ export default class StoreDocumentsAPI {
         }
       });
     }
-    const response = await fetch(`${API_BASE_URL}/folders/tree`, {
+    const response = await fetch(`${API_BASE_URL}/folders/${caseId}/tree`, {
       method: 'GET',
       headers: uploadHeaders
     });
@@ -166,7 +166,7 @@ export default class StoreDocumentsAPI {
         }
       });
     }
-    const response = await fetch(`${API_BASE_URL}/folder-cases`, {
+    const response = await fetch(`${API_BASE_URL}/case-types`, {
       method: 'GET',
       headers: uploadHeaders
     });

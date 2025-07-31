@@ -22,9 +22,9 @@ interface TaskDetailModalProps {
 }
 
 interface TaskData {
-  subject: string;
-  dueDate: string;
-  comments: string;
+  name: string;
+  due_date: string;
+  description: string;
 }
 
 export default function CreateTaskModal({
@@ -33,9 +33,9 @@ export default function CreateTaskModal({
   onSave
 }: TaskDetailModalProps) {
   const [formData, setFormData] = useState<TaskData>({
-    subject: '',
-    dueDate: '',
-    comments: ''
+    name: '',
+    due_date: '',
+    description: ''
   });
 
   const handleInputChange = (field: keyof TaskData, value: string) => {
@@ -66,17 +66,17 @@ export default function CreateTaskModal({
               {/* Subject Field */}
               <div className='space-y-2'>
                 <Label
-                  htmlFor='subject'
+                  htmlFor='name'
                   className='text-sm font-medium text-gray-700'
                 >
                   Subject <span className='text-red-500'>*</span>
                 </Label>
                 <Input
-                  id='subject'
+                  id='name'
                   type='text'
                   placeholder='Subject'
-                  value={formData.subject}
-                  onChange={(e) => handleInputChange('subject', e.target.value)}
+                  value={formData.name}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
                   required
                   className='w-full'
                 />
@@ -85,24 +85,23 @@ export default function CreateTaskModal({
               {/* Due Date Field */}
               <div className='space-y-2'>
                 <Label
-                  htmlFor='dueDate'
+                  htmlFor='due_date'
                   className='text-sm font-medium text-gray-700'
                 >
                   Due Date <span className='text-red-500'>*</span>
                 </Label>
                 <div className='relative'>
                   <Input
-                    id='dueDate'
-                    type='text'
+                    id='due_date'
+                    type='date'
                     placeholder='mm/dd/yy'
-                    value={formData.dueDate}
+                    value={formData.due_date}
                     onChange={(e) =>
-                      handleInputChange('dueDate', e.target.value)
+                      handleInputChange('due_date', e.target.value)
                     }
                     required
                     className='w-full pr-10'
                   />
-                  <Calendar className='absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 transform text-gray-400' />
                 </div>
               </div>
             </div>
@@ -110,25 +109,25 @@ export default function CreateTaskModal({
             {/* Comments Field */}
             <div className='space-y-2'>
               <Label
-                htmlFor='comments'
+                htmlFor='description'
                 className='text-sm font-medium text-gray-700'
               >
                 Comments (Optional)
               </Label>
               <div className='relative'>
                 <Textarea
-                  id='comments'
-                  placeholder='Enter comments...'
-                  value={formData.comments}
+                  id='description'
+                  placeholder='Enter description...'
+                  value={formData.description}
                   onChange={(e) =>
-                    handleInputChange('comments', e.target.value)
+                    handleInputChange('description', e.target.value)
                   }
                   className='w-full resize-none'
                   rows={4}
                   maxLength={1000}
                 />
                 <div className='absolute right-2 bottom-2 text-xs text-gray-400'>
-                  {formData.comments.length}/1000
+                  {formData.description.length}/1000
                 </div>
               </div>
             </div>
