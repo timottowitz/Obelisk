@@ -1,18 +1,47 @@
 import CaseDetailsTable from './table';
 import { tasksColumns } from './columns';
 import { Button } from '@/components/ui/button';
-import CreateTaskModal from './components/create-task-modal';
+import TaskModel from './components/task-modal';
 import { useState } from 'react';
 import { useCasesOperations, useGetCaseTasks } from '@/hooks/useCases';
 import { toast } from 'sonner';
 import { useCallback } from 'react';
+import { Task } from '@/types/cases';
+import { AlertModal } from '@/components/modal/alert-modal';
 
 export default function Tasks({ caseId }: { caseId: string }) {
   const [isOpen, setIsOpen] = useState(false);
-  const { data: tasks, isLoading, error } = useGetCaseTasks(caseId);
-  const { createCaseTask } = useCasesOperations();
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const {
+    data: tasks,
+    isLoading: isLoadingTasks,
+    error
+  } = useGetCaseTasks(caseId);
+  const { createCaseTask, deleteCaseTask, updateCaseTask } =
+    useCasesOperations();
 
-  const handleSave = useCallback(
+  const openTaskModal = useCallback((task: Task | null) => {
+    setIsOpen(true);
+    setSelectedTask(task);
+  }, []);
+
+  const openDeleteTaskModal = useCallback((task: Task) => {
+    setIsDeleteOpen(true);
+    setSelectedTask(task);
+  }, []);
+
+  const closeTaskModal = useCallback(() => {
+    setIsOpen(false);
+    setSelectedTask(null);
+  }, []);
+
+  const closeDeleteModal = useCallback(() => {
+    setIsDeleteOpen(false);
+  }, []);
+
+  const handleCreateTask = useCallback(
     async (taskData: any) => {
       try {
         const response = await createCaseTask.mutateAsync({
@@ -33,6 +62,47 @@ export default function Tasks({ caseId }: { caseId: string }) {
     [caseId, createCaseTask]
   );
 
+  const handleUpdateTask = useCallback(
+    async (taskData: any) => {
+      try {
+        const response = await updateCaseTask.mutateAsync({
+          caseId,
+          taskId: selectedTask!.id,
+          formData: taskData
+        });
+        if (response) {
+          toast.success('Task updated successfully');
+        } else {
+          toast.error('Failed to update task');
+        }
+      } catch (error: any) {
+        console.log(error);
+        toast.error('Failed to update task');
+      }
+      setIsOpen(false);
+    },
+    [caseId, updateCaseTask, selectedTask]
+  );
+
+  const handleDeleteTask = useCallback(
+    async (task: Task) => {
+      try {
+        setIsLoading(true);
+        await deleteCaseTask.mutateAsync({
+          caseId,
+          taskId: task.id
+        });
+        toast.success('Task deleted successfully');
+      } catch (error: any) {
+        toast.error('Failed to delete task');
+      } finally {
+        setIsLoading(false);
+        setIsDeleteOpen(false);
+      }
+    },
+    [caseId, deleteCaseTask]
+  );
+
   return (
     <div className='flex flex-col gap-4'>
       <h3 className='text-sm font-semibold text-gray-900'>Case Tasks</h3>
@@ -40,7 +110,7 @@ export default function Tasks({ caseId }: { caseId: string }) {
         size='lg'
         variant='outline'
         className='ml-auto flex w-fit items-center justify-end text-xs'
-        onClick={() => setIsOpen(true)}
+        onClick={() => openTaskModal(null)}
       >
         Create A Task
       </Button>
@@ -48,14 +118,27 @@ export default function Tasks({ caseId }: { caseId: string }) {
         title='Tasks'
         columns={tasksColumns}
         data={tasks || []}
-        isLoading={isLoading}
+        isLoading={isLoadingTasks}
         error={error}
+        onEdit={openTaskModal}
+        onDelete={openDeleteTaskModal}
       />
-      <CreateTaskModal
+      <TaskModel
         isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
-        onSave={handleSave}
+        onClose={closeTaskModal}
+        onSave={selectedTask ? handleUpdateTask : handleCreateTask}
+        initialData={selectedTask || undefined}
+        loading={isLoading}
       />
+      {selectedTask && (
+        <AlertModal
+          isOpen={isDeleteOpen}
+          onClose={closeDeleteModal}
+          onConfirm={() => handleDeleteTask(selectedTask)}
+          deleteTargetType='task'
+          loading={isLoading}
+        />
+      )}
     </div>
   );
 }

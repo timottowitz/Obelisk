@@ -201,6 +201,56 @@ export function useCreateCaseTask() {
   });
 }
 
+export function useUpdateCaseTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      caseId,
+      taskId,
+      formData
+    }: {
+      caseId: string;
+      taskId: string;
+      formData: any;
+    }) => {
+      const response = await CasesAPI.updateCaseTask(caseId, taskId, formData);
+      return response;
+    },
+    onSuccess: (_, { caseId }) => {
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.tasks, caseId]
+      });
+    },
+    onError: (error) => {
+      console.error('Case task update failed:', error);
+    }
+  });
+}
+
+export function useDeleteCaseTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      caseId,
+      taskId
+    }: {
+      caseId: string;
+      taskId: string;
+    }) => {
+      const response = await CasesAPI.deleteCaseTask(caseId, taskId);
+      return response;
+    },
+    onSuccess: (_, { caseId }) => {
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.tasks, caseId]
+      });
+    },
+    onError: (error) => {
+      console.error('Case task deletion failed:', error);
+    }
+  });
+}
+
 export function useUpdateCaseType() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -275,6 +325,8 @@ export function useCasesOperations() {
     getCases: useGetCases(),
     deleteCase: useDeleteCase(),
     createCaseTask: useCreateCaseTask(),
+    deleteCaseTask: useDeleteCaseTask(),
+    updateCaseTask: useUpdateCaseTask(),
     createCaseType: useCreateCaseType(),
     deleteCaseType: useDeleteCaseType(),
     updateCaseType: useUpdateCaseType(),

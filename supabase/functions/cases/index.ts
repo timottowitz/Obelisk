@@ -1333,6 +1333,71 @@ app.post("/cases/:id/tasks", async (c) => {
   }
 });
 
+// PUT /cases/:id/tasks/:taskId - Update task for case
+app.put("/cases/:id/tasks/:taskId", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const caseId = c.req.param("id");
+  const taskId = c.req.param("taskId");
+
+  try {
+    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
+    const body = await c.req.json();
+
+    const { name, description, due_date } = body;
+
+    const { data: updatedTask, error: updateError } = await supabase
+      .schema(schema)
+      .from("case_tasks")
+      .update({ name, description, due_date })
+      .eq("id", taskId)
+      .eq("case_id", caseId)
+      .select()
+      .single();
+
+    if (updateError || !updatedTask) {
+      return c.json(
+        { error: "Failed to update task", details: updateError },
+        500
+      );
+    }
+
+    return c.json(updatedTask, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// DELETE /cases/:id/tasks/:taskId - Delete task for case
+app.delete("/cases/:id/tasks/:taskId", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const caseId = c.req.param("id");
+  const taskId = c.req.param("taskId");
+
+  try {
+    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
+
+    const { error: deleteError } = await supabase
+      .schema(schema)
+      .from("case_tasks")
+      .delete()
+      .eq("id", taskId)
+      .eq("case_id", caseId);
+
+    if (deleteError) {
+      return c.json(
+        { error: "Failed to delete task", details: deleteError },
+        500
+      );
+    }
+
+    return c.json({ success: true, message: "Task deleted successfully" }, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
 export default app;
 
 /* To invoke locally:

@@ -1,6 +1,19 @@
 import { API_CONFIG, getAuthHeaders, handleApiResponse } from '@/config/api';
 import { Case, CaseType, FolderTemplate, Task } from '@/types/cases';
 
+// Utility function to create upload headers
+function createUploadHeaders(headers: HeadersInit): Record<string, string> {
+  const uploadHeaders: Record<string, string> = {};
+  if (typeof headers === 'object' && headers !== null) {
+    Object.entries(headers).forEach(([key, value]) => {
+      if (key.toLowerCase() !== 'content-type') {
+        uploadHeaders[key] = value as string;
+      }
+    });
+  }
+  return uploadHeaders;
+}
+
 const API_BASE_URL = API_CONFIG.CASES_BASE_URL;
 export default class CasesAPI {
   static async getCaseTypes() {
@@ -23,15 +36,8 @@ export default class CasesAPI {
 
   static async createCaseType(formData: any) {
     const headers = await getAuthHeaders();
+    const uploadHeaders = createUploadHeaders(headers);
 
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
     const response = await fetch(`${API_BASE_URL}/types`, {
       method: 'POST',
       headers: uploadHeaders,
@@ -42,15 +48,8 @@ export default class CasesAPI {
 
   static async createCase(caseData: Case) {
     const headers = await getAuthHeaders();
+    const uploadHeaders = createUploadHeaders(headers);
 
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
     const response = await fetch(`${API_BASE_URL}`, {
       method: 'POST',
       headers: uploadHeaders,
@@ -61,15 +60,7 @@ export default class CasesAPI {
 
   static async updateCase(caseId: string, caseData: Case) {
     const headers = await getAuthHeaders();
-
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
+    const uploadHeaders = createUploadHeaders(headers);
 
     const response = await fetch(`${API_BASE_URL}/${caseId}`, {
       method: 'PUT',
@@ -81,15 +72,7 @@ export default class CasesAPI {
 
   static async getCases() {
     const headers = await getAuthHeaders();
-
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
+    const uploadHeaders = createUploadHeaders(headers);
 
     const response = await fetch(`${API_BASE_URL}`, {
       method: 'GET',
@@ -105,15 +88,7 @@ export default class CasesAPI {
 
   static async deleteCase(caseId: string) {
     const headers = await getAuthHeaders();
-
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
+    const uploadHeaders = createUploadHeaders(headers);
 
     const response = await fetch(`${API_BASE_URL}/${caseId}`, {
       method: 'DELETE',
@@ -124,15 +99,8 @@ export default class CasesAPI {
 
   static async getCase(caseId: string) {
     const headers = await getAuthHeaders();
+    const uploadHeaders = createUploadHeaders(headers);
 
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
     const response = await fetch(`${API_BASE_URL}/${caseId}`, {
       method: 'GET',
       headers: uploadHeaders
@@ -142,15 +110,7 @@ export default class CasesAPI {
 
   static async getCaseTasks(caseId: string) {
     const headers = await getAuthHeaders();
-
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
+    const uploadHeaders = createUploadHeaders(headers);
 
     const response = await fetch(`${API_BASE_URL}/${caseId}/tasks`, {
       method: 'GET',
@@ -161,15 +121,7 @@ export default class CasesAPI {
 
   static async createCaseTask(caseId: string, formData: any) {
     const headers = await getAuthHeaders();
-
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
+    const uploadHeaders = createUploadHeaders(headers);
 
     const response = await fetch(`${API_BASE_URL}/${caseId}/tasks`, {
       method: 'POST',
@@ -179,17 +131,33 @@ export default class CasesAPI {
     return handleApiResponse<Task>(response);
   }
 
+  static async deleteCaseTask(caseId: string, taskId: string) {
+    const headers = await getAuthHeaders();
+    const uploadHeaders = createUploadHeaders(headers);
+
+    const response = await fetch(`${API_BASE_URL}/${caseId}/tasks/${taskId}`, {
+      method: 'DELETE',
+      headers: uploadHeaders
+    });
+    return handleApiResponse(response);
+  }
+
+  static async updateCaseTask(caseId: string, taskId: string, formData: any) {
+    const headers = await getAuthHeaders();
+    const uploadHeaders = createUploadHeaders(headers);
+
+    const response = await fetch(`${API_BASE_URL}/${caseId}/tasks/${taskId}`, {
+      method: 'PUT',
+      headers: uploadHeaders,
+      body: JSON.stringify(formData)
+    });
+    return handleApiResponse(response);
+  }
+
   static async updateCaseType(caseTypeId: string, caseType: any) {
     const headers = await getAuthHeaders();
+    const uploadHeaders = createUploadHeaders(headers);
 
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
     const response = await fetch(`${API_BASE_URL}/types/${caseTypeId}`, {
       method: 'PUT',
       headers: uploadHeaders,
@@ -200,15 +168,8 @@ export default class CasesAPI {
 
   static async deleteCaseType(caseTypeId: string) {
     const headers = await getAuthHeaders();
+    const uploadHeaders = createUploadHeaders(headers);
 
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
     const response = await fetch(`${API_BASE_URL}/types/${caseTypeId}`, {
       method: 'DELETE',
       headers: uploadHeaders
@@ -218,14 +179,8 @@ export default class CasesAPI {
 
   static async updateFolderTemplates(caseTypeId: string, formData: any) {
     const headers = await getAuthHeaders();
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
+    const uploadHeaders = createUploadHeaders(headers);
+
     const response = await fetch(
       `${API_BASE_URL}/types/${caseTypeId}/templates`,
       {
@@ -239,14 +194,8 @@ export default class CasesAPI {
 
   static async deleteFolderTemplate(templateId: string) {
     const headers = await getAuthHeaders();
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
+    const uploadHeaders = createUploadHeaders(headers);
+
     const response = await fetch(`${API_BASE_URL}/templates/${templateId}`, {
       method: 'DELETE',
       headers: uploadHeaders
