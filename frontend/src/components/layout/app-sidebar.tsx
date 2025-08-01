@@ -17,13 +17,13 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail
+  SidebarRail,
+  useSidebar
 } from '@/components/ui/sidebar';
 import { UserAvatarProfile } from '@/components/user-avatar-profile';
-import { navItems, practiceAreaItems, footerItems } from '@/constants/data';
+import { navItems, footerItems } from '@/constants/data';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useUser, useOrganizationList, useAuth } from '@clerk/nextjs';
 import {
   IconBell,
@@ -40,10 +40,11 @@ import { Icons } from '../icons';
 import { OrgSwitcher } from '../org-switcher';
 import { Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { cn } from '@/lib/utils';
 
 export default function AppSidebar() {
   const pathname = usePathname();
-  const { isOpen } = useMediaQuery();
+  const { state } = useSidebar();
   const { user } = useUser();
   const { userMemberships, setActive: setActiveTenant } = useOrganizationList({
     userMemberships: {
@@ -51,7 +52,7 @@ export default function AppSidebar() {
     }
   });
   const auth = useAuth();
-  
+
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -72,13 +73,9 @@ export default function AppSidebar() {
     (membership) => membership.organization.id === auth.orgId
   );
 
-  React.useEffect(() => {
-    // Side effects based on sidebar state changes
-  }, [isOpen]);
-
   return (
     <Sidebar collapsible='icon'>
-      <SidebarHeader>
+      <SidebarHeader className='px-3 py-4'>
         {userMemberships.isLoading || !activeTenant ? (
           <div className='flex h-full items-center justify-center'>
             <Loader2 className='h-4 w-4 animate-spin' />
@@ -99,11 +96,14 @@ export default function AppSidebar() {
       </SidebarHeader>
       <SidebarContent className='overflow-x-hidden'>
         {/* File a New Case Button */}
-        <div className='px-3 py-2'>
+        <div className='px-3 py-4'>
           <Link href='/dashboard/cases/create'>
-            <Button className='w-full bg-black text-white hover:bg-gray-800 rounded-lg cursor-pointer' size='sm'>
-              <Icons.add className='mr-2 h-4 w-4' />
-              File a New Case
+            <Button
+              className='w-full cursor-pointer rounded-lg bg-black text-white hover:bg-gray-800'
+              size='lg'
+            >
+              <Icons.add className='h-4 w-4' />
+              {state === 'expanded' && 'File a New Case'}
             </Button>
           </Link>
         </div>
@@ -113,46 +113,22 @@ export default function AppSidebar() {
           <SidebarMenu>
             {navItems.map((item) => {
               const Icon = item.icon ? Icons[item.icon] : Icons.logo;
+              const isActive = pathname === item.url;
               return (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
                     tooltip={item.title}
-                    isActive={pathname === item.url}
+                    className={cn(
+                      'text-md flex w-full items-center rounded-lg px-4 py-5 text-left transition-colors',
+                      isActive
+                        ? 'border border-blue-200 bg-blue-50 text-blue-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    )}
                   >
                     <Link href={item.url}>
-                      <Icon />
+                      <Icon size={24} />
                       <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              );
-            })}
-          </SidebarMenu>
-        </SidebarGroup>
-
-        {/* Practice Areas Section */}
-        <SidebarGroup>
-          <SidebarMenu>
-            {practiceAreaItems.map((item) => {
-              const Icon = item.icon ? Icons[item.icon] : Icons.logo;
-              return (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    tooltip={item.title}
-                    isActive={pathname === item.url}
-                  >
-                    <Link href={item.url} className='flex items-center justify-between w-full'>
-                      <div className='flex items-center'>
-                        <Icon />
-                        <span>{item.title}</span>
-                      </div>
-                      {item.label && (
-                        <Badge variant='secondary' className='ml-auto text-xs'>
-                          {item.label}
-                        </Badge>
-                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -166,15 +142,21 @@ export default function AppSidebar() {
           <SidebarMenu>
             {footerItems.map((item) => {
               const Icon = item.icon ? Icons[item.icon] : Icons.logo;
+              const isActive = pathname === item.url;
               return (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
                     tooltip={item.title}
-                    isActive={pathname === item.url}
+                    className={cn(
+                      'text-md flex w-full items-center rounded-lg px-4 py-5 text-left transition-colors',
+                      isActive
+                        ? 'border border-blue-200 bg-blue-50 text-blue-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    )}
                   >
                     <Link href={item.url}>
-                      <Icon />
+                      <Icon size={24} />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -185,12 +167,21 @@ export default function AppSidebar() {
         </SidebarGroup>
 
         {/* Support Section */}
-        <div className='px-3 py-4 text-xs text-muted-foreground'>
-          <p className='mb-2'>For case-related questions and assistance, please contact your case manager. For other questions, please email Customer Service at:</p>
-          <a href='mailto:CustomerService@adr.org' className='text-blue-400 hover:text-blue-300'>
-            CustomerService@adr.org
-          </a>
-        </div>
+        {state === 'expanded' && (
+          <div className='text-muted-foreground px-6 py-4 text-xs'>
+            <p className='mb-2'>
+              For case-related questions and assistance, please contact your
+              case manager. For other questions, please email Customer Service
+              at:
+            </p>
+            <a
+              href='mailto:CustomerService@adr.org'
+              className='text-blue-400 hover:text-blue-300'
+            >
+              CustomerService@adr.org
+            </a>
+          </div>
+        )}
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
