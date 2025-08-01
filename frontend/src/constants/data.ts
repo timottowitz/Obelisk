@@ -30,6 +30,22 @@ export const navItems: NavItem[] = [
     items: []
   },
   {
+    title: 'Litigation',
+    url: '/dashboard/litigation',
+    icon: 'litigation',
+    isActive: false,
+    shortcut: ['c', 'c'],
+    items: []
+  },
+  {
+    title: 'IMVA',
+    url: '/dashboard/imva',
+    icon: 'imva',
+    isActive: false,
+    shortcut: ['c', 'c'],
+    items: []
+  },
+  {
     title: 'My Tasks',
     url: '/dashboard/tasks',
     icon: 'tasks',
@@ -38,8 +54,8 @@ export const navItems: NavItem[] = [
     items: []
   },
   {
-    title: 'Events Calendar',
-    url: '/dashboard/calendar',
+    title: 'Events',
+    url: '/dashboard/events',
     icon: 'calendar',
     isActive: false,
     shortcut: ['e', 'c'],
@@ -54,9 +70,9 @@ export const navItems: NavItem[] = [
     items: []
   },
   {
-    title: 'My Profile',
-    url: '/dashboard/profile',
-    icon: 'user',
+    title: 'Expenses',
+    url: '/dashboard/expenses',
+    icon: 'dollar',
     isActive: false,
     shortcut: ['p', 'p'],
     items: []

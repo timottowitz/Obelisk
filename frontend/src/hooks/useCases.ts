@@ -140,11 +140,11 @@ export function useDeleteCase() {
   });
 }
 
-export function useGetCases() {
+export function useGetCases(page: number, search?: string, statusFilter?: string, sort?: string) {
   return useQuery({
-    queryKey: [...QUERY_KEYS.cases],
+    queryKey: [...QUERY_KEYS.cases, page, search, statusFilter, sort],
     queryFn: async () => {
-      const response = await CasesAPI.getCases();
+      const response = await CasesAPI.getCases(page, search, statusFilter, sort);
       return response;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -345,7 +345,6 @@ export function useCasesOperations() {
     //Mutations
     createCase: useCreateCase(),
     updateCase: useUpdateCase(),
-    getCases: useGetCases(),
     deleteCase: useDeleteCase(),
     createCaseTask: useCreateCaseTask(),
     deleteCaseTask: useDeleteCaseTask(),

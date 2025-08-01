@@ -36,6 +36,8 @@ export interface Case {
   track: string;
   claim_amount: string;
   hearing_locale: string;
+  case_tasks_count: number;
+  documents_count: number;
   created_at: string;
   updated_at: string;
 }
