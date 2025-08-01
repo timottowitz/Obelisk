@@ -1327,13 +1327,20 @@ app.post("/cases/:id/tasks", async (c) => {
       );
     }
 
+    const { data: user } = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+
     const { error: eventError } = await supabase
       .schema(schema)
       .from("case_events")
       .insert({
         case_id: case_id,
         event_type: "task_created",
-        description: `Task ${name} created`,
+        description: `${user.email} created task ${name}`,
         date: new Date().toISOString().split("T")[0],
         time: new Date().toISOString().split("T")[1].split(".")[0],
       })
@@ -1382,13 +1389,20 @@ app.put("/cases/:id/tasks/:taskId", async (c) => {
       );
     }
 
+    const { data: user } = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+
     const { error: eventError } = await supabase
       .schema(schema)
       .from("case_events")
       .insert({
         case_id: caseId,
         event_type: "task_updated",
-        description: `Task ${name} updated`,
+        description: `${user.email} updated task ${name}`,
         date: new Date().toISOString().split("T")[0],
         time: new Date().toISOString().split("T")[1].split(".")[0],
       });
@@ -1415,6 +1429,13 @@ app.delete("/cases/:id/tasks/:taskId", async (c) => {
 
   try {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
+
+    const { data: user } = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
 
     const { data: task } = await supabase
       .schema(schema)
@@ -1448,7 +1469,7 @@ app.delete("/cases/:id/tasks/:taskId", async (c) => {
       .insert({
         case_id: caseId,
         event_type: "task_deleted",
-        description: `Task ${task.name} deleted`,
+        description: `${user.email} deleted task ${task.name}`,
         date: new Date().toISOString().split("T")[0],
         time: new Date().toISOString().split("T")[1].split(".")[0],
       });

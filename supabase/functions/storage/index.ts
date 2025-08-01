@@ -585,7 +585,7 @@ app.post("/storage/upload-direct", async (c) => {
       .insert({
         case_id: folderData.case_id,
         event_type: "file_uploaded",
-        description: `File ${file.name || "untitled"} uploaded`,
+        description: `${user.data?.email} uploaded file ${file.name || "untitled"}`,
         date: new Date().toISOString().split("T")[0],
         time: new Date().toISOString().split("T")[1].split(".")[0],
       });
@@ -801,13 +801,20 @@ async function handleFileDelete(
     throw new Error("Folder not found");
   }
 
+  const { data: user } = await supabaseClient
+    .schema("private")
+    .from("users")
+    .select("*")
+    .eq("clerk_user_id", userId)
+    .single();
+
   const { error: eventError } = await supabaseClient
     .schema(schema)
     .from("case_events")
     .insert({
       case_id: folderData.case_id,
       event_type: "file_deleted",
-      description: `File ${fileRecord.name} deleted`,
+      description: `${user.data?.email} deleted file ${fileRecord.name}`,
       date: new Date().toISOString().split("T")[0],
       time: new Date().toISOString().split("T")[1].split(".")[0],
     });
