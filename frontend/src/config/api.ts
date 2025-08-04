@@ -13,6 +13,10 @@ export const API_CONFIG = {
     ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/cases`
     : 'https://rnmjwdxqtsvsbelcftzg.supabase.co/functions/v1/cases',
 
+  EVENTS_BASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL
+    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/events`
+    : 'https://rnmjwdxqtsvsbelcftzg.supabase.co/functions/v1/events',
+
   // Default pagination settings
   DEFAULT_LIMIT: 50,
   DEFAULT_ORDER_BY: 'start_time',

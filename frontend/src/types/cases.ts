@@ -54,12 +54,9 @@ export interface Task {
 
 export interface CaseEvent {
   id: string;
-  case_id: string;
+  case_number: string;
   event_type: string;
-  method: string;
-  status: string;
-  location: string;
-  address: string;
+  description: string;
   date: string;
   time: string;
   created_at: string;
