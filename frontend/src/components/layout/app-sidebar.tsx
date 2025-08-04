@@ -1,4 +1,6 @@
 'use client';
+
+import { useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +20,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   useSidebar
 } from '@/components/ui/sidebar';
 import { UserAvatarProfile } from '@/components/user-avatar-profile';
@@ -28,13 +33,14 @@ import { useUser, useOrganizationList, useAuth } from '@clerk/nextjs';
 import {
   IconBell,
   IconChevronsDown,
+  IconChevronsRight,
   IconCreditCard,
   IconLogout,
   IconUserCircle
 } from '@tabler/icons-react';
 import { SignOutButton } from '@clerk/nextjs';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import * as React from 'react';
 import { Icons } from '../icons';
 import { OrgSwitcher } from '../org-switcher';
@@ -44,6 +50,8 @@ import { cn } from '@/lib/utils';
 
 export default function AppSidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [isOpen, setIsOpen] = useState(searchParams.get('type') ? true : false);
   const { state } = useSidebar();
   const { user } = useUser();
   const { userMemberships, setActive: setActiveTenant } = useOrganizationList({
@@ -113,7 +121,7 @@ export default function AppSidebar() {
           <SidebarMenu>
             {navItems.map((item) => {
               const Icon = item.icon ? Icons[item.icon] : Icons.logo;
-              const isActive = pathname === item.url;
+              const isActive = item.url === "/dashboard" ? pathname === "/dashboard/overview" : pathname.includes(item.url);
               return (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
@@ -126,11 +134,48 @@ export default function AppSidebar() {
                         : 'text-gray-700 hover:bg-gray-50'
                     )}
                   >
-                    <Link href={item.url}>
-                      <Icon size={24} />
-                      <span>{item.title}</span>
-                    </Link>
+                    {item.items && item.items.length > 0 ? (
+                      <div className='flex items-center gap-2 cursor-pointer' onClick={() => setIsOpen(!isOpen)} >
+                        <Icon size={24} />
+                        <span>{item.title}</span>
+                        {isOpen ? (
+                          <IconChevronsDown className='ml-auto size-4' />
+                        ) : (
+                          <IconChevronsRight className='ml-auto size-4' />
+                        )}
+                      </div>
+                    ) : (
+                      <Link href={item.url}>
+                        <Icon size={24} />
+                        <span>{item.title}</span>
+                      </Link>
+                    )}
                   </SidebarMenuButton>
+                  {item.items && item.items.length > 0 && isOpen && (
+                    <SidebarMenuSub key={item.title}>
+                      {item.items.map((subItem) => {
+                        const SubIcon = subItem.icon
+                          ? Icons[subItem.icon]
+                          : Icons.logo;
+                        const isSubActive = searchParams.get('type') === subItem.url.split('?')[1].split('=')[1];
+                        return (
+                          <SidebarMenuSubItem key={subItem.title}>
+                            <SidebarMenuSubButton asChild className={cn(
+                              'text-md flex w-full items-center rounded-lg px-4 py-5 text-left transition-colors',
+                              isSubActive
+                                ? 'border border-blue-200 bg-blue-50 text-blue-700'
+                                : 'text-gray-700 hover:bg-gray-50'
+                            )}>
+                              <Link href={subItem.url}>
+                                <SubIcon size={24} />
+                                <span>{subItem.title}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
+                    </SidebarMenuSub>
+                  )}
                 </SidebarMenuItem>
               );
             })}

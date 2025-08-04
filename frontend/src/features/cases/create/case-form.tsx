@@ -17,6 +17,7 @@ import { UploadIcon, CircleAlertIcon, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import dyajs from 'dayjs';
 import { useCasesOperations } from '@/hooks/useCases';
+import { toast } from 'sonner';
 
 export function CaseForm({ initialData }: { initialData?: any }) {
   const { caseTypes: caseTypesData } = useCasesOperations();
@@ -96,10 +97,13 @@ export function CaseForm({ initialData }: { initialData?: any }) {
           case_number
         });
       }
-      console.log(`Case ${initialData ? 'updated' : 'created'} successfully`);
-      router.push(`/dashboard/cases`);
+      const type = caseTypes.find(
+        (type) => type.id === formData.case_type_id
+      )?.display_name.toLowerCase();
+      toast.success(`Case ${initialData ? 'updated' : 'created'} successfully`);
+      router.push(`/dashboard/cases?type=${type}`);
     } catch (error) {
-      console.error('Case creation failed:', error);
+      toast.error(`Case ${initialData ? 'update' : 'creation'} failed`);
     } finally {
       setCreateLoading(false);
     }

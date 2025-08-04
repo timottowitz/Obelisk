@@ -70,12 +70,13 @@ export default class CasesAPI {
     return handleApiResponse(response);
   }
 
-  static async getCases(page: number, search?: string, statusFilter?: string, sort?: string) {
+  static async getCases(type: string, page: number, search?: string, statusFilter?: string, sort?: string) {
     const headers = await getAuthHeaders();
     const uploadHeaders = createUploadHeaders(headers);
 
     const params = new URLSearchParams();
     params.append('page', page.toString());
+    if (type) params.append('type', type);
     if (search) params.append('search', search);
     if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
     if (sort) params.append('sort', sort);

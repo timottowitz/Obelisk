@@ -12,7 +12,7 @@ import { extractUserAndOrgId } from "../_shared/index.ts";
 import {
   seedCaseTypes,
   DEFAULT_CASE_TYPES,
-} from "./seeders/default-case-types.ts";
+} from "../_shared/default-case-types.ts";
 
 console.log("Hello from Cases Functions!");
 
@@ -364,8 +364,7 @@ app.get("/cases/types", async (c) => {
       .schema(schema)
       .from("case_types")
       .select("*, folder_templates(*)")
-      .eq("is_active", true)
-      .order("name");
+      .eq("is_active", true);
 
     if (error) {
       return c.json(
@@ -786,14 +785,15 @@ app.get("/cases", async (c) => {
 
     // Parse query params
     const url = new URL(c.req.url);
+    const type = url.searchParams.get("type") || "all";
     const page = parseInt(url.searchParams.get("page") || "1");
     const limit = parseInt(url.searchParams.get("limit") || "5");
     const offset = (page - 1) * limit;
     const orderBy = url.searchParams.get("orderBy") || "claimant";
-    const orderDirection = (url.searchParams.get("sort") ||
-      "asc") as "asc" | "desc";
+    const orderDirection = (url.searchParams.get("sort") || "asc") as
+      | "asc"
+      | "desc";
     const search = url.searchParams.get("search") || undefined;
-    const caseTypeId = url.searchParams.get("caseTypeId") || undefined;
     const status = url.searchParams.get("status") || undefined;
 
     // Check if we're getting a specific case by ID
@@ -827,12 +827,20 @@ app.get("/cases", async (c) => {
       return c.json({ case: case_ }, 200);
     }
 
-    // Build query for listing cases
-    let query = supabase
-      .schema(schema)
-      .from("cases")
-      .select(
-        `
+    try {
+      const display_name =
+        type === "imva"
+          ? "IMVA"
+          : type === "litigation"
+          ? "Litigation"
+          : "Solar";
+
+      // Build query for listing cases
+      let query = supabase
+        .schema(schema)
+        .from("cases")
+        .select(
+          `
         *,
         case_types(
           id,
@@ -843,96 +851,114 @@ app.get("/cases", async (c) => {
           icon
         )
       `,
-        { count: "exact" }
-      );
-
-    // Apply filters
-    if (search) {
-      query = query.or(`claimant.ilike.%${search}%,case_number.ilike.%${search}%`);
-    }
-    if (caseTypeId) {
-      query = query.eq("case_type_id", caseTypeId);
-    }
-    if (status) {
-      query = query.eq("status", status);
-    }
-    // Apply ordering and pagination
-    query = query.order(orderBy, { ascending: orderDirection === "asc" });
-    query = query.range(offset, offset + limit - 1);
-
-    const { data: cases, error, count } = await query;
-
-    if (error) {
-      return c.json({ error: "Failed to fetch cases", details: error }, 500);
-    }
-
-    const detailedCases = [];
-
-    for (const caseItem of cases) {
-      const { data: caseTasks, error: caseTasksError } = await supabase
-        .schema(schema)
-        .from("case_tasks")
-        .select("*")
-        .eq("case_id", caseItem.id);
-
-      if (caseTasksError) {
-        console.error("Failed to fetch case tasks:", caseTasksError);
-        return c.json(
-          { error: "Failed to fetch case tasks", details: caseTasksError },
-          500
+          { count: "exact" }
         );
-      }
 
-      const { data: folders, error: foldersError } = await supabase
-        .schema(schema)
-        .from("storage_folders")
-        .select("*")
-        .eq("case_id", caseItem.id);
+      // Apply filters
 
-      if (foldersError) {
-        console.error("Failed to fetch folders:", foldersError);
-        return c.json(
-          { error: "Failed to fetch folders", details: foldersError },
-          500
-        );
-      }
-
-      let documentsCount = 0;
-      for (const folder of folders) { 
-        const { data: documents, error: documentsError } = await supabase
+      if (type !== "all") {
+        const { data: caseType, error: caseTypeError } = await supabase
           .schema(schema)
-          .from("storage_files")
+          .from("case_types")
           .select("*")
-          .eq("folder_id", folder.id)
-          .is("deleted_at", null);
+          .eq("display_name", display_name)
+          .single();
 
-        if (documentsError) {
-          console.error("Failed to fetch documents:", documentsError);
+        if (caseTypeError || !caseType) {
+          return c.json({ error: "Case type not found" }, 404);
+        }
+        query = query.eq("case_type", caseType.id);
+      }
+
+      if (search) {
+        query = query.or(
+          `claimant.ilike.%${search}%,case_number.ilike.%${search}%`
+        );
+      }
+
+      if (status) {
+        query = query.eq("status", status);
+      }
+      // Apply ordering and pagination
+      query = query.order(orderBy, { ascending: orderDirection === "asc" });
+      query = query.range(offset, offset + limit - 1);
+
+      const { data: cases, error, count } = await query;
+
+      if (error) {
+        return c.json({ error: "Failed to fetch cases", details: error }, 500);
+      }
+
+      const detailedCases = [];
+
+      for (const caseItem of cases) {
+        const { data: caseTasks, error: caseTasksError } = await supabase
+          .schema(schema)
+          .from("case_tasks")
+          .select("*")
+          .eq("case_id", caseItem.id);
+
+        if (caseTasksError) {
+          console.error("Failed to fetch case tasks:", caseTasksError);
           return c.json(
-            { error: "Failed to fetch documents", details: documentsError },
+            { error: "Failed to fetch case tasks", details: caseTasksError },
             500
           );
         }
 
-        documentsCount += documents?.length || 0;
+        const { data: folders, error: foldersError } = await supabase
+          .schema(schema)
+          .from("storage_folders")
+          .select("*")
+          .eq("case_id", caseItem.id);
+
+        if (foldersError) {
+          console.error("Failed to fetch folders:", foldersError);
+          return c.json(
+            { error: "Failed to fetch folders", details: foldersError },
+            500
+          );
+        }
+
+        let documentsCount = 0;
+        for (const folder of folders) {
+          const { data: documents, error: documentsError } = await supabase
+            .schema(schema)
+            .from("storage_files")
+            .select("*")
+            .eq("folder_id", folder.id)
+            .is("deleted_at", null);
+
+          if (documentsError) {
+            console.error("Failed to fetch documents:", documentsError);
+            return c.json(
+              { error: "Failed to fetch documents", details: documentsError },
+              500
+            );
+          }
+
+          documentsCount += documents?.length || 0;
+        }
+
+        detailedCases.push({
+          ...caseItem,
+          case_tasks_count: caseTasks?.length || 0,
+          documents_count: documentsCount,
+        });
       }
 
-      detailedCases.push({
-        ...caseItem,
-        case_tasks_count: caseTasks?.length || 0,
-        documents_count: documentsCount,
-      });
+      return c.json(
+        {
+          cases: detailedCases || [],
+          total: count || 0,
+          limit,
+          offset,
+        },
+        200
+      );
+    } catch (error: any) {
+      return c.json({ error: "Failed to fetch cases", details: error }, 500);
     }
-
-    return c.json(
-      {
-        cases: detailedCases || [],
-        total: count || 0,
-        limit,
-        offset,
-      },
-      200
-    );
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }

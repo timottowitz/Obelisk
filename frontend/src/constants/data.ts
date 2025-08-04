@@ -27,23 +27,32 @@ export const navItems: NavItem[] = [
     icon: 'page',
     isActive: false,
     shortcut: ['c', 'c'],
-    items: []
-  },
-  {
-    title: 'Litigation',
-    url: '/dashboard/litigation',
-    icon: 'litigation',
-    isActive: false,
-    shortcut: ['c', 'c'],
-    items: []
-  },
-  {
-    title: 'IMVA',
-    url: '/dashboard/imva',
-    icon: 'imva',
-    isActive: false,
-    shortcut: ['c', 'c'],
-    items: []
+    items: [
+      {
+        title: 'Solar Cases',
+        url: '/dashboard/cases?type=solar',
+        icon: 'sun',
+        isActive: false,
+        shortcut: ['c', 'c'],
+        items: []
+      },
+      {
+        title: 'Litigation',
+        url: '/dashboard/cases?type=litigation',
+        icon: 'litigation',
+        isActive: false,
+        shortcut: ['c', 'c'],
+        items: []
+      },
+      {
+        title: 'IMVA',
+        url: '/dashboard/cases?type=imva',
+        icon: 'imva',
+        isActive: false,
+        shortcut: ['c', 'c'],
+        items: []
+      },
+    ]
   },
   {
     title: 'My Tasks',

@@ -62,6 +62,7 @@ export default function CasesPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [queryParams, setQueryParams] = useState({
+    type: searchParams.get('type') || 'all',
     page: parseInt(searchParams.get('page') || '1'),
     search: searchParams.get('search') || '',
     status: searchParams.get('status') || 'all',
@@ -71,6 +72,7 @@ export default function CasesPage() {
   const debouncedSearchValue = useDebounce(queryParams.search, 1000);
 
   const { data: casesData, isLoading: casesLoading } = useGetCases(
+    queryParams.type,
     queryParams.page,
     debouncedSearchValue,
     queryParams.status,
@@ -79,6 +81,13 @@ export default function CasesPage() {
 
   const casesTotal = casesData?.total;
   const itemsPerPage = 5;
+
+  useEffect(() => {
+    setQueryParams({
+      ...queryParams,
+      type: searchParams.get('type') || 'all'
+    });
+  }, [searchParams.get('type')]);
 
   useEffect(() => {
     setQueryParams({
@@ -93,7 +102,8 @@ export default function CasesPage() {
     debouncedSearchValue,
     queryParams.status,
     queryParams.sort,
-    queryParams.page
+    queryParams.page,
+    queryParams.type
   ]);
 
   const totalPages = Math.ceil((casesTotal || 0) / itemsPerPage);
@@ -171,7 +181,13 @@ export default function CasesPage() {
       <div className='mx-auto max-w-7xl'>
         {/* Page Header */}
         <div className='mb-8 flex items-center justify-between'>
-          <h1 className='text-foreground mb-2 text-3xl font-bold'>My cases</h1>
+          <h1 className='text-foreground mb-2 text-3xl font-bold'>
+            {queryParams.type === 'imva'
+              ? 'IMVA'
+              : queryParams.type === 'solar'
+                ? 'Solar Cases'
+                : 'Litigation'}
+          </h1>
         </div>
 
         {/* Search and Filter Bar */}
