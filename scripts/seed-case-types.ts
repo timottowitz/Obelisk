@@ -2,10 +2,10 @@
 
 /**
  * Case Types Seeder Script
- * 
+ *
  * This script seeds default case types and folder templates for organizations.
  * Designed for site administrators to initialize or update case type configurations.
- * 
+ *
  * Usage:
  *   npm run seed:case-types                           # Seed all organizations
  *   npm run seed:case-types -- --org=org_12345       # Seed specific organization
@@ -14,12 +14,12 @@
  *   npm run seed:case-types -- --help                # Show help
  */
 
-import { config } from 'dotenv';
-import pkg from 'pg';
-import type { Client } from 'pg';
+import { config } from "dotenv";
+import pkg from "pg";
+import type { Client } from "pg";
 const { Client: PgClient } = pkg;
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from "fs";
+import * as path from "path";
 
 // Load environment variables
 config();
@@ -79,144 +79,207 @@ const CONFIG: Config = {
 };
 
 // Default case types configuration
-const DEFAULT_CASE_TYPES: CaseTypeConfig[] = [
+export const DEFAULT_CASE_TYPES: CaseTypeConfig[] = [
   {
-    name: 'general_legal',
-    display_name: 'General Legal',
-    description: 'General legal matters and consultations',
-    color: '#3B82F6',
-    icon: 'scale',
+    name: "solar",
+    display_name: "Solar",
+    description: "Solar matters and consultations",
+    color: "#3B82F6",
+    icon: "sun",
     folder_templates: [
-      { name: 'Client Documents', path: '/client-documents', sort_order: 1 },
-      { name: 'Correspondence', path: '/correspondence', sort_order: 2 },
-      { name: 'Legal Research', path: '/legal-research', sort_order: 3 },
-      { name: 'Billing', path: '/billing', sort_order: 4 },
+      {
+        name: "Expenses",
+        path: "/expenses",
+        sort_order: 1,
+      },
+      {
+        name: "Insurance",
+        path: "/insurance",
+        sort_order: 2,
+      },
+      {
+        name: "Roof Expert Report",
+        path: "/roof-expert-report",
+        sort_order: 3,
+      },
+      {
+        name: "Solar Expert Report",
+        path: "/solar-expert-report",
+        sort_order: 4,
+      },
+      {
+        name: "UCC1 Filings and Lien Notices",
+        path: "/ucc1-filings-and-lien-notices",
+        sort_order: 5,
+      },
+      {
+        name: "Solar Contracts",
+        path: "/solar-contracts",
+        sort_order: 6,
+      },
+      {
+        name: "Settlement",
+        path: "/settlement",
+        sort_order: 7,
+      },
+      {
+        name: "Pre-Panel Electricity Bills",
+        path: "/pre-panel-electricity-bills",
+        sort_order: 8,
+      },
+      {
+        name: "Post-Panel Electricity Bills",
+        path: "/post-panel-electricity-bills",
+        sort_order: 9,
+      },
+      {
+        name: "Photos of Home and Panels",
+        path: "/photos-of-home-and-panels",
+        sort_order: 10,
+      },
+      {
+        name: "Installers or Subcontractors Docs",
+        path: "/installers-or-subcontractors-docs",
+        sort_order: 11,
+      },
+      {
+        name: "Financing Contracts",
+        path: "/financing-contracts",
+        sort_order: 12,
+      },
+      {
+        name: "Emails re Contracts",
+        path: "/emails-re-contracts",
+        sort_order: 13,
+      },
+      {
+        name: "Bennett Legal Communications",
+        path: "/bennett-legal-communications",
+        sort_order: 14,
+      },
+      {
+        name: "Banking Records",
+        path: "/banking-records",
+        sort_order: 15,
+      },
+      {
+        name: "Arbitration",
+        path: "/arbitration",
+        sort_order: 16,
+      },
+      {
+        name: "Administrative",
+        path: "/administrative",
+        sort_order: 17,
+      },
     ],
   },
   {
-    name: 'contract_review',
-    display_name: 'Contract Review',
-    description: 'Contract analysis and review cases',
-    color: '#10B981',
-    icon: 'document-text',
+    name: "litigation",
+    display_name: "Litigation",
+    description: "Court cases and legal disputes",
+    color: "#EF4444",
+    icon: "court-hammer",
     folder_templates: [
-      { name: 'Original Contracts', path: '/original-contracts', sort_order: 1 },
-      { name: 'Redlined Versions', path: '/redlined-versions', sort_order: 2 },
-      { name: 'Final Versions', path: '/final-versions', sort_order: 3 },
-      { name: 'Supporting Documents', path: '/supporting-documents', sort_order: 4 },
+      {
+        name: "Pleadings",
+        path: "/pleadings",
+        sort_order: 1,
+      },
+      {
+        name: "Discovery",
+        path: "/discovery",
+        sort_order: 2,
+      },
+      {
+        name: "Evidence",
+        path: "/evidence",
+        sort_order: 3,
+      },
+      {
+        name: "Court Filings",
+        path: "/court-filings",
+        sort_order: 4,
+      },
+      {
+        name: "Witness Documents",
+        path: "/witness-documents",
+        sort_order: 5,
+      },
+      {
+        name: "Expert Reports",
+        path: "/expert-reports",
+        sort_order: 6,
+      },
     ],
   },
   {
-    name: 'litigation',
-    display_name: 'Litigation',
-    description: 'Court cases and legal disputes',
-    color: '#EF4444',
-    icon: 'court-hammer',
+    name: "IMVA",
+    display_name: "IMVA",
+    description: "IMVA matters and consultations",
+    color: "#10B981",
+    icon: "building",
     folder_templates: [
-      { name: 'Pleadings', path: '/pleadings', sort_order: 1 },
-      { name: 'Discovery', path: '/discovery', sort_order: 2 },
-      { name: 'Evidence', path: '/evidence', sort_order: 3 },
-      { name: 'Court Filings', path: '/court-filings', sort_order: 4 },
-      { name: 'Witness Documents', path: '/witness-documents', sort_order: 5 },
-      { name: 'Expert Reports', path: '/expert-reports', sort_order: 6 },
-    ],
-  },
-  {
-    name: 'corporate_law',
-    display_name: 'Corporate Law',
-    description: 'Business formation and corporate matters',
-    color: '#8B5CF6',
-    icon: 'building-office',
-    folder_templates: [
-      { name: 'Formation Documents', path: '/formation-documents', sort_order: 1 },
-      { name: 'Board Resolutions', path: '/board-resolutions', sort_order: 2 },
-      { name: 'Shareholder Agreements', path: '/shareholder-agreements', sort_order: 3 },
-      { name: 'Compliance Documents', path: '/compliance-documents', sort_order: 4 },
-      { name: 'Financial Records', path: '/financial-records', sort_order: 5 },
-    ],
-  },
-  {
-    name: 'real_estate',
-    display_name: 'Real Estate',
-    description: 'Property transactions and real estate law',
-    color: '#F59E0B',
-    icon: 'home',
-    folder_templates: [
-      { name: 'Purchase Agreements', path: '/purchase-agreements', sort_order: 1 },
-      { name: 'Title Documents', path: '/title-documents', sort_order: 2 },
-      { name: 'Inspections', path: '/inspections', sort_order: 3 },
-      { name: 'Financing Documents', path: '/financing-documents', sort_order: 4 },
-      { name: 'Closing Documents', path: '/closing-documents', sort_order: 5 },
-    ],
-  },
-  {
-    name: 'family_law',
-    display_name: 'Family Law',
-    description: 'Divorce, custody, and family legal matters',
-    color: '#EC4899',
-    icon: 'users',
-    folder_templates: [
-      { name: 'Divorce Proceedings', path: '/divorce-proceedings', sort_order: 1 },
-      { name: 'Child Custody', path: '/child-custody', sort_order: 2 },
-      { name: 'Financial Disclosure', path: '/financial-disclosure', sort_order: 3 },
-      { name: 'Support Documents', path: '/support-documents', sort_order: 4 },
-      { name: 'Mediation Records', path: '/mediation-records', sort_order: 5 },
-    ],
-  },
-  {
-    name: 'employment_law',
-    display_name: 'Employment Law',
-    description: 'Workplace disputes and employment issues',
-    color: '#06B6D4',
-    icon: 'briefcase',
-    folder_templates: [
-      { name: 'Employment Contracts', path: '/employment-contracts', sort_order: 1 },
-      { name: 'HR Policies', path: '/hr-policies', sort_order: 2 },
-      { name: 'Complaint Documentation', path: '/complaint-documentation', sort_order: 3 },
-      { name: 'Investigation Records', path: '/investigation-records', sort_order: 4 },
-      { name: 'Settlement Documents', path: '/settlement-documents', sort_order: 5 },
-    ],
-  },
-  {
-    name: 'intellectual_property',
-    display_name: 'Intellectual Property',
-    description: 'Patents, trademarks, and IP protection',
-    color: '#7C3AED',
-    icon: 'lightbulb',
-    folder_templates: [
-      { name: 'Patent Applications', path: '/patent-applications', sort_order: 1 },
-      { name: 'Trademark Filings', path: '/trademark-filings', sort_order: 2 },
-      { name: 'Copyright Documents', path: '/copyright-documents', sort_order: 3 },
-      { name: 'Licensing Agreements', path: '/licensing-agreements', sort_order: 4 },
-      { name: 'IP Research', path: '/ip-research', sort_order: 5 },
-    ],
-  },
-  {
-    name: 'criminal_defense',
-    display_name: 'Criminal Defense',
-    description: 'Criminal law and defense cases',
-    color: '#DC2626',
-    icon: 'shield-check',
-    folder_templates: [
-      { name: 'Case Files', path: '/case-files', sort_order: 1 },
-      { name: 'Evidence', path: '/evidence', sort_order: 2 },
-      { name: 'Witness Statements', path: '/witness-statements', sort_order: 3 },
-      { name: 'Court Documents', path: '/court-documents', sort_order: 4 },
-      { name: 'Investigation', path: '/investigation', sort_order: 5 },
-    ],
-  },
-  {
-    name: 'bankruptcy',
-    display_name: 'Bankruptcy',
-    description: 'Bankruptcy and debt restructuring cases',
-    color: '#059669',
-    icon: 'calculator',
-    folder_templates: [
-      { name: 'Petition Documents', path: '/petition-documents', sort_order: 1 },
-      { name: 'Financial Statements', path: '/financial-statements', sort_order: 2 },
-      { name: 'Asset Documentation', path: '/asset-documentation', sort_order: 3 },
-      { name: 'Creditor Communications', path: '/creditor-communications', sort_order: 4 },
-      { name: 'Court Orders', path: '/court-orders', sort_order: 5 },
+      {
+        name: "Medicals",
+        path: "/medicals",
+        sort_order: 1,
+      },
+      {
+        name: "Mediation",
+        path: "/mediation",
+        sort_order: 2,
+      },
+      {
+        name: "Pleadings",
+        path: "/pleadings",
+        sort_order: 3,
+      },
+      {
+        name: "Lop and Liens",
+        path: "/lop-and-liens",
+        sort_order: 4,
+      },
+      {
+        name: "Investigation",
+        path: "/investigation",
+        sort_order: 5,
+      },
+      {
+        name: "Experts",
+        path: "/experts",
+        sort_order: 6,
+      },
+      {
+        name: "Expenses",
+        path: "/expenses",
+        sort_order: 7,
+      },
+      {
+        name: "Discovery",
+        path: "/discovery",
+        sort_order: 8,
+      },
+      {
+        name: "Depositions",
+        path: "/depositions",
+        sort_order: 9,
+      },
+      {
+        name: "Depo Prep",
+        path: "/depo-prep",
+        sort_order: 10,
+      },
+      {
+        name: "Correspondence",
+        path: "/correspondence",
+        sort_order: 11,
+      },
+      {
+        name: "Administrative",
+        path: "/administrative",
+        sort_order: 12,
+      },
     ],
   },
 ];
@@ -229,7 +292,10 @@ class CaseTypeSeeder {
   constructor() {
     this.client = new PgClient({
       connectionString: CONFIG.databaseUrl,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+      ssl:
+        process.env.NODE_ENV === "production"
+          ? { rejectUnauthorized: false }
+          : false,
     });
     this.args = this.parseArgs();
     this.stats = {
@@ -249,17 +315,17 @@ class CaseTypeSeeder {
       config: null,
     };
 
-    process.argv.slice(2).forEach(arg => {
-      if (arg.startsWith('--org=')) {
-        args.org = arg.split('=')[1];
-      } else if (arg === '--force') {
+    process.argv.slice(2).forEach((arg) => {
+      if (arg.startsWith("--org=")) {
+        args.org = arg.split("=")[1];
+      } else if (arg === "--force") {
         args.force = true;
-      } else if (arg === '--preview') {
+      } else if (arg === "--preview") {
         args.preview = true;
-      } else if (arg === '--help') {
+      } else if (arg === "--help") {
         args.help = true;
-      } else if (arg.startsWith('--config=')) {
-        args.config = arg.split('=')[1];
+      } else if (arg.startsWith("--config=")) {
+        args.config = arg.split("=")[1];
       }
     });
 
@@ -303,25 +369,26 @@ CONFIGURATION FILE FORMAT:
 
     // Validate environment
     if (!CONFIG.databaseUrl) {
-      console.error('❌ Missing required environment variable: DATABASE_URL');
+      console.error("❌ Missing required environment variable: DATABASE_URL");
       process.exit(1);
     }
 
     // Connect to database
     await this.client.connect();
-    console.log('🚀 Case Types Seeder initialized');
+    console.log("🚀 Case Types Seeder initialized");
   }
 
   private async loadConfiguration(): Promise<CaseTypeConfig[]> {
     if (this.args.config) {
       try {
         const configPath = path.resolve(this.args.config);
-        const configData = fs.readFileSync(configPath, 'utf8');
+        const configData = fs.readFileSync(configPath, "utf8");
         const customConfig: CaseTypeConfig[] = JSON.parse(configData);
         console.log(`📄 Using custom configuration: ${configPath}`);
         return customConfig;
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
         console.error(`❌ Failed to load configuration file: ${errorMessage}`);
         process.exit(1);
       }
@@ -334,7 +401,7 @@ CONFIGURATION FILE FORMAT:
       if (this.args.org) {
         // Get specific organization
         const result = await this.client.query(
-          'SELECT id, name, schema_name FROM private.organizations WHERE schema_name = $1',
+          "SELECT id, name, schema_name FROM private.organizations WHERE schema_name = $1",
           [this.args.org]
         );
 
@@ -347,23 +414,32 @@ CONFIGURATION FILE FORMAT:
       } else {
         // Get all organizations
         const result = await this.client.query(
-          'SELECT id, name, schema_name FROM private.organizations ORDER BY created_at'
+          "SELECT id, name, schema_name FROM private.organizations ORDER BY created_at"
         );
 
         return result.rows as Organization[];
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('❌ Database connection error:', errorMessage);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      console.error("❌ Database connection error:", errorMessage);
       process.exit(1);
     }
   }
 
-  private async seedCaseTypesForOrg(organization: Organization, caseTypesConfig: CaseTypeConfig[]): Promise<void> {
+  private async seedCaseTypesForOrg(
+    organization: Organization,
+    caseTypesConfig: CaseTypeConfig[]
+  ): Promise<void> {
     const schema = organization.schema_name.toLowerCase();
-    console.log(`\n📁 Processing organization: ${organization.name} (${schema})`);
+    console.log(
+      `\n📁 Processing organization: ${organization.name} (${schema})`
+    );
 
     const orgStats: OrgStats = { caseTypes: 0, templates: 0, errors: 0 };
+
+    await this.client.query(`DELETE FROM ${schema}.folder_templates`);
+    await this.client.query(`DELETE FROM ${schema}.case_types`);
 
     for (const caseTypeConfig of caseTypesConfig) {
       try {
@@ -377,11 +453,15 @@ CONFIGURATION FILE FORMAT:
 
         if (existingCaseTypeResult.rows.length > 0) {
           if (!this.args.force) {
-            console.log(`  ⏭️  ${caseTypeConfig.display_name} already exists, skipping...`);
+            console.log(
+              `  ⏭️  ${caseTypeConfig.display_name} already exists, skipping...`
+            );
             continue;
           }
           caseTypeId = existingCaseTypeResult.rows[0].id;
-          console.log(`  🔄 ${caseTypeConfig.display_name} exists, forcing update...`);
+          console.log(
+            `  🔄 ${caseTypeConfig.display_name} exists, forcing update...`
+          );
         } else {
           // Create case type
           const newCaseTypeResult = await this.client.query(
@@ -392,7 +472,7 @@ CONFIGURATION FILE FORMAT:
               caseTypeConfig.display_name,
               caseTypeConfig.description,
               caseTypeConfig.color,
-              caseTypeConfig.icon
+              caseTypeConfig.icon,
             ]
           );
 
@@ -423,7 +503,7 @@ CONFIGURATION FILE FORMAT:
                   template.name,
                   template.sort_order,
                   template.is_required !== false,
-                  existingTemplateResult.rows[0].id
+                  existingTemplateResult.rows[0].id,
                 ]
               );
             } else {
@@ -438,68 +518,86 @@ CONFIGURATION FILE FORMAT:
                   template.path,
                   template.parent_path || null,
                   template.sort_order,
-                  template.is_required !== false
+                  template.is_required !== false,
                 ]
               );
               orgStats.templates++;
             }
           } catch (templateError) {
-            const errorMessage = templateError instanceof Error ? templateError.message : 'Unknown error';
+            const errorMessage =
+              templateError instanceof Error
+                ? templateError.message
+                : "Unknown error";
             console.error(`    ❌ Template ${template.name}:`, errorMessage);
             orgStats.errors++;
           }
         }
 
-        console.log(`    📂 Created/updated ${caseTypeConfig.folder_templates.length} templates`);
-
+        console.log(
+          `    📂 Created/updated ${caseTypeConfig.folder_templates.length} templates`
+        );
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error(`  ❌ Error processing ${caseTypeConfig.name}:`, errorMessage);
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        console.error(
+          `  ❌ Error processing ${caseTypeConfig.name}:`,
+          errorMessage
+        );
         orgStats.errors++;
       }
     }
 
-    console.log(`  📊 Org Summary: ${orgStats.caseTypes} case types, ${orgStats.templates} templates, ${orgStats.errors} errors`);
-    
+    console.log(
+      `  📊 Org Summary: ${orgStats.caseTypes} case types, ${orgStats.templates} templates, ${orgStats.errors} errors`
+    );
+
     // Update global stats
     this.stats.caseTypes += orgStats.caseTypes;
     this.stats.templates += orgStats.templates;
     this.stats.errors += orgStats.errors;
   }
 
-  private async preview(organizations: Organization[], caseTypesConfig: CaseTypeConfig[]): Promise<void> {
-    console.log('\n📋 PREVIEW MODE - No changes will be made\n');
-    
-    console.log('🏢 Organizations to process:');
-    organizations.forEach(org => {
+  private async preview(
+    organizations: Organization[],
+    caseTypesConfig: CaseTypeConfig[]
+  ): Promise<void> {
+    console.log("\n📋 PREVIEW MODE - No changes will be made\n");
+
+    console.log("🏢 Organizations to process:");
+    organizations.forEach((org) => {
       console.log(`  • ${org.name} (${org.schema_name})`);
     });
 
-    console.log('\n📦 Case types to seed:');
-    caseTypesConfig.forEach(caseType => {
-      console.log(`  • ${caseType.display_name} (${caseType.folder_templates.length} templates)`);
+    console.log("\n📦 Case types to seed:");
+    caseTypesConfig.forEach((caseType) => {
+      console.log(
+        `  • ${caseType.display_name} (${caseType.folder_templates.length} templates)`
+      );
     });
 
-    const totalTemplates = caseTypesConfig.reduce((sum, ct) => sum + ct.folder_templates.length, 0);
-    
-    console.log('\n📊 Summary:');
+    const totalTemplates = caseTypesConfig.reduce(
+      (sum, ct) => sum + ct.folder_templates.length,
+      0
+    );
+
+    console.log("\n📊 Summary:");
     console.log(`  Organizations: ${organizations.length}`);
     console.log(`  Case Types: ${caseTypesConfig.length}`);
     console.log(`  Total Templates: ${totalTemplates}`);
-    console.log(`  Force Mode: ${this.args.force ? 'YES' : 'NO'}`);
+    console.log(`  Force Mode: ${this.args.force ? "YES" : "NO"}`);
   }
 
   public async run(): Promise<void> {
     const startTime = Date.now();
-    
+
     try {
       await this.init();
-      
+
       const caseTypesConfig = await this.loadConfiguration();
       const organizations = await this.getOrganizations();
 
       if (organizations.length === 0) {
-        console.log('⚠️  No organizations found');
+        console.log("⚠️  No organizations found");
         return;
       }
 
@@ -508,9 +606,11 @@ CONFIGURATION FILE FORMAT:
         return;
       }
 
-      console.log(`\n🎯 Starting seeder for ${organizations.length} organization(s)`);
+      console.log(
+        `\n🎯 Starting seeder for ${organizations.length} organization(s)`
+      );
       console.log(`📦 Seeding ${caseTypesConfig.length} case types`);
-      console.log(`🔄 Force mode: ${this.args.force ? 'ENABLED' : 'DISABLED'}`);
+      console.log(`🔄 Force mode: ${this.args.force ? "ENABLED" : "DISABLED"}`);
 
       this.stats.organizations = organizations.length;
 
@@ -520,7 +620,7 @@ CONFIGURATION FILE FORMAT:
 
       const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
-      console.log('\n🎉 SEEDING COMPLETE!');
+      console.log("\n🎉 SEEDING COMPLETE!");
       console.log(`📊 Final Summary:`);
       console.log(`  Organizations: ${this.stats.organizations}`);
       console.log(`  Case Types Created: ${this.stats.caseTypes}`);
@@ -531,11 +631,11 @@ CONFIGURATION FILE FORMAT:
       if (this.stats.errors > 0) {
         process.exit(1);
       }
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : '';
-      console.error('\n💥 Fatal error:', errorMessage);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      const errorStack = error instanceof Error ? error.stack : "";
+      console.error("\n💥 Fatal error:", errorMessage);
       console.error(errorStack);
       process.exit(1);
     } finally {
@@ -548,8 +648,8 @@ CONFIGURATION FILE FORMAT:
 // Run the seeder
 if (require.main === module) {
   const seeder = new CaseTypeSeeder();
-  seeder.run().catch(error => {
-    console.error('Unhandled error:', error);
+  seeder.run().catch((error) => {
+    console.error("Unhandled error:", error);
     process.exit(1);
   });
 }
