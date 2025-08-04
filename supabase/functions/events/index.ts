@@ -102,6 +102,7 @@ app.get("/events", async (c) => {
       .schema(schema)
       .from("case_events")
       .select("*", { count: "exact" })
+      .order("created_at", { ascending: false })
       .range(limit * (page - 1), limit * page - 1);
 
     if (error) {
