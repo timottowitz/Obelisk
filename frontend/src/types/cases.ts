@@ -48,6 +48,9 @@ export interface Task {
   description: string;
   status: string;
   due_date: string;
+  case_number: string;
+  claimant: string;
+  respondent: string;
   created_at: string;
   updated_at: string;
 }
