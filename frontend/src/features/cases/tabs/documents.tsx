@@ -118,49 +118,6 @@ export default function Documents({
 
   // Upload document state
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
-  useState(false);
-
-  // Initialize expanded folders from localStorage when folders are loaded
-  useEffect(() => {
-    if (Array.isArray(foldersList) && foldersList.length > 0) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('expandedFolders');
-        if (saved) {
-          try {
-            const savedArray = JSON.parse(saved);
-            const validExpandedFolders = new Set<string>();
-
-            // Only include folder IDs that actually exist in the current folder structure
-            const allFolderIds = new Set(
-              foldersList.map((folder: any) => folder.id)
-            );
-
-            savedArray.forEach((folderId: string) => {
-              if (allFolderIds.has(folderId)) {
-                validExpandedFolders.add(folderId);
-              }
-            });
-
-            setExpandedFolders(validExpandedFolders);
-          } catch (error) {
-            console.warn(
-              'Failed to parse expanded folders from localStorage:',
-              error
-            );
-            // Expand all root folders by default
-            setExpandedFolders(
-              new Set<string>(foldersList.map((folder: any) => folder.id))
-            );
-          }
-        } else {
-          // No saved state, expand all root folders by default
-          setExpandedFolders(
-            new Set<string>(foldersList.map((folder: any) => folder.id))
-          );
-        }
-      }
-    }
-  }, [foldersList]);
 
   // Recursive function to count all documents in a folder and its children
   const [selectedUploadFolderId, setSelectedUploadFolderId] =
@@ -244,7 +201,6 @@ export default function Documents({
     setSearchQuery(searchValue);
   };
 
-  // Handle folder toggle
   const toggleFolder = useCallback((folderId: string) => {
     setExpandedFolders((prev) => {
       const newSet = new Set(prev);
@@ -253,15 +209,6 @@ export default function Documents({
       } else {
         newSet.add(folderId);
       }
-
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(
-          'expandedFolders',
-          JSON.stringify(Array.from(newSet))
-        );
-      }
-
       return newSet;
     });
   }, []);
@@ -330,13 +277,6 @@ export default function Documents({
         setExpandedFolders((prev) => {
           const newSet = new Set(prev);
           newSet.add(selectedParentFolderId);
-          // Save to localStorage
-          if (typeof window !== 'undefined') {
-            localStorage.setItem(
-              'expandedFolders',
-              JSON.stringify(Array.from(newSet))
-            );
-          }
           return newSet;
         });
       }
