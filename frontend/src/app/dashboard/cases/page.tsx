@@ -1,8 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious
+} from '@/components/ui/pagination';
 import {
   Table,
   TableBody,
@@ -11,22 +20,16 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import {
   FolderOpen,
   Search,
-  ChevronDown,
-  CheckCircle,
+  Eye,
   FileText,
-  Receipt,
-  Pencil,
-  Trash
+  ChevronDown,
+  Loader2,
+  ChevronUp
 } from 'lucide-react';
 import Link from 'next/link';
-import { useCasesOperations } from '@/hooks/useCases';
-import { useRouter } from 'next/navigation';
-import { AlertModal } from '@/components/modal/alert-modal';
-import { toast } from 'sonner';
 import {
   SelectItem,
   SelectContent,
@@ -34,226 +37,437 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Select } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+import { useGetCases } from '@/hooks/useCases';
+import { useDebounce } from '@/hooks/use-debounce';
+import { useSearchParams, useRouter } from 'next/navigation';
+import queryString from 'query-string';
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'active':
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800';
+    case 'settled (in...)':
+      return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800';
+    case 'awarded':
+      return 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-400 dark:border-purple-800';
+    case 'inactive':
+      return 'bg-muted text-muted-foreground border-border';
+    default:
+      return 'bg-muted text-muted-foreground border-border';
+  }
+};
 
 export default function CasesPage() {
-  const { getCases, deleteCase } = useCasesOperations();
-  const casesData = getCases.data;
-  const casesLoading = getCases.isLoading;
-  const casesError = getCases.error;
-  const [searchTerm, setSearchTerm] = useState('');
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const getStatusBadge = (status: string) => {
-    if (status === 'Active') {
-      return (
-        <Badge className='bg-blue-100 text-blue-800 hover:bg-blue-100'>
-          Active
-        </Badge>
-      );
-    }
-    return <span className='text-gray-600'>{status}</span>;
-  };
+  const [queryParams, setQueryParams] = useState({
+    type: searchParams.get('type') || 'all',
+    page: parseInt(searchParams.get('page') || '1'),
+    search: searchParams.get('search') || '',
+    status: searchParams.get('status') || 'all',
+    sort: searchParams.get('sort') || 'asc'
+  });
 
-  const [isOpen, setIsOpen] = useState(false);
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const handleConfirmDelete = async () => {
-    if (selectedCaseId) {
-      await deleteCase.mutateAsync(selectedCaseId);
-      toast.success('Case deleted successfully');
+  const debouncedSearchValue = useDebounce(queryParams.search, 1000);
+
+  const { data: casesData, isLoading: casesLoading } = useGetCases(
+    queryParams.type,
+    queryParams.page,
+    debouncedSearchValue,
+    queryParams.status,
+    queryParams.sort
+  );
+
+  const casesTotal = casesData?.total;
+  const itemsPerPage = 5;
+
+  useEffect(() => {
+    setQueryParams({
+      ...queryParams,
+      type: searchParams.get('type') || 'all'
+    });
+  }, [searchParams.get('type')]);
+
+  useEffect(() => {
+    setQueryParams({
+      ...queryParams,
+      page: 1
+    });
+  }, [debouncedSearchValue, queryParams.status, queryParams.sort]);
+
+  useEffect(() => {
+    router.push(`/dashboard/cases?${queryString.stringify(queryParams)}`);
+  }, [
+    debouncedSearchValue,
+    queryParams.status,
+    queryParams.sort,
+    queryParams.page,
+    queryParams.type
+  ]);
+
+  const totalPages = Math.ceil((casesTotal || 0) / itemsPerPage);
+
+  const getPageNumbers = useCallback(() => {
+    const pages = [];
+    const maxVisiblePages = 5;
+
+    if (totalPages <= maxVisiblePages) {
+      // Show all pages if total is 5 or less
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Show 5 pages with ellipsis
+      if (queryParams.page <= 3) {
+        // Show first 5 pages
+        for (let i = 1; i <= 5; i++) {
+          pages.push(i);
+        }
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (queryParams.page >= totalPages - 2) {
+        // Show last 5 pages
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPages - 4; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        // Show current page with 2 pages on each side
+        pages.push(1);
+        pages.push('...');
+        for (let i = queryParams.page - 1; i <= queryParams.page + 1; i++) {
+          pages.push(i);
+        }
+        pages.push('...');
+        pages.push(totalPages);
+      }
     }
-    setIsOpen(false);
-  };
+
+    return pages;
+  }, [queryParams.page, totalPages]);
+
+  const handlePageChange = useCallback(
+    (page: number) => {
+      setQueryParams({
+        ...queryParams,
+        page
+      });
+    },
+    [queryParams]
+  );
+
+  const handlePreviousPage = useCallback(() => {
+    if (queryParams.page > 1) {
+      setQueryParams({
+        ...queryParams,
+        page: queryParams.page - 1
+      });
+    }
+  }, [queryParams]);
+
+  const handleNextPage = useCallback(() => {
+    if (queryParams.page < totalPages) {
+      setQueryParams({
+        ...queryParams,
+        page: queryParams.page + 1
+      });
+    }
+  }, [queryParams, totalPages]);
 
   return (
-    <div className='h-[calc(100vh-4rem)] overflow-y-auto bg-gray-50'>
-      {/* Header */}
-      <div className='border-b border-gray-200 bg-white px-6 py-4'>
-        <div className='flex items-center space-x-3'>
-          <div className='flex h-10 w-10 items-center justify-center rounded-lg bg-red-100'>
-            <FolderOpen className='h-6 w-6 text-red-600' />
-          </div>
-          <h1 className='text-2xl font-bold text-gray-900'>My Cases</h1>
+    <div className='bg-background max-h-[calc(100vh-100px)] min-h-screen overflow-y-auto p-8'>
+      <div className='mx-auto max-w-7xl'>
+        {/* Page Header */}
+        <div className='mb-8 flex items-center justify-between'>
+          <h1 className='text-foreground mb-2 text-3xl font-bold'>
+            {queryParams.type === 'imva'
+              ? 'IMVA'
+              : queryParams.type === 'solar'
+                ? 'Solar Cases'
+                : 'Litigation'}
+          </h1>
         </div>
-      </div>
 
-      {/* Controls */}
-      <div className='border-b border-gray-200 bg-white px-6 py-4'>
-        <div className='flex items-center justify-between'>
-          <div className='flex items-center space-x-4'>
-            {/* Search */}
-            <div className='relative'>
-              <Search className='absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400' />
+        {/* Search and Filter Bar */}
+        <div className='border-border bg-card mb-6 rounded-xl border p-6 shadow-sm'>
+          <div className='flex flex-col items-start gap-4 sm:flex-row sm:items-center'>
+            {/* Search Input */}
+            <div className='relative max-w-md flex-1'>
+              <Search className='text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform' />
               <Input
+                type='text'
                 placeholder='Find by keyword or number'
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className='w-80 pl-10'
+                value={queryParams.search}
+                onChange={(e) =>
+                  setQueryParams({
+                    ...queryParams,
+                    search: e.target.value
+                  })
+                }
+                className='border-input focus:ring-ring w-full rounded-lg border py-2.5 pr-4 pl-10 text-sm focus:border-transparent focus:ring-2'
               />
             </div>
 
-            {/* Filter */}
+            {/* Filter Dropdown */}
             <Select
-              onValueChange={(value) => setStatusFilter(value)}
-              value={statusFilter}
+              onValueChange={(value) =>
+                setQueryParams({
+                  ...queryParams,
+                  status: value
+                })
+              }
+              value={queryParams.status}
             >
-              <SelectTrigger className='w-40'>
-                <SelectValue />
+              <SelectTrigger>
+                <SelectValue placeholder='Select a filter' />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value='all'>All Cases</SelectItem>
                 <SelectItem value='active'>Active</SelectItem>
+                <SelectItem value='inactive'>Inactive</SelectItem>
                 <SelectItem value='settled'>Settled</SelectItem>
                 <SelectItem value='awarded'>Awarded</SelectItem>
-                <SelectItem value='inactive'>Inactive</SelectItem>
+                <SelectItem value='closed'>Closed</SelectItem>
               </SelectContent>
             </Select>
           </div>
-
-          {/* Switch View Button */}
-          <Button variant='outline' className='flex items-center space-x-2'>
-            Switch to Recently Filed Cases
-          </Button>
         </div>
-      </div>
 
-      {/* Table */}
-      <div className='bg-white'>
-        <div className='px-6 py-4'>
+        {/* Cases Table */}
+        <div className='border-border bg-card overflow-hidden rounded-xl border shadow-sm'>
+          {/* Table Header */}
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className='text-center font-semibold text-gray-900'>
-                  Case Number
-                  <ChevronDown className='ml-1 inline h-4 w-4' />
+                <TableHead className='py-4'>
+                  <Button
+                    className='hover:text-foreground m-auto flex cursor-pointer items-center gap-1 transition-colors'
+                    variant='ghost'
+                    onClick={() =>
+                      setQueryParams({
+                        ...queryParams,
+                        sort: queryParams.sort === 'asc' ? 'desc' : 'asc'
+                      })
+                    }
+                  >
+                    Claimant
+                    {queryParams.sort === 'asc' ? (
+                      <ChevronDown className='h-3 w-3' />
+                    ) : (
+                      <ChevronUp className='h-3 w-3' />
+                    )}
+                  </Button>
                 </TableHead>
-                <TableHead className='text-center font-semibold text-gray-900'>
-                  Status
-                  <ChevronDown className='ml-1 inline h-4 w-4' />
+                <TableHead>
+                  <Button
+                    className='hover:text-foreground m-auto flex items-center gap-1 transition-colors'
+                    variant='ghost'
+                  >
+                    Case Number
+                  </Button>
                 </TableHead>
-                <TableHead className='text-center font-semibold text-gray-900'>
-                  Claimant
-                  <ChevronDown className='ml-1 inline h-4 w-4' />
+                <TableHead>
+                  <Button
+                    className='hover:text-foreground m-auto flex items-center gap-1 transition-colors'
+                    variant='ghost'
+                  >
+                    Status
+                  </Button>
                 </TableHead>
-                <TableHead className='text-center font-semibold text-gray-900'>
-                  Respondent
-                  <ChevronDown className='ml-1 inline h-4 w-4' />
+                <TableHead>
+                  <Button
+                    className='hover:text-foreground m-auto flex items-center gap-1 transition-colors'
+                    variant='ghost'
+                  >
+                    Respondent
+                  </Button>
                 </TableHead>
-                <TableHead className='text-center font-semibold text-gray-900'>
-                  Case Manager
-                  <ChevronDown className='ml-1 inline h-4 w-4' />
+                <TableHead>
+                  <Button
+                    className='hover:text-foreground m-auto flex items-center gap-1 transition-colors'
+                    variant='ghost'
+                  >
+                    Case Manager
+                  </Button>
                 </TableHead>
-                <TableHead className='text-center font-semibold text-gray-900'>
-                  Tasks
+                <TableHead>
+                  <Button
+                    className='hover:text-foreground m-auto flex items-center gap-1 transition-colors'
+                    variant='ghost'
+                  >
+                    Next Event
+                  </Button>
                 </TableHead>
-                <TableHead className='text-center font-semibold text-gray-900'>
-                  Docs
+                <TableHead>
+                  <Button
+                    className='hover:text-foreground m-auto flex items-center gap-1 transition-colors'
+                    variant='ghost'
+                  >
+                    Tasks
+                  </Button>
                 </TableHead>
-                <TableHead className='text-center font-semibold text-gray-900'>
-                  Invoices
-                </TableHead>
-                <TableHead className='text-center font-semibold text-gray-900'>
-                  Actions
+                <TableHead>
+                  <Button
+                    className='hover:text-foreground m-auto flex items-center gap-1 transition-colors'
+                    variant='ghost'
+                  >
+                    Docs
+                  </Button>
                 </TableHead>
               </TableRow>
             </TableHeader>
+            {/* Table Body */}
             <TableBody>
-              {casesLoading ? (
+              {casesLoading && (
                 <TableRow>
                   <TableCell colSpan={10} className='text-center'>
-                    Loading...
+                    <Loader2 className='text-muted-foreground h-4 w-4 animate-spin' />
                   </TableCell>
                 </TableRow>
-              ) : casesError ? (
-                <TableRow>
-                  <TableCell colSpan={10} className='text-center'>
-                    Error loading cases
-                  </TableCell>
-                </TableRow>
-              ) : (
-                casesData?.cases
-                  .filter((caseItem) => {
-                    if (statusFilter === 'all') return true;
-                    return caseItem.status === statusFilter;
-                  })
-                  .map((caseItem) => (
-                    <TableRow key={caseItem.id} className='hover:bg-gray-50'>
-                      <TableCell className='text-center'>
-                        <Link
-                          href={`/dashboard/cases/${caseItem.id}`}
-                          className='text-blue-600 underline hover:text-blue-800'
-                        >
-                          {caseItem.case_number}
-                        </Link>
-                      </TableCell>
-                      <TableCell className='text-center'>
-                        {getStatusBadge(caseItem.status)}
-                      </TableCell>
-                      <TableCell className='text-center text-gray-900'>
-                        {caseItem.claimant}
-                      </TableCell>
-                      <TableCell className='text-center text-gray-900'>
-                        {caseItem.respondent}
-                      </TableCell>
-                      <TableCell className='text-center'>
-                        <Link
-                          href='#'
-                          className='text-blue-600 underline hover:text-blue-800'
-                        >
-                          {caseItem.case_manager}
-                        </Link>
-                      </TableCell>
-                      <TableCell className='text-center'>
-                        <div className='flex items-center justify-center'>
-                          <CheckCircle className='h-5 w-5 text-green-600' />
-                        </div>
-                      </TableCell>
-                      <TableCell className='text-center'>
-                        <div className='relative flex items-center justify-center'>
-                          <FileText className='h-5 w-5 text-gray-600' />
-                        </div>
-                      </TableCell>
-                      <TableCell className='text-center'>
-                        <div className='flex items-center justify-center'>
-                          <Receipt className='h-5 w-5 text-gray-600' />
-                        </div>
-                      </TableCell>
-                      <TableCell className='flex items-center justify-center gap-2 text-center'>
-                        <Button
-                          variant='outline'
-                          className='flex cursor-pointer items-center space-x-2'
-                          onClick={() =>
-                            router.push(`/dashboard/cases/${caseItem.id}/edit`)
-                          }
-                        >
-                          <Pencil className='h-4 w-4' />
-                          Edit
-                        </Button>
-                        <Button
-                          variant='outline'
-                          className='flex cursor-pointer items-center space-x-2'
-                          onClick={() => {
-                            setIsOpen(true);
-                            setSelectedCaseId(caseItem.id);
-                          }}
-                        >
-                          <Trash className='h-4 w-4 text-red-500' />
-                          Delete
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
               )}
+              {!casesLoading &&
+                casesData?.cases?.map((caseItem) => (
+                  <TableRow key={caseItem.id}>
+                    {/* Claimant */}
+                    <TableCell className='py-4 text-center'>
+                      <Link
+                        href={`/dashboard/cases/${caseItem.id}`}
+                        className='flex items-center justify-center text-left text-sm font-medium text-blue-500 underline hover:text-blue-600'
+                      >
+                        {caseItem.claimant}
+                      </Link>
+                    </TableCell>
+
+                    {/* Case Number */}
+                    <TableCell className='py-4 text-center'>
+                      <p className='text-foreground text-sm font-medium'>
+                        {caseItem.case_number}
+                      </p>
+                    </TableCell>
+
+                    {/* Status */}
+                    <TableCell className='py-4 text-center'>
+                      <span
+                        className={cn(
+                          'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium',
+                          getStatusColor(caseItem.status)
+                        )}
+                      >
+                        {caseItem.status}
+                      </span>
+                    </TableCell>
+
+                    {/* Respondent */}
+                    <TableCell className='py-4 text-center'>
+                      <p className='text-muted-foreground text-sm'>
+                        {caseItem.respondent}
+                      </p>
+                    </TableCell>
+
+                    {/* Case Manager */}
+                    <TableCell className='py-4 text-center'>
+                      <Button
+                        className='text-sm text-blue-500 underline hover:text-blue-600'
+                        variant='ghost'
+                      >
+                        {caseItem.case_manager}
+                      </Button>
+                    </TableCell>
+
+                    {/* Next Event */}
+                    <TableCell className='py-4 text-center'>
+                      <p className='text-muted-foreground text-sm'>N/A</p>
+                    </TableCell>
+
+                    {/* Tasks */}
+                    <TableCell className='py-4 text-center'>
+                      <div className='relative inline-block'>
+                        <Eye className='text-muted-foreground h-5 w-5' />
+                        <Badge
+                          className='absolute -top-1.5 -right-1.5 h-3 w-3 rounded-full p-1 text-xs font-medium'
+                          variant='destructive'
+                        >
+                          {caseItem.case_tasks_count || 0}
+                        </Badge>
+                      </div>
+                    </TableCell>
+
+                    {/* Docs */}
+                    <TableCell className='py-4 text-center'>
+                      <div className='relative inline-block'>
+                        <FileText className='text-muted-foreground h-5 w-5' />
+                        <Badge
+                          className='absolute -top-1.5 -right-1.5 h-3 w-3 rounded-full p-1 text-xs font-medium'
+                          variant='destructive'
+                        >
+                          {caseItem.documents_count || 0}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
           </Table>
         </div>
+        {/* Table Footer */}
+        <div className='text-muted-foreground mt-6 flex items-center justify-between text-sm'>
+          <div className='flex items-center gap-4'>
+            <p>
+              Showing{' '}
+              {casesTotal ? (queryParams.page - 1) * itemsPerPage + 1 : 0} -{' '}
+              {casesTotal
+                ? casesTotal > queryParams.page * itemsPerPage
+                  ? queryParams.page * itemsPerPage
+                  : casesTotal
+                : 0}{' '}
+              of {casesTotal || 0} cases
+            </p>
+          </div>
+
+          <div>
+            {totalPages > 1 && (
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem className='cursor-pointer'>
+                    <PaginationPrevious
+                      onClick={handlePreviousPage}
+                      className={cn(
+                        'border-muted-foreground cursor-pointer border',
+                        queryParams.page <= 1
+                          ? 'pointer-events-none opacity-50'
+                          : ''
+                      )}
+                    />
+                  </PaginationItem>
+                  {getPageNumbers().map((page, index) => (
+                    <PaginationItem key={index} className='cursor-pointer'>
+                      <PaginationLink
+                        onClick={() => handlePageChange(page as number)}
+                        isActive={queryParams.page === page}
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem className='cursor-pointer'>
+                    <PaginationNext
+                      onClick={handleNextPage}
+                      className={cn(
+                        'border-muted-foreground cursor-pointer border',
+                        queryParams.page >= totalPages
+                          ? 'pointer-events-none opacity-50'
+                          : ''
+                      )}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
+          </div>
+        </div>
       </div>
-      <AlertModal
-        isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
-        onConfirm={handleConfirmDelete}
-        loading={false}
-        deleteTargetType='case'
-      />
     </div>
   );
 }

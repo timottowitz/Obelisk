@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@clerk/nextjs';
 import CasesAPI from '@/services/cases';
 import { ApiResponse } from './useDocuments';
-import { CaseType } from '@/types/cases';
+import { CaseType, FolderTemplate } from '@/types/cases';
 
 // Define the actual API response structure
 interface CaseTypesResponse {
@@ -14,7 +14,8 @@ const QUERY_KEYS = {
   cases: ['cases'] as const,
   case: ['case'] as const,
   tasks: ['tasks'] as const,
-  folders: ['folders'] as const
+  folders: ['folders'] as const,
+  events: ['events'] as const
 };
 
 export function useCaseTypes() {
@@ -24,6 +25,19 @@ export function useCaseTypes() {
       const response = (await CasesAPI.getCaseTypes()) as CaseTypesResponse;
       return response.caseTypes || [];
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 2
+  });
+}
+
+export function useCaseType(caseTypeId: string) {
+  return useQuery({
+    queryKey: [...QUERY_KEYS.caseTypes, caseTypeId],
+    queryFn: async () => {
+      const response = await CasesAPI.getCaseType(caseTypeId);
+      return response;
+    },
+    enabled: !!caseTypeId,
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 2
   });
@@ -126,11 +140,11 @@ export function useDeleteCase() {
   });
 }
 
-export function useGetCases() {
+export function useGetCases(type: string,page: number, search?: string, statusFilter?: string, sort?: string) {
   return useQuery({
-    queryKey: [...QUERY_KEYS.cases],
+    queryKey: [...QUERY_KEYS.cases, type, page, search, statusFilter, sort],
     queryFn: async () => {
-      const response = await CasesAPI.getCases();
+      const response = await CasesAPI.getCases(type, page, search, statusFilter, sort);
       return response;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -181,6 +195,9 @@ export function useCreateCaseTask() {
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.tasks, caseId]
       });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.events, caseId]
+      });
     },
     onError: (error) => {
       console.error('Case task creation failed:', error);
@@ -188,10 +205,72 @@ export function useCreateCaseTask() {
   });
 }
 
+export function useUpdateCaseTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      caseId,
+      taskId,
+      formData
+    }: {
+      caseId: string;
+      taskId: string;
+      formData: any;
+    }) => {
+      const response = await CasesAPI.updateCaseTask(caseId, taskId, formData);
+      return response;
+    },
+    onSuccess: (_, { caseId }) => {
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.tasks, caseId]
+      });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.events]
+      });
+    },
+    onError: (error) => {
+      console.error('Case task update failed:', error);
+    }
+  });
+}
+
+export function useDeleteCaseTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      caseId,
+      taskId
+    }: {
+      caseId: string;
+      taskId: string;
+    }) => {
+      const response = await CasesAPI.deleteCaseTask(caseId, taskId);
+      return response;
+    },
+    onSuccess: (_, { caseId }) => {
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.tasks, caseId]
+      });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.events]
+      });
+    },
+    onError: (error) => {
+      console.error('Case task deletion failed:', error);
+    }
+  });
+}
+
 export function useUpdateCaseType() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ caseTypeId, caseType }: { caseTypeId: string; caseType: any }) => {
+    mutationFn: async ({
+      caseTypeId,
+      caseType
+    }: {
+      caseTypeId: string;
+      caseType: any;
+    }) => {
       const response = await CasesAPI.updateCaseType(caseTypeId, caseType);
       return response;
     },
@@ -204,30 +283,76 @@ export function useUpdateCaseType() {
   });
 }
 
+export function useUpdateFolderTemplates() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      caseTypeId,
+      formData
+    }: {
+      caseTypeId: string;
+      formData: any;
+    }) => {
+      const response = await CasesAPI.updateFolderTemplates(
+        caseTypeId,
+        formData
+      );
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.caseTypes] });
+    },
+    onError: (error) => {
+      console.error('Case type folder templates update failed:', error);
+    }
+  });
+}
+
+export function useDeleteFolderTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (templateId: string) => {
+      const response = await CasesAPI.deleteFolderTemplate(templateId);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.caseTypes] });
+    },
+    onError: (error) => {
+      console.error('Folder template deletion failed:', error);
+    }
+  });
+}
+
+export function useGetCaseEvents(caseId: string) {
+  return useQuery({
+    queryKey: [...QUERY_KEYS.events, caseId],
+    queryFn: async () => {
+      const response = await CasesAPI.getCaseEvents(caseId);
+      return response;
+    },
+    enabled: !!caseId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 2
+  });
+}
+
 export function useCasesOperations() {
   return {
-    //QUeries
+    //Queries
     caseTypes: useCaseTypes(),
 
     //Mutations
     createCase: useCreateCase(),
     updateCase: useUpdateCase(),
-    getCases: useGetCases(),
     deleteCase: useDeleteCase(),
     createCaseTask: useCreateCaseTask(),
+    deleteCaseTask: useDeleteCaseTask(),
+    updateCaseTask: useUpdateCaseTask(),
     createCaseType: useCreateCaseType(),
     deleteCaseType: useDeleteCaseType(),
-    updateCaseType: useUpdateCaseType()
-  };
-}
-
-// Helper function to get case operations with a specific caseId
-export function useCaseOperations(caseId: string) {
-  return {
-    //Queries
-    getCase: useGetCase(caseId),
-    getCaseTasks: useGetCaseTasks(caseId)
-
-    //Mutations
+    updateCaseType: useUpdateCaseType(),
+    updateFolderTemplates: useUpdateFolderTemplates(),
+    deleteFolderTemplate: useDeleteFolderTemplate()
   };
 }

@@ -3,7 +3,7 @@
     "migrate": "tsx scripts/inAppMigrationRunner.ts all-tenants",
     "upload-migrations": "tsx scripts/uploadTenantMigrationsToDb.ts",
     "meeting-intelligence:migrate": "tsx scripts/runMeetingIntelligenceMigrations.ts migrate",
-    "meeting-intelligence:validate": "tsx scripts/runMeetingIntelligenceMigrations.ts validate", 
+    "meeting-intelligence:validate": "tsx scripts/runMeetingIntelligenceMigrations.ts validate",
     "meeting-intelligence:rollback": "tsx scripts/runMeetingIntelligenceMigrations.ts rollback",
     "meeting-intelligence:rollback-confirm": "tsx scripts/runMeetingIntelligenceMigrations.ts rollback-confirm",
     "meeting-intelligence:test": "tsx scripts/testMeetingIntelligenceIntegration.ts",
@@ -14,6 +14,7 @@
     "dev": "cd frontend && npm run dev"
   },
   "dependencies": {
+    "@anthropic-ai/claude-code": "^1.0.67",
     "@supabase/supabase-js": "^2.51.0",
     "dotenv": "^16.5.0",
     "pg": "^8.16.0"

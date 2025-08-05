@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -71,7 +71,7 @@ export function CreateCaseTypeDialog({
     }
   }, [initialCaseType]);
 
-  const handleCaseType = async () => {
+  const handleCaseType = useCallback(async () => {
     if (!newCaseType.name || !newCaseType.display_name) {
       toast.error('Please fill in all required fields');
       return;
@@ -86,7 +86,7 @@ export function CreateCaseTypeDialog({
         await onCreateCaseType(newCaseType);
         toast.success('Case type created successfully');
       }
-      
+
       // Reset form after successful operation
       setNewCaseType({
         name: '',
@@ -97,23 +97,46 @@ export function CreateCaseTypeDialog({
       });
       onOpenChange(false);
     } catch (error) {
-      toast.error(initialCaseType ? 'Failed to update case type' : 'Failed to create case type');
+      toast.error(
+        initialCaseType
+          ? 'Failed to update case type'
+          : 'Failed to create case type'
+      );
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [
+    initialCaseType,
+    onCreateCaseType,
+    onEditCaseType,
+    newCaseType,
+    onOpenChange
+  ]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button className='bg-blue-600 hover:bg-blue-700'>
+        <Button
+          className='bg-blue-600 hover:bg-blue-700'
+          onClick={() => {
+            setNewCaseType({
+              name: '',
+              display_name: '',
+              description: '',
+              color: '#3B82F6',
+              icon: 'folder'
+            });
+          }}
+        >
           <Plus className='mr-2 h-4 w-4' />
           Create Case Type
         </Button>
       </DialogTrigger>
       <DialogContent className='max-w-md'>
         <DialogHeader>
-          <DialogTitle>{initialCaseType ? 'Edit Case Type' : 'Create New Case Type'}</DialogTitle>
+          <DialogTitle>
+            {initialCaseType ? 'Edit Case Type' : 'Create New Case Type'}
+          </DialogTitle>
           <DialogDescription>
             {initialCaseType ? 'Edit a case type' : 'Add a new case type'}
           </DialogDescription>
@@ -211,7 +234,11 @@ export function CreateCaseTypeDialog({
             }
             className='bg-blue-600 hover:bg-blue-700'
           >
-            {isLoading ? 'Saving...' : (initialCaseType ? 'Update Case Type' : 'Create Case Type')}
+            {isLoading
+              ? 'Saving...'
+              : initialCaseType
+                ? 'Update Case Type'
+                : 'Create Case Type'}
           </Button>
         </DialogFooter>
       </DialogContent>

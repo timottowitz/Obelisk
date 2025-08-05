@@ -12,7 +12,7 @@ import { extractUserAndOrgId } from "../_shared/index.ts";
 import {
   seedCaseTypes,
   DEFAULT_CASE_TYPES,
-} from "./seeders/default-case-types.ts";
+} from "../_shared/default-case-types.ts";
 
 console.log("Hello from Cases Functions!");
 
@@ -364,8 +364,7 @@ app.get("/cases/types", async (c) => {
       .schema(schema)
       .from("case_types")
       .select("*, folder_templates(*)")
-      .eq("is_active", true)
-      .order("name");
+      .eq("is_active", true);
 
     if (error) {
       return c.json(
@@ -413,7 +412,7 @@ app.get("/cases/types/:id", async (c) => {
       return c.json({ error: "Case type not found" }, 404);
     }
 
-    return c.json({ caseType }, 200);
+    return c.json(caseType, 200);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -786,13 +785,16 @@ app.get("/cases", async (c) => {
 
     // Parse query params
     const url = new URL(c.req.url);
-    const limit = parseInt(url.searchParams.get("limit") || "20");
-    const offset = parseInt(url.searchParams.get("offset") || "0");
-    const orderBy = url.searchParams.get("orderBy") || "created_at";
-    const orderDirection = (url.searchParams.get("orderDirection") ||
-      "desc") as "asc" | "desc";
+    const type = url.searchParams.get("type") || "all";
+    const page = parseInt(url.searchParams.get("page") || "1");
+    const limit = parseInt(url.searchParams.get("limit") || "5");
+    const offset = (page - 1) * limit;
+    const orderBy = url.searchParams.get("orderBy") || "claimant";
+    const orderDirection = (url.searchParams.get("sort") || "asc") as
+      | "asc"
+      | "desc";
     const search = url.searchParams.get("search") || undefined;
-    const caseTypeId = url.searchParams.get("caseTypeId") || undefined;
+    const status = url.searchParams.get("status") || undefined;
 
     // Check if we're getting a specific case by ID
     const pathParts = url.pathname.split("/");
@@ -825,12 +827,20 @@ app.get("/cases", async (c) => {
       return c.json({ case: case_ }, 200);
     }
 
-    // Build query for listing cases
-    let query = supabase
-      .schema(schema)
-      .from("cases")
-      .select(
-        `
+    try {
+      const display_name =
+        type === "imva"
+          ? "IMVA"
+          : type === "litigation"
+          ? "Litigation"
+          : "Solar";
+
+      // Build query for listing cases
+      let query = supabase
+        .schema(schema)
+        .from("cases")
+        .select(
+          `
         *,
         case_types(
           id,
@@ -841,36 +851,114 @@ app.get("/cases", async (c) => {
           icon
         )
       `,
-        { count: "exact" }
+          { count: "exact" }
+        );
+
+      // Apply filters
+
+      if (type !== "all") {
+        const { data: caseType, error: caseTypeError } = await supabase
+          .schema(schema)
+          .from("case_types")
+          .select("*")
+          .eq("display_name", display_name)
+          .single();
+
+        if (caseTypeError || !caseType) {
+          return c.json({ error: "Case type not found" }, 404);
+        }
+        query = query.eq("case_type", caseType.id);
+      }
+
+      if (search) {
+        query = query.or(
+          `claimant.ilike.%${search}%,case_number.ilike.%${search}%`
+        );
+      }
+
+      if (status) {
+        query = query.eq("status", status);
+      }
+      // Apply ordering and pagination
+      query = query.order(orderBy, { ascending: orderDirection === "asc" });
+      query = query.range(offset, offset + limit - 1);
+
+      const { data: cases, error, count } = await query;
+
+      if (error) {
+        return c.json({ error: "Failed to fetch cases", details: error }, 500);
+      }
+
+      const detailedCases = [];
+
+      for (const caseItem of cases) {
+        const { data: caseTasks, error: caseTasksError } = await supabase
+          .schema(schema)
+          .from("case_tasks")
+          .select("*")
+          .eq("case_id", caseItem.id);
+
+        if (caseTasksError) {
+          console.error("Failed to fetch case tasks:", caseTasksError);
+          return c.json(
+            { error: "Failed to fetch case tasks", details: caseTasksError },
+            500
+          );
+        }
+
+        const { data: folders, error: foldersError } = await supabase
+          .schema(schema)
+          .from("storage_folders")
+          .select("*")
+          .eq("case_id", caseItem.id);
+
+        if (foldersError) {
+          console.error("Failed to fetch folders:", foldersError);
+          return c.json(
+            { error: "Failed to fetch folders", details: foldersError },
+            500
+          );
+        }
+
+        let documentsCount = 0;
+        for (const folder of folders) {
+          const { data: documents, error: documentsError } = await supabase
+            .schema(schema)
+            .from("storage_files")
+            .select("*")
+            .eq("folder_id", folder.id)
+            .is("deleted_at", null);
+
+          if (documentsError) {
+            console.error("Failed to fetch documents:", documentsError);
+            return c.json(
+              { error: "Failed to fetch documents", details: documentsError },
+              500
+            );
+          }
+
+          documentsCount += documents?.length || 0;
+        }
+
+        detailedCases.push({
+          ...caseItem,
+          case_tasks_count: caseTasks?.length || 0,
+          documents_count: documentsCount,
+        });
+      }
+
+      return c.json(
+        {
+          cases: detailedCases || [],
+          total: count || 0,
+          limit,
+          offset,
+        },
+        200
       );
-
-    // Apply filters
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
-    }
-    if (caseTypeId) {
-      query = query.eq("case_type_id", caseTypeId);
-    }
-
-    // Apply ordering and pagination
-    query = query.order(orderBy, { ascending: orderDirection === "asc" });
-    query = query.range(offset, offset + limit - 1);
-
-    const { data: cases, error, count } = await query;
-
-    if (error) {
+    } catch (error: any) {
       return c.json({ error: "Failed to fetch cases", details: error }, 500);
     }
-
-    return c.json(
-      {
-        cases: cases || [],
-        total: count || 0,
-        limit,
-        offset,
-      },
-      200
-    );
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -1320,14 +1408,197 @@ app.post("/cases/:id/tasks", async (c) => {
       .select()
       .single();
 
-    if (insertError || !newTask) {
+    if (insertError) {
       return c.json(
         { error: "Failed to create task", details: insertError },
         500
       );
     }
 
+    const { data: user } = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+
+    const { error: eventError } = await supabase
+      .schema(schema)
+      .from("case_events")
+      .insert({
+        case_id: case_id,
+        event_type: "task_created",
+        description: `${user.email} created task ${name}`,
+        date: new Date().toISOString().split("T")[0],
+        time: new Date().toISOString().split("T")[1].split(".")[0],
+      })
+      .select()
+      .single();
+
+    if (eventError) {
+      return c.json(
+        { error: "Failed to create event", details: eventError },
+        500
+      );
+    }
+
     return c.json(newTask, 201);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// PUT /cases/:id/tasks/:taskId - Update task for case
+app.put("/cases/:id/tasks/:taskId", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const caseId = c.req.param("id");
+  const taskId = c.req.param("taskId");
+
+  try {
+    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
+    const body = await c.req.json();
+
+    const { name, description, due_date } = body;
+
+    const { data: updatedTask, error: updateError } = await supabase
+      .schema(schema)
+      .from("case_tasks")
+      .update({ name, description, due_date })
+      .eq("id", taskId)
+      .eq("case_id", caseId)
+      .select()
+      .single();
+
+    if (updateError || !updatedTask) {
+      return c.json(
+        { error: "Failed to update task", details: updateError },
+        500
+      );
+    }
+
+    const { data: user } = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+
+    const { error: eventError } = await supabase
+      .schema(schema)
+      .from("case_events")
+      .insert({
+        case_id: caseId,
+        event_type: "task_updated",
+        description: `${user.email} updated task ${name}`,
+        date: new Date().toISOString().split("T")[0],
+        time: new Date().toISOString().split("T")[1].split(".")[0],
+      });
+
+    if (eventError) {
+      return c.json(
+        { error: "Failed to create event", details: eventError },
+        500
+      );
+    }
+
+    return c.json(updatedTask, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// DELETE /cases/:id/tasks/:taskId - Delete task for case
+app.delete("/cases/:id/tasks/:taskId", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const caseId = c.req.param("id");
+  const taskId = c.req.param("taskId");
+
+  try {
+    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
+
+    const { data: user } = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+
+    const { data: task } = await supabase
+      .schema(schema)
+      .from("case_tasks")
+      .select("*")
+      .eq("id", taskId)
+      .eq("case_id", caseId)
+      .single();
+
+    if (!task) {
+      return c.json({ error: "Task not found" }, 404);
+    }
+
+    const { error: deleteError } = await supabase
+      .schema(schema)
+      .from("case_tasks")
+      .delete()
+      .eq("id", taskId)
+      .eq("case_id", caseId);
+
+    if (deleteError) {
+      return c.json(
+        { error: "Failed to delete task", details: deleteError },
+        500
+      );
+    }
+
+    const { error: eventError } = await supabase
+      .schema(schema)
+      .from("case_events")
+      .insert({
+        case_id: caseId,
+        event_type: "task_deleted",
+        description: `${user.email} deleted task ${task.name}`,
+        date: new Date().toISOString().split("T")[0],
+        time: new Date().toISOString().split("T")[1].split(".")[0],
+      });
+
+    if (eventError) {
+      return c.json(
+        { error: "Failed to create event", details: eventError },
+        500
+      );
+    }
+
+    return c.json({ success: true, message: "Task deleted successfully" }, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+//GET /cases/:id/events - Get events for case
+app.get("/cases/:id/events", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const caseId = c.req.param("id");
+
+  try {
+    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
+
+    const { data: events, error: selectError } = await supabase
+      .schema(schema)
+      .from("case_events")
+      .select("*")
+      .eq("case_id", caseId)
+      .order("created_at", { ascending: false });
+
+    if (selectError) {
+      return c.json(
+        { error: "Failed to fetch events", details: selectError },
+        500
+      );
+    }
+
+    return c.json(events, 200);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }

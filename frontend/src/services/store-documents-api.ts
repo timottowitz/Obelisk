@@ -1,20 +1,24 @@
 import { API_CONFIG, getAuthHeaders, handleApiResponse } from '@/config/api';
 
+// Utility function to create upload headers
+function createUploadHeaders(headers: HeadersInit): Record<string, string> {
+  const uploadHeaders: Record<string, string> = {};
+  if (typeof headers === 'object' && headers !== null) {
+    Object.entries(headers).forEach(([key, value]) => {
+      if (key.toLowerCase() !== 'content-type') {
+        uploadHeaders[key] = value as string;
+      }
+    });
+  }
+  return uploadHeaders;
+}
+
 const API_BASE_URL = API_CONFIG.STORAGE_BASE_URL;
 
 export default class StoreDocumentsAPI {
   static async uploadDocument(file: File, folderId: string) {
     const headers = await getAuthHeaders();
-
-    // Create new headers without Content-Type for FormData
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
+    const uploadHeaders = createUploadHeaders(headers);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -31,15 +35,7 @@ export default class StoreDocumentsAPI {
 
   static async getDocuments() {
     const headers = await getAuthHeaders();
-
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
+    const uploadHeaders = createUploadHeaders(headers);
     const response = await fetch(`${API_BASE_URL}/list`, {
       method: 'GET',
       headers: uploadHeaders
@@ -48,15 +44,13 @@ export default class StoreDocumentsAPI {
   }
 
   static async getFolders(caseId: string) {
-    const headers = await getAuthHeaders();
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
+    // Validate caseId before making API call
+    if (!caseId || caseId === "undefined" || caseId === "null") {
+      throw new Error("Invalid case ID provided");
     }
+
+    const headers = await getAuthHeaders();
+    const uploadHeaders = createUploadHeaders(headers);
     const response = await fetch(`${API_BASE_URL}/folders/${caseId}/tree`, {
       method: 'GET',
       headers: uploadHeaders
@@ -66,14 +60,7 @@ export default class StoreDocumentsAPI {
 
   static async createFolder(folderName: string, parentId: string) {
     const headers = await getAuthHeaders();
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
+    const uploadHeaders = createUploadHeaders(headers);
     const response = await fetch(`${API_BASE_URL}/folders`, {
       method: 'POST',
       headers: uploadHeaders,
@@ -87,14 +74,7 @@ export default class StoreDocumentsAPI {
 
   static async downloadFile(fileId: string) {
     const headers = await getAuthHeaders();
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
+    const uploadHeaders = createUploadHeaders(headers);
 
     const response = await fetch(`${API_BASE_URL}/download/${fileId}`, {
       method: 'GET',
@@ -105,14 +85,7 @@ export default class StoreDocumentsAPI {
 
   static async deleteFile(fileId: string) {
     const headers = await getAuthHeaders();
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
+    const uploadHeaders = createUploadHeaders(headers);
     const response = await fetch(`${API_BASE_URL}/files/${fileId}`, {
       method: 'DELETE',
       headers: uploadHeaders
@@ -122,14 +95,7 @@ export default class StoreDocumentsAPI {
 
   static async deleteFolder(folderId: string) {
     const headers = await getAuthHeaders();
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
+    const uploadHeaders = createUploadHeaders(headers);
     const response = await fetch(`${API_BASE_URL}/folders/${folderId}`, {
       method: 'DELETE',
       headers: uploadHeaders
@@ -139,14 +105,7 @@ export default class StoreDocumentsAPI {
 
   static async createFolderCase(folderCaseName: string) {
     const headers = await getAuthHeaders();
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
+    const uploadHeaders = createUploadHeaders(headers);
     const response = await fetch(`${API_BASE_URL}/folder-cases`, {
       method: 'POST',
       headers: uploadHeaders,
@@ -158,14 +117,7 @@ export default class StoreDocumentsAPI {
 
   static async getFolderCases() {
     const headers = await getAuthHeaders();
-    const uploadHeaders: Record<string, string> = {};
-    if (typeof headers === 'object' && headers !== null) {
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          uploadHeaders[key] = value as string;
-        }
-      });
-    }
+    const uploadHeaders = createUploadHeaders(headers);
     const response = await fetch(`${API_BASE_URL}/case-types`, {
       method: 'GET',
       headers: uploadHeaders

@@ -545,6 +545,10 @@ app.post("/storage/upload-direct", async (c) => {
       .eq("clerk_organization_id", orgId)
       .single();
 
+    if (!user || !org) {
+      return c.json({ error: "User or organization not found" }, 404);
+    }
+
     const member = await supabaseClient
       .schema("private")
       .from("organization_members")
@@ -563,6 +567,32 @@ app.post("/storage/upload-direct", async (c) => {
       uploadedBy: member.data?.id,
       schema: org.data?.schema_name.toLowerCase(),
     });
+
+    const { data: folderData, error: folderError } = await supabaseClient
+      .schema(org.data?.schema_name.toLowerCase())
+      .from("storage_folders")
+      .select("*")
+      .eq("id", folderId)
+      .single();
+
+    if (folderError || !folderData) {
+      return c.json({ error: "Folder not found" }, 404);
+    }
+
+    const { error: eventError } = await supabaseClient
+      .schema(org.data?.schema_name.toLowerCase())
+      .from("case_events")
+      .insert({
+        case_id: folderData.case_id,
+        event_type: "file_uploaded",
+        description: `${user.data?.email} uploaded file ${file.name || "untitled"}`,
+        date: new Date().toISOString().split("T")[0],
+        time: new Date().toISOString().split("T")[1].split(".")[0],
+      });
+
+    if (eventError) {
+      console.error("Failed to create event:", eventError);
+    }
 
     return c.json({ success: true, data: result });
   } catch (error: any) {
@@ -757,10 +787,41 @@ async function handleFileDelete(
 
   if (updateError) throw updateError;
 
-  console.log("successfully deleted file");
-
   // Delete from GCS
   await gcsService.deleteFile(fileRecord.gcs_blob_name);
+
+  const { data: folderData, error: folderError } = await supabaseClient
+    .schema(schema)
+    .from("storage_folders")
+    .select("*")
+    .eq("id", fileRecord.folder_id)
+    .single();
+
+  if (folderError || !folderData) {
+    throw new Error("Folder not found");
+  }
+
+  const { data: user } = await supabaseClient
+    .schema("private")
+    .from("users")
+    .select("*")
+    .eq("clerk_user_id", userId)
+    .single();
+
+  const { error: eventError } = await supabaseClient
+    .schema(schema)
+    .from("case_events")
+    .insert({
+      case_id: folderData.case_id,
+      event_type: "file_deleted",
+      description: `${user.data?.email} deleted file ${fileRecord.name}`,
+      date: new Date().toISOString().split("T")[0],
+      time: new Date().toISOString().split("T")[1].split(".")[0],
+    });
+
+  if (eventError) {
+    throw eventError;
+  }
 
   // Log activity
   await logStorageActivity(supabaseClient, {

@@ -53,17 +53,9 @@ import {
   useFoldersOperations,
   useStorageOperations
 } from '@/hooks/useDocuments';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
-
 import { DocumentPreviewModal } from '@/features/documents/components/document-preview-modal';
 import { CreateFolderModal } from '@/features/documents/components/create-folder-modal';
-import { useCasesOperations } from '@/hooks/useCases';
+import { useUser } from '@clerk/nextjs';
 
 // Get file icon
 function getFileIcon(type: string, className?: string) {
@@ -87,8 +79,14 @@ function getFileIcon(type: string, className?: string) {
   }
 }
 
-export default function Documents({ caseId }: { caseId: string }) {
-  const currentMatter = 'Johnson Solar Arbitration';
+export default function Documents({
+  caseId,
+  caseTypeName
+}: {
+  caseId: string;
+  caseTypeName: string;
+}) {
+  const { user } = useUser();
   // Use React Query hooks for all storage operations
   const {
     uploadDocument,
@@ -97,23 +95,18 @@ export default function Documents({ caseId }: { caseId: string }) {
     deleteFolder,
     downloadFile
   } = useStorageOperations();
-  const { caseTypes } = useCasesOperations();
   const { folders } = useFoldersOperations(caseId);
 
   // Derive state from React Query data
   const foldersList = folders.data || [];
   const isLoadingFolders = folders.isLoading;
   const foldersError = folders.error;
-  const caseTypesList = caseTypes.data || [];
-  const isLoadingcaseTypes = caseTypes.isLoading;
-  const caseTypesError = caseTypes.error;
 
   const [searchValue, setSearchValue] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDocument, setSelectedDocument] =
     useState<SolarDocumentItem | null>(null);
   const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
-  const [selectedCaseType, setSelectedCaseType] = useState<string>();
 
   // Create folder state
   const [isCreateFolderDialogOpen, setIsCreateFolderDialogOpen] =
@@ -125,63 +118,6 @@ export default function Documents({ caseId }: { caseId: string }) {
 
   // Upload document state
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
-  useState(false);
-
-  // Initialize expanded folders from localStorage when folders are loaded
-  useEffect(() => {
-    if (Array.isArray(foldersList) && foldersList.length > 0) {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('expandedFolders');
-        if (saved) {
-          try {
-            const savedArray = JSON.parse(saved);
-            const validExpandedFolders = new Set<string>();
-
-            // Only include folder IDs that actually exist in the current folder structure
-            const allFolderIds = new Set(
-              foldersList.map((folder: any) => folder.id)
-            );
-
-            savedArray.forEach((folderId: string) => {
-              if (allFolderIds.has(folderId)) {
-                validExpandedFolders.add(folderId);
-              }
-            });
-
-            setExpandedFolders(validExpandedFolders);
-          } catch (error) {
-            console.warn(
-              'Failed to parse expanded folders from localStorage:',
-              error
-            );
-            // Expand all root folders by default
-            setExpandedFolders(
-              new Set<string>(foldersList.map((folder: any) => folder.id))
-            );
-          }
-        } else {
-          // No saved state, expand all root folders by default
-          setExpandedFolders(
-            new Set<string>(foldersList.map((folder: any) => folder.id))
-          );
-        }
-      }
-    }
-  }, [foldersList]);
-
-  // Show error toast if folders failed to load
-  useEffect(() => {
-    if (foldersError || caseTypesError) {
-      toast.error('Failed to load folder and cases');
-    }
-  }, [foldersError, caseTypesError]);
-
-  // Set default selected folder case when folder cases are loaded
-  useEffect(() => {
-    if (caseTypesList.length > 0 && !selectedCaseType) {
-      setSelectedCaseType(caseTypesList[0].display_name);
-    }
-  }, [caseTypesList, selectedCaseType]);
 
   // Recursive function to count all documents in a folder and its children
   const [selectedUploadFolderId, setSelectedUploadFolderId] =
@@ -230,9 +166,6 @@ export default function Documents({ caseId }: { caseId: string }) {
   const filteredFolders = useMemo(
     () =>
       foldersList.filter((folder) => {
-        const selectedCaseTypeId = caseTypesList.find(
-          (folderCase: any) => folderCase.display_name === selectedCaseType
-        )?.id;
         // Logically fix: search should check folder name, its documents, and recursively its children
         const matchesSearch = (folderOrChild: any): boolean => {
           if (searchQuery.length === 0) {
@@ -255,13 +188,9 @@ export default function Documents({ caseId }: { caseId: string }) {
           return false;
         };
 
-        return (
-          matchesSearch(folder) &&
-          folder.case_type_id === selectedCaseTypeId &&
-          folder.case_id === caseId
-        );
+        return matchesSearch(folder);
       }),
-    [foldersList, searchQuery, selectedCaseType, caseId]
+    [foldersList, searchQuery]
   );
 
   const folderStructure = Array.isArray(foldersList) ? filteredFolders : [];
@@ -272,7 +201,6 @@ export default function Documents({ caseId }: { caseId: string }) {
     setSearchQuery(searchValue);
   };
 
-  // Handle folder toggle
   const toggleFolder = useCallback((folderId: string) => {
     setExpandedFolders((prev) => {
       const newSet = new Set(prev);
@@ -281,15 +209,6 @@ export default function Documents({ caseId }: { caseId: string }) {
       } else {
         newSet.add(folderId);
       }
-
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(
-          'expandedFolders',
-          JSON.stringify(Array.from(newSet))
-        );
-      }
-
       return newSet;
     });
   }, []);
@@ -358,13 +277,6 @@ export default function Documents({ caseId }: { caseId: string }) {
         setExpandedFolders((prev) => {
           const newSet = new Set(prev);
           newSet.add(selectedParentFolderId);
-          // Save to localStorage
-          if (typeof window !== 'undefined') {
-            localStorage.setItem(
-              'expandedFolders',
-              JSON.stringify(Array.from(newSet))
-            );
-          }
           return newSet;
         });
       }
@@ -379,10 +291,6 @@ export default function Documents({ caseId }: { caseId: string }) {
       setIsCreatingFolder(false);
     }
   }, [newFolderName, selectedParentFolderId, createFolder]);
-
-  const handleFolderCaseChange = useCallback((value: string) => {
-    setSelectedCaseType(value);
-  }, []);
 
   const handleUploadEvidence = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -749,7 +657,7 @@ export default function Documents({ caseId }: { caseId: string }) {
                     <BreadcrumbItem>
                       <BreadcrumbLink className='text-muted-foreground hover:text-primary flex items-center gap-1 text-sm font-medium transition-colors'>
                         <Sun className='h-4 w-4' />
-                        {selectedCaseType}
+                        {user?.fullName}
                       </BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator>
@@ -767,7 +675,7 @@ export default function Documents({ caseId }: { caseId: string }) {
                     <BreadcrumbItem>
                       <BreadcrumbLink className='text-primary flex items-center gap-1 text-sm font-medium'>
                         <Zap className='h-4 w-4' />
-                        {currentMatter}
+                        {caseTypeName}
                       </BreadcrumbLink>
                     </BreadcrumbItem>
                   </BreadcrumbList>
@@ -779,7 +687,7 @@ export default function Documents({ caseId }: { caseId: string }) {
                 <div className='min-w-0 flex-1'>
                   <div className='mb-3 flex items-center gap-3'>
                     <h1 className='text-foreground truncate text-2xl font-bold'>
-                      {currentMatter}
+                      {caseTypeName}
                     </h1>
                   </div>
 
@@ -870,37 +778,6 @@ export default function Documents({ caseId }: { caseId: string }) {
                       <div className='mt-2 flex items-center gap-2 text-sm text-blue-600'>
                         <Loader2 className='h-4 w-4 animate-spin' />
                         <span>Uploading document...</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className='flex items-center gap-2'>
-                    <span className='text-muted-foreground text-sm'>
-                      Case Types:
-                    </span>
-                    {!isLoadingcaseTypes && (
-                      <Select
-                        onValueChange={handleFolderCaseChange}
-                        value={selectedCaseType}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder='Select Case' />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {caseTypesList.map((folderCase: any) => (
-                            <SelectItem
-                              key={folderCase.id}
-                              value={folderCase.display_name}
-                            >
-                              {folderCase.display_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    {isLoadingcaseTypes && (
-                      <div className='mt-2 flex items-center gap-2 text-sm text-blue-600'>
-                        <Loader2 className='h-4 w-4 animate-spin' />
-                        <span>Loading cases...</span>
                       </div>
                     )}
                   </div>

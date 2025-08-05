@@ -27,7 +27,32 @@ export const navItems: NavItem[] = [
     icon: 'page',
     isActive: false,
     shortcut: ['c', 'c'],
-    items: []
+    items: [
+      {
+        title: 'Solar Cases',
+        url: '/dashboard/cases?type=solar',
+        icon: 'sun',
+        isActive: false,
+        shortcut: ['c', 'c'],
+        items: []
+      },
+      {
+        title: 'Litigation',
+        url: '/dashboard/cases?type=litigation',
+        icon: 'litigation',
+        isActive: false,
+        shortcut: ['c', 'c'],
+        items: []
+      },
+      {
+        title: 'IMVA',
+        url: '/dashboard/cases?type=imva',
+        icon: 'imva',
+        isActive: false,
+        shortcut: ['c', 'c'],
+        items: []
+      },
+    ]
   },
   {
     title: 'My Tasks',
@@ -38,8 +63,8 @@ export const navItems: NavItem[] = [
     items: []
   },
   {
-    title: 'Events Calendar',
-    url: '/dashboard/calendar',
+    title: 'Events',
+    url: '/dashboard/events',
     icon: 'calendar',
     isActive: false,
     shortcut: ['e', 'c'],
@@ -54,9 +79,9 @@ export const navItems: NavItem[] = [
     items: []
   },
   {
-    title: 'My Profile',
-    url: '/dashboard/profile',
-    icon: 'user',
+    title: 'Expenses',
+    url: '/dashboard/expenses',
+    icon: 'dollar',
     isActive: false,
     shortcut: ['p', 'p'],
     items: []
@@ -101,7 +126,7 @@ export const practiceAreaItems: NavItem[] = [
 export const footerItems: NavItem[] = [
   {
     title: 'Settings',
-    url: '/dashboard/settings',
+    url: '/dashboard/settings/caseTypes',
     icon: 'settings',
     isActive: false,
     shortcut: ['s', 's'],

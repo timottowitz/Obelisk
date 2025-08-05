@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CaseInfo from '@/features/cases/tabs/case-info';
@@ -13,7 +14,7 @@ import Documents from '@/features/cases/tabs/documents';
 import HearingExhibits from '@/features/cases/tabs/hearing-exhibits';
 import Finances from '@/features/cases/tabs/finances';
 import OfferHistory from '@/features/cases/tabs/offer-history';
-import { useCaseOperations } from '@/hooks/useCases';
+import { useGetCase } from '@/hooks/useCases';
 
 interface CaseDetail {
   id: string;
@@ -32,21 +33,19 @@ interface CaseDetail {
 }
 
 interface CaseDetailClientProps {
-  caseMockData: CaseDetail;
   caseId: string;
 }
 
 export default function CaseDetailClient({
-  caseMockData,
   caseId
 }: CaseDetailClientProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('case-information');
-  const { getCase } = useCaseOperations(caseId);
-  const caseDataLoading = getCase.isLoading;
-  const caseDataError = getCase.error;
-
-  // Extract case data from API response or use mock data
-  const caseData = getCase.data;
+  const {
+    data: caseData,
+    isLoading: caseDataLoading,
+    error: caseDataError
+  } = useGetCase(caseId);
 
   return (
     <div className='h-[calc(100vh-4rem)] overflow-y-auto bg-gray-50'>
@@ -54,13 +53,17 @@ export default function CaseDetailClient({
       <div className='border-b border-gray-200 bg-white px-6 py-4'>
         <div className='flex items-center justify-between'>
           <div className='flex items-center space-x-4'>
-            <Link
-              href='/dashboard/cases'
-              className='flex items-center space-x-2 text-gray-600 transition-colors hover:text-gray-900'
+            <div
+              className='flex cursor-pointer items-center space-x-2 text-gray-600 transition-colors hover:text-gray-900'
+              onClick={() =>
+                router.push(
+                  `/dashboard/cases?type=${caseData?.case_types.display_name.toLowerCase()}`
+                )
+              }
             >
               <ArrowLeft className='h-4 w-4' />
               <span>Back to My Cases</span>
-            </Link>
+            </div>
           </div>
 
           <div className='flex items-center space-x-3'>
@@ -87,20 +90,17 @@ export default function CaseDetailClient({
 
           <div className='flex-1'>
             <h2 className='mb-2 text-2xl font-bold text-gray-900'>
-              {caseMockData.title}
+              Tammy Lee as Legal Representative of... et al
             </h2>
 
             <div className='flex flex-row space-y-1 text-sm text-gray-600'>
-              <span>Case Number: {caseMockData.caseNumber}</span>
-              <span>, Manager: {caseMockData.manager.name}</span>
-              <span>, Phone: {caseMockData.manager.phone}</span>
+              <span>Case Number: {caseData?.case_number}</span>
+              <span>, Manager: {caseData?.case_manager}</span>
+              <span>, Phone: {caseData?.phone}</span>
               <span>
                 , Email:{' '}
-                <a
-                  href={`mailto:${caseMockData.manager.email}`}
-                  className='text-blue-600 hover:text-blue-800'
-                >
-                  {caseMockData.manager.email}
+                <a href="#" className='text-blue-600 hover:text-blue-800'>
+                  {caseData?.email}
                 </a>
               </span>
             </div>
@@ -190,7 +190,7 @@ export default function CaseDetailClient({
                 </TabsContent>
 
                 <TabsContent value='events' className='space-y-6'>
-                  <Events />
+                  <Events caseId={caseId} />
                 </TabsContent>
 
                 <TabsContent value='forms' className='space-y-6'>
@@ -198,7 +198,10 @@ export default function CaseDetailClient({
                 </TabsContent>
 
                 <TabsContent value='documents' className='space-y-6'>
-                  <Documents caseId={caseId} />
+                  <Documents
+                    caseId={caseId}
+                    caseTypeName={caseData!.case_types.display_name}
+                  />
                 </TabsContent>
 
                 <TabsContent value='hearing-exhibits' className='space-y-6'>

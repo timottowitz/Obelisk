@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import dayjs from 'dayjs';
 
 export const caseParticipantsColumns = [
@@ -17,17 +18,37 @@ export const casePanelistsColumns = [
 export const tasksColumns = [
   { key: 'name', label: 'Task Name' },
   { key: 'description', label: 'Task Description' },
-  { key: 'due_date', label: 'Due Date', render: (value: string) => dayjs(value).format('YYYY-MM-DD') }
+  {
+    key: 'due_date',
+    label: 'Due Date',
+    render: (value: string) => dayjs(value).format('YYYY-MM-DD')
+  },
+  { key: 'status', label: 'Status' },
+  {
+    key: 'actions',
+    label: 'Actions',
+    render: (
+      row: any,
+      onEdit?: (row: any) => void,
+      onDelete?: (row: any) => void
+    ) => (
+      <div className='flex gap-2'>
+        <Button variant='outline' size='sm' onClick={() => onEdit?.(row)}>
+          Edit
+        </Button>
+        <Button variant='destructive' size='sm' onClick={() => onDelete?.(row)}>
+          Delete
+        </Button>
+      </div>
+    )
+  }
 ];
 
 export const eventsColumns = [
-  { key: 'date', label: 'Date' },
-  { key: 'time', label: 'Time' },
   { key: 'event_type', label: 'Event Type' },
-  { key: 'method', label: 'Method' },
-  { key: 'status', label: 'Status' },
-  { key: 'location', label: 'Location' },
-  { key: 'address', label: 'Address' }
+  { key: 'description', label: 'Description' },
+  { key: 'date', label: 'Date' },
+  { key: 'time', label: 'Time' }
 ];
 
 export const hearingExhibitColumns = [

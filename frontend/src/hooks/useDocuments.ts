@@ -46,7 +46,8 @@ export interface ApiResponse<T> {
 // Query keys
 const QUERY_KEYS = {
   documents: ['documents'] as const,
-  folders: ['folders'] as const
+  folders: ['folders'] as const,
+  events: ['events'] as const
 } as const;
 
 // Hooks for querying data
@@ -87,7 +88,7 @@ export function useUploadDocument() {
     mutationFn: async ({ file, folderId }: UploadDocumentData) => {
       const response = (await StoreDocumentsAPI.uploadDocument(
         file,
-        folderId
+        folderId,
       )) as ApiResponse<any>;
       if (!response.success) {
         throw new Error(response.error || 'Upload failed');
@@ -98,6 +99,7 @@ export function useUploadDocument() {
       // Invalidate and refetch both documents and folders
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.documents] });
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.folders] });
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.events] });
     },
     onError: (error) => {
       console.error('Upload failed:', error);
@@ -163,6 +165,7 @@ export function useDeleteFile() {
       // Invalidate and refetch both documents and folders
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.documents] });
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.folders] });
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.events] });
     },
     onError: (error) => {
       console.error('Delete file failed:', error);

@@ -1,3 +1,9 @@
+export interface FolderTemplate {
+  id: string;
+  name: string;
+  sort_order: number;
+}
+
 export interface CaseType {
   id: string;
   name: string;
@@ -6,7 +12,7 @@ export interface CaseType {
   display_name: string;
   description: string;
   is_active: boolean;
-  folder_templates: { name: string }[];
+  folder_templates: FolderTemplate[];
   created_at: string;
   updated_at: string;
 }
@@ -19,6 +25,7 @@ export interface Case {
   phone: string;
   email: string;
   case_type: string;
+  case_types: CaseType;
   special_notes: string;
   filing_fee: string;
   claimant: string;
@@ -29,6 +36,8 @@ export interface Case {
   track: string;
   claim_amount: string;
   hearing_locale: string;
+  case_tasks_count: number;
+  documents_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -39,6 +48,20 @@ export interface Task {
   description: string;
   status: string;
   due_date: string;
+  case_number: string;
+  claimant: string;
+  respondent: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CaseEvent {
+  id: string;
+  case_number: string;
+  event_type: string;
+  description: string;
+  date: string;
+  time: string;
   created_at: string;
   updated_at: string;
 }

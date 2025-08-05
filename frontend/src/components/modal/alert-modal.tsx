@@ -8,7 +8,7 @@ interface AlertModalProps {
   onClose: () => void;
   onConfirm: () => void;
   loading: boolean;
-  deleteTargetType: 'folder' | 'document' | 'case' | null;
+  deleteTargetType: 'folder' | 'document' | 'case' | 'task' | null;
 }
 
 export const AlertModal: React.FC<AlertModalProps> = ({

@@ -1,24 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
-  DialogTrigger
+  DialogTitle
 } from '@/components/ui/dialog';
-import { DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import dayjs from 'dayjs';
 
 interface TaskDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (taskData: TaskData) => void;
+  initialData?: TaskData;
+  loading: boolean;
 }
 
 interface TaskData {
@@ -27,10 +27,12 @@ interface TaskData {
   description: string;
 }
 
-export default function CreateTaskModal({
+export default function TaskModel({
   isOpen,
   onClose,
-  onSave
+  onSave,
+  initialData,
+  loading
 }: TaskDetailModalProps) {
   const [formData, setFormData] = useState<TaskData>({
     name: '',
@@ -38,18 +40,42 @@ export default function CreateTaskModal({
     description: ''
   });
 
-  const handleInputChange = (field: keyof TaskData, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  // Update form data when initialData changes
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        name: initialData.name || '',
+        due_date: dayjs(initialData.due_date).format('YYYY-MM-DD') || '',
+        description: initialData.description || ''
+      });
+    } else {
+      // Reset form when no initial data
+      setFormData({
+        name: '',
+        due_date: '',
+        description: ''
+      });
+    }
+  }, [initialData]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave(formData);
-    onClose();
-  };
+
+  const handleInputChange = useCallback(
+    (field: keyof TaskData, value: string) => {
+      setFormData((prev) => ({
+        ...prev,
+        [field]: value
+      }));
+    },
+    []
+  );
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      onSave(formData);
+    },
+    [formData, onSave, onClose]
+  );
 
   if (!isOpen) return null;
 
@@ -57,7 +83,9 @@ export default function CreateTaskModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create Task</DialogTitle>
+          <DialogTitle>
+            {initialData ? 'Update Task' : 'Create Task'}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className='p-6'>
           <div className='space-y-4'>
@@ -147,7 +175,7 @@ export default function CreateTaskModal({
               type='submit'
               className='bg-red-600 px-4 py-2 text-white hover:bg-red-700'
             >
-              Save
+              {loading ? 'Saving...' : 'Save'}
             </Button>
           </div>
         </form>

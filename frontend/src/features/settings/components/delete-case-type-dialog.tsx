@@ -45,12 +45,16 @@ export function DeleteCaseTypeDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant='outline' className="cursor-pointer" onClick={() => setOpen(false)}>
+          <Button
+            variant='outline'
+            className='cursor-pointer'
+            onClick={() => setOpen(false)}
+          >
             Cancel
           </Button>
           <Button
             onClick={onDelete}
-            className='bg-red-600 hover:bg-red-700 cursor-pointer'
+            className='cursor-pointer bg-red-600 hover:bg-red-700'
           >
             Delete
           </Button>
@@ -58,4 +62,4 @@ export function DeleteCaseTypeDialog({
       </DialogContent>
     </Dialog>
   );
-} 
+}
