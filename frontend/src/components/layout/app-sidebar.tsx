@@ -121,7 +121,10 @@ export default function AppSidebar() {
           <SidebarMenu>
             {navItems.map((item) => {
               const Icon = item.icon ? Icons[item.icon] : Icons.logo;
-              const isActive = item.url === "/dashboard" ? pathname === "/dashboard/overview" : pathname.includes(item.url);
+              const isActive =
+                item.url === '/dashboard'
+                  ? pathname === '/dashboard/overview'
+                  : pathname.includes(item.url);
               return (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
@@ -135,8 +138,11 @@ export default function AppSidebar() {
                     )}
                   >
                     {item.items && item.items.length > 0 ? (
-                      <div className='flex items-center gap-2 cursor-pointer' onClick={() => setIsOpen(!isOpen)} >
-                        <Icon size={24} />
+                      <div
+                        className='flex cursor-pointer items-center gap-2'
+                        onClick={() => setIsOpen(!isOpen)}
+                      >
+                        <Icon style={{ width: '24px', height: '24px' }} />
                         <span>{item.title}</span>
                         {isOpen ? (
                           <IconChevronsDown className='ml-auto size-4' />
@@ -146,8 +152,8 @@ export default function AppSidebar() {
                       </div>
                     ) : (
                       <Link href={item.url}>
-                        <Icon size={24} />
-                        <span>{item.title}</span>
+                        <Icon style={{ width: '24px', height: '24px' }} />
+                        <span className='text-sm'>{item.title}</span>
                       </Link>
                     )}
                   </SidebarMenuButton>
@@ -157,18 +163,23 @@ export default function AppSidebar() {
                         const SubIcon = subItem.icon
                           ? Icons[subItem.icon]
                           : Icons.logo;
-                        const isSubActive = searchParams.get('type') === subItem.url.split('?')[1].split('=')[1];
+                        const isSubActive =
+                          searchParams.get('type') ===
+                          subItem.url.split('?')[1].split('=')[1];
                         return (
                           <SidebarMenuSubItem key={subItem.title}>
-                            <SidebarMenuSubButton asChild className={cn(
-                              'text-md flex w-full items-center rounded-lg px-4 py-5 text-left transition-colors',
-                              isSubActive
-                                ? 'border border-blue-200 bg-blue-50 text-blue-700'
-                                : 'text-gray-700 hover:bg-gray-50'
-                            )}>
+                            <SidebarMenuSubButton
+                              asChild
+                              className={cn(
+                                'text-md flex w-full items-center rounded-lg px-4 py-5 text-left transition-colors',
+                                isSubActive
+                                  ? 'border border-blue-200 bg-blue-50 text-blue-700'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                              )}
+                            >
                               <Link href={subItem.url}>
-                                <SubIcon size={24} />
-                                <span>{subItem.title}</span>
+                                <SubIcon style={{ width: '24px', height: '24px' }} />
+                                <span className='text-sm'>{subItem.title}</span>
                               </Link>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
@@ -201,8 +212,8 @@ export default function AppSidebar() {
                     )}
                   >
                     <Link href={item.url}>
-                      <Icon size={24} />
-                      <span>{item.title}</span>
+                      <Icon style={{ width: '24px', height: '24px' }} />
+                      <span className='text-sm'>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
