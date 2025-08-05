@@ -37,9 +37,9 @@ const MobileLoadingState = memo(() => (
         key={i}
         className='border-muted bg-card animate-pulse rounded-lg border p-4 shadow-sm'
       >
-        <div className='mb-3 h-4 w-3/4 rounded bg-muted'></div>
-        <div className='mb-2 h-3 w-1/2 rounded bg-muted'></div>
-        <div className='h-3 w-2/3 rounded bg-muted'></div>
+        <div className='bg-muted mb-3 h-4 w-3/4 rounded'></div>
+        <div className='bg-muted mb-2 h-3 w-1/2 rounded'></div>
+        <div className='bg-muted h-3 w-2/3 rounded'></div>
       </div>
     ))}
   </div>
@@ -60,8 +60,8 @@ DesktopLoadingState.displayName = 'DesktopLoadingState';
 
 const MobileEmptyState = memo(() => (
   <div className='p-8 text-center'>
-    <div className='mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-muted'>
-      <FileText className='h-8 w-8 text-muted-foreground' />
+    <div className='bg-muted mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full'>
+      <FileText className='text-muted-foreground h-8 w-8' />
     </div>
     <p className='text-muted-foreground'>No tasks found</p>
   </div>
@@ -72,8 +72,8 @@ const DesktopEmptyState = memo(() => (
   <TableRow>
     <TableCell colSpan={5} className='py-16 text-center'>
       <div className='flex flex-col items-center gap-3'>
-        <div className='inline-flex h-16 w-16 items-center justify-center rounded-full bg-muted'>
-          <FileText className='h-8 w-8 text-muted-foreground' />
+        <div className='bg-muted inline-flex h-16 w-16 items-center justify-center rounded-full'>
+          <FileText className='text-muted-foreground h-8 w-8' />
         </div>
         <p className='text-muted-foreground'>No tasks found</p>
       </div>
@@ -86,10 +86,12 @@ const MobileTaskRow = memo(({ task }: { task: Task }) => (
   <div className='border-muted bg-card space-y-3 rounded-lg border p-4 shadow-sm transition-shadow duration-200 hover:shadow-md'>
     <div className='flex items-start justify-between'>
       <div className='flex items-center gap-2'>
-        <Hash className='h-4 w-4 text-muted-foreground' />
-        <span className='font-semibold text-foreground'>{task.case_number}</span>
+        <Hash className='text-muted-foreground h-4 w-4' />
+        <span className='text-foreground font-semibold'>
+          {task.case_number}
+        </span>
       </div>
-      <div className='flex gap-2 flex-wrap'>
+      <div className='flex flex-wrap gap-2'>
         <span className='inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200'>
           {task.claimant}
         </span>
@@ -100,10 +102,10 @@ const MobileTaskRow = memo(({ task }: { task: Task }) => (
     </div>
 
     {task.name && (
-      <p className='line-clamp-2 text-sm text-muted-foreground'>{task.name}</p>
+      <p className='text-muted-foreground line-clamp-2 text-sm'>{task.name}</p>
     )}
 
-    <div className='flex items-center gap-4 text-xs text-muted-foreground'>
+    <div className='text-muted-foreground flex items-center gap-4 text-xs'>
       <div className='flex items-center gap-1'>
         <Calendar className='h-3 w-3' />
         <span>{dayjs(task.due_date).format('DD/MM/YYYY')}</span>
@@ -181,9 +183,7 @@ function TasksTable({
               <TableHead className='text-center font-semibold'>
                 Case Number
               </TableHead>
-              <TableHead className='text-center font-semibold'>
-                Task
-              </TableHead>
+              <TableHead className='text-center font-semibold'>Task</TableHead>
               <TableHead className='hidden text-center font-semibold lg:table-cell'>
                 Due Date
               </TableHead>
@@ -202,7 +202,7 @@ function TasksTable({
               tasks.map((task) => (
                 <TableRow
                   key={task.id}
-                  className='text-center transition-colors duration-150 hover:bg-muted/50'
+                  className='hover:bg-muted/50 text-center transition-colors duration-150'
                 >
                   <TableCell className='font-medium'>
                     {task.case_number}
@@ -212,7 +212,7 @@ function TasksTable({
                       {task.name}
                     </span>
                   </TableCell>
-                  <TableCell className='hidden text-muted-foreground lg:table-cell'>
+                  <TableCell className='text-muted-foreground hidden lg:table-cell'>
                     {dayjs(task.due_date).format('DD/MM/YYYY')}
                   </TableCell>
                   <TableCell>
@@ -233,13 +233,15 @@ function TasksTable({
       </div>
       <div className='mt-4 flex items-center justify-between'>
         {isLoading ? (
-          <span className='text-sm text-muted-foreground'>Loading...</span>
-        ) : (
-          <span className='text-sm text-muted-foreground'>
-            Showing {`${(currentPage - 1) * 5 + 1}`} -{' '}
-            {`${Math.min(currentPage * 5, count)}`} of {count} tasks
-          </span>
-        )}
+          <p>Loading...</p>
+        ) : count && count > 0 ? (
+          <p>
+            <span className='text-muted-foreground text-sm'>
+              Showing {`${(currentPage - 1) * 5 + 1}`} -{' '}
+              {`${Math.min(currentPage * 5, count)}`} of {count} tasks
+            </span>
+          </p>
+        ) : null}
         {/* Pagination */}
         {totalPages > 1 && (
           <Pagination className='flex justify-end'>
@@ -250,7 +252,7 @@ function TasksTable({
                   className={cn(
                     'h-9 cursor-pointer rounded-lg border px-3 transition-all duration-200',
                     currentPage === 1
-                      ? 'pointer-events-none bg-muted opacity-50'
+                      ? 'bg-muted pointer-events-none opacity-50'
                       : 'hover:bg-accent hover:text-accent-foreground'
                   )}
                 />
@@ -260,7 +262,7 @@ function TasksTable({
                 {pageNumbers.map((page, index) => (
                   <PaginationItem key={`${page}-${index}`}>
                     {page === '...' ? (
-                      <span className='px-3 text-muted-foreground'>...</span>
+                      <span className='text-muted-foreground px-3'>...</span>
                     ) : (
                       <PaginationLink
                         onClick={() => handlePageChange(Number(page))}
@@ -280,7 +282,7 @@ function TasksTable({
 
               {/* Mobile Page Indicator */}
               <div className='flex items-center gap-2 px-3 sm:hidden'>
-                <span className='text-sm text-muted-foreground'>
+                <span className='text-muted-foreground text-sm'>
                   Page {currentPage} of {totalPages}
                 </span>
               </div>
@@ -291,7 +293,7 @@ function TasksTable({
                   className={cn(
                     'h-9 cursor-pointer rounded-lg border px-3 transition-all duration-200',
                     currentPage === totalPages
-                      ? 'pointer-events-none bg-muted opacity-50'
+                      ? 'bg-muted pointer-events-none opacity-50'
                       : 'hover:bg-accent hover:text-accent-foreground'
                   )}
                 />

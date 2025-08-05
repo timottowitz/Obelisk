@@ -34,11 +34,11 @@ const MobileLoadingState = memo(() => (
     {[1, 2, 3].map((i) => (
       <div
         key={i}
-        className='animate-pulse rounded-lg border bg-card p-4 shadow-sm'
+        className='bg-card animate-pulse rounded-lg border p-4 shadow-sm'
       >
-        <div className='mb-3 h-4 w-3/4 rounded bg-muted'></div>
-        <div className='mb-2 h-3 w-1/2 rounded bg-muted'></div>
-        <div className='h-3 w-2/3 rounded bg-muted'></div>
+        <div className='bg-muted mb-3 h-4 w-3/4 rounded'></div>
+        <div className='bg-muted mb-2 h-3 w-1/2 rounded'></div>
+        <div className='bg-muted h-3 w-2/3 rounded'></div>
       </div>
     ))}
   </div>
@@ -49,7 +49,7 @@ const DesktopLoadingState = memo(() => (
   <TableRow>
     <TableCell colSpan={5} className='py-16 text-center'>
       <div className='flex flex-col items-center gap-3'>
-        <div className='h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent'></div>
+        <div className='border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent'></div>
         <span className='text-muted-foreground'>Loading events...</span>
       </div>
     </TableCell>
@@ -59,8 +59,8 @@ DesktopLoadingState.displayName = 'DesktopLoadingState';
 
 const MobileEmptyState = memo(() => (
   <div className='p-8 text-center'>
-    <div className='mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-muted'>
-      <FileText className='h-8 w-8 text-muted-foreground' />
+    <div className='bg-muted mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full'>
+      <FileText className='text-muted-foreground h-8 w-8' />
     </div>
     <p className='text-muted-foreground'>No events found</p>
   </div>
@@ -71,8 +71,8 @@ const DesktopEmptyState = memo(() => (
   <TableRow>
     <TableCell colSpan={5} className='py-16 text-center'>
       <div className='flex flex-col items-center gap-3'>
-        <div className='inline-flex h-16 w-16 items-center justify-center rounded-full bg-muted'>
-          <FileText className='h-8 w-8 text-muted-foreground' />
+        <div className='bg-muted inline-flex h-16 w-16 items-center justify-center rounded-full'>
+          <FileText className='text-muted-foreground h-8 w-8' />
         </div>
         <p className='text-muted-foreground'>No events found</p>
       </div>
@@ -82,11 +82,13 @@ const DesktopEmptyState = memo(() => (
 DesktopEmptyState.displayName = 'DesktopEmptyState';
 
 const MobileEventRow = memo(({ event }: { event: CaseEvent }) => (
-  <div className='space-y-3 rounded-lg border bg-card p-4 shadow-sm transition-shadow duration-200 hover:shadow-md'>
+  <div className='bg-card space-y-3 rounded-lg border p-4 shadow-sm transition-shadow duration-200 hover:shadow-md'>
     <div className='flex items-start justify-between'>
       <div className='flex items-center gap-2'>
-        <Hash className='h-4 w-4 text-muted-foreground' />
-        <span className='font-semibold text-foreground'>{event.case_number}</span>
+        <Hash className='text-muted-foreground h-4 w-4' />
+        <span className='text-foreground font-semibold'>
+          {event.case_number}
+        </span>
       </div>
       <span className='inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200'>
         {event.event_type}
@@ -94,10 +96,12 @@ const MobileEventRow = memo(({ event }: { event: CaseEvent }) => (
     </div>
 
     {event.description && (
-      <p className='line-clamp-2 text-sm text-muted-foreground'>{event.description}</p>
+      <p className='text-muted-foreground line-clamp-2 text-sm'>
+        {event.description}
+      </p>
     )}
 
-    <div className='flex items-center gap-4 text-xs text-muted-foreground'>
+    <div className='text-muted-foreground flex items-center gap-4 text-xs'>
       <div className='flex items-center gap-1'>
         <Calendar className='h-3 w-3' />
         <span>{event.date}</span>
@@ -176,7 +180,7 @@ function EventsTable({
       </div>
 
       {/* Desktop View */}
-      <div className='hidden overflow-hidden rounded-lg border bg-card shadow-sm sm:block'>
+      <div className='bg-card hidden overflow-hidden rounded-lg border shadow-sm sm:block'>
         <Table>
           <TableHeader>
             <TableRow className='bg-muted/50 hover:bg-muted/50'>
@@ -189,9 +193,7 @@ function EventsTable({
               <TableHead className='hidden text-center font-semibold lg:table-cell'>
                 Description
               </TableHead>
-              <TableHead className='text-center font-semibold'>
-                Date
-              </TableHead>
+              <TableHead className='text-center font-semibold'>Date</TableHead>
               <TableHead className='hidden text-center font-semibold md:table-cell'>
                 Time
               </TableHead>
@@ -204,7 +206,7 @@ function EventsTable({
               events.map((event) => (
                 <TableRow
                   key={event.id}
-                  className='text-center transition-colors duration-150 hover:bg-muted/50'
+                  className='hover:bg-muted/50 text-center transition-colors duration-150'
                 >
                   <TableCell className='font-medium'>
                     {event.case_number}
@@ -214,11 +216,11 @@ function EventsTable({
                       {event.event_type}
                     </span>
                   </TableCell>
-                  <TableCell className='hidden text-muted-foreground lg:table-cell'>
+                  <TableCell className='text-muted-foreground hidden lg:table-cell'>
                     {event.description}
                   </TableCell>
                   <TableCell>{event.date}</TableCell>
-                  <TableCell className='hidden text-muted-foreground md:table-cell'>
+                  <TableCell className='text-muted-foreground hidden md:table-cell'>
                     {event.time}
                   </TableCell>
                 </TableRow>
@@ -231,13 +233,15 @@ function EventsTable({
       </div>
       <div className='mt-4 flex items-center justify-between'>
         {isLoading ? (
-          <span className='text-sm text-muted-foreground'>Loading...</span>
-        ) : (
-          <span className='text-sm text-muted-foreground'>
-            Showing {`${(currentPage - 1) * 5 + 1}`} -{' '}
-            {`${Math.min(currentPage * 5, count)}`} of {count} events
-          </span>
-        )}
+          <p>Loading...</p>
+        ) : count && count > 0 ? (
+          <p>
+            <span className='text-muted-foreground text-sm'>
+              Showing {`${(currentPage - 1) * 5 + 1}`} -{' '}
+              {`${Math.min(currentPage * 5, count)}`} of {count} events
+            </span>
+          </p>
+        ) : null}
         {/* Pagination */}
         {totalPages > 1 && (
           <Pagination className='flex justify-end'>
@@ -248,7 +252,7 @@ function EventsTable({
                   className={cn(
                     'h-9 cursor-pointer rounded-lg border px-3 transition-all duration-200',
                     currentPage === 1
-                      ? 'pointer-events-none bg-muted opacity-50'
+                      ? 'bg-muted pointer-events-none opacity-50'
                       : 'hover:bg-accent hover:text-accent-foreground'
                   )}
                 />
@@ -258,7 +262,7 @@ function EventsTable({
                 {pageNumbers.map((page, index) => (
                   <PaginationItem key={`${page}-${index}`}>
                     {page === '...' ? (
-                      <span className='px-3 text-muted-foreground'>...</span>
+                      <span className='text-muted-foreground px-3'>...</span>
                     ) : (
                       <PaginationLink
                         onClick={() => handlePageChange(Number(page))}
@@ -278,7 +282,7 @@ function EventsTable({
 
               {/* Mobile Page Indicator */}
               <div className='flex items-center gap-2 px-3 sm:hidden'>
-                <span className='text-sm text-muted-foreground'>
+                <span className='text-muted-foreground text-sm'>
                   Page {currentPage} of {totalPages}
                 </span>
               </div>
@@ -289,7 +293,7 @@ function EventsTable({
                   className={cn(
                     'h-9 cursor-pointer rounded-lg border px-3 transition-all duration-200',
                     currentPage === totalPages
-                      ? 'pointer-events-none bg-muted opacity-50'
+                      ? 'bg-muted pointer-events-none opacity-50'
                       : 'hover:bg-accent hover:text-accent-foreground'
                   )}
                 />

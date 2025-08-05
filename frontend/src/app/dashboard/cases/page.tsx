@@ -445,16 +445,18 @@ export default function CasesPage() {
         {/* Table Footer */}
         <div className='text-muted-foreground mt-6 flex items-center justify-between text-sm'>
           <div className='flex items-center gap-4'>
-            <p>
-              Showing{' '}
-              {casesTotal ? (queryParams.page - 1) * itemsPerPage + 1 : 0} -{' '}
-              {casesTotal
-                ? casesTotal > queryParams.page * itemsPerPage
-                  ? queryParams.page * itemsPerPage
-                  : casesTotal
-                : 0}{' '}
-              of {casesTotal || 0} cases
-            </p>
+            {casesTotal && casesTotal > 0 ? (
+              <p>
+                Showing{' '}
+                {casesTotal ? (queryParams.page - 1) * itemsPerPage + 1 : 0} -{' '}
+                {casesTotal
+                  ? casesTotal > queryParams.page * itemsPerPage
+                    ? queryParams.page * itemsPerPage
+                    : casesTotal
+                  : 0}{' '}
+                of {casesTotal || 0} cases
+              </p>
+            ) : null}
           </div>
 
           <div>
