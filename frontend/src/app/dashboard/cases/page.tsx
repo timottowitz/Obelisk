@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +21,6 @@ import {
   TableRow
 } from '@/components/ui/table';
 import {
-  FolderOpen,
   Search,
   Eye,
   FileText,
@@ -42,6 +41,7 @@ import { useGetCases } from '@/hooks/useCases';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useSearchParams, useRouter } from 'next/navigation';
 import queryString from 'query-string';
+import { useOrganization, useUser } from '@clerk/nextjs';
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -59,6 +59,16 @@ const getStatusColor = (status: string) => {
 };
 
 export default function CasesPage() {
+  const { organization } = useOrganization();
+  const { user } = useUser();
+  const role = useMemo(
+    () =>
+      user?.organizationMemberships.find(
+        (membership) => membership.organization.id === organization?.id
+      )?.role,
+    [user, organization]
+  );
+
   const searchParams = useSearchParams();
   const router = useRouter();
   const [queryParams, setQueryParams] = useState({
@@ -316,6 +326,14 @@ export default function CasesPage() {
                     Docs
                   </Button>
                 </TableHead>
+                <TableHead>
+                  <Button
+                    className='hover:text-foreground m-auto flex items-center gap-1 transition-colors'
+                    variant='ghost'
+                  >
+                    Action
+                  </Button>
+                </TableHead>
               </TableRow>
             </TableHeader>
             {/* Table Body */}
@@ -405,6 +423,19 @@ export default function CasesPage() {
                           {caseItem.documents_count || 0}
                         </Badge>
                       </div>
+                    </TableCell>
+                    <TableCell className='py-4 text-center'>
+                      {(role === 'org:admin' ||
+                        caseItem.access === 'public') && (
+                        <Link href={`/dashboard/cases/${caseItem.id}/edit`}>
+                          <Button
+                            variant='default'
+                            className='cursor-pointer text-white'
+                          >
+                            Edit
+                          </Button>
+                        </Link>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

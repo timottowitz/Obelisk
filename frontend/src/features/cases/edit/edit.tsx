@@ -1,14 +1,33 @@
 'use client';
 
+import { useMemo } from 'react';
 import { CaseForm } from '../create/case-form';
-import { useCaseOperations } from '@/hooks/useCases';
+import { useGetCase } from '@/hooks/useCases';
 import { CaseSidebar } from '../create/case-sidebar';
 import { Loader2 } from 'lucide-react';
+import { useOrganization, useUser } from '@clerk/nextjs';
 
 export default function Edit({ caseId }: { caseId: string }) {
-  const { getCase } = useCaseOperations(caseId);
-  const caseData = getCase.data;
-  const caseLoading = getCase.isLoading;
+  const { data: caseData, isLoading: caseLoading } = useGetCase(caseId);
+  const { organization } = useOrganization();
+  const { user } = useUser();
+  const role = useMemo(
+    () =>
+      user?.organizationMemberships.find(
+        (membership) => membership.organization.id === organization?.id
+      )?.role,
+    [user, organization]
+  );
+
+  if (role === 'org:member' && caseData?.access === 'admin_only') {
+    return (
+      <div className='flex h-screen justify-center py-10'>
+        <div className='text-2xl font-bold'>
+          You are not authorized to edit this case
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className='container mx-auto px-4 py-6'>

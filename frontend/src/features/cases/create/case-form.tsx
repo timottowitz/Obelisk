@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +13,7 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { UploadIcon, CircleAlertIcon, Loader2 } from 'lucide-react';
+import { CircleAlertIcon, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import dyajs from 'dayjs';
 import { useCasesOperations } from '@/hooks/useCases';
@@ -40,6 +40,7 @@ export function CaseForm({ initialData }: { initialData?: any }) {
     track: string;
     claim_amount: string;
     hearing_locale: string;
+    access: string;
   }>({
     full_name: initialData?.full_name || '',
     phone: initialData?.phone || '',
@@ -55,7 +56,8 @@ export function CaseForm({ initialData }: { initialData?: any }) {
     applicable_rules: initialData?.applicable_rules || '',
     track: initialData?.track || '',
     claim_amount: initialData?.claim_amount || '',
-    hearing_locale: initialData?.hearing_locale || ''
+    hearing_locale: initialData?.hearing_locale || '',
+    access: initialData?.access || 'admin_only'
   });
 
   const { createCase, updateCase } = useCasesOperations();
@@ -71,43 +73,51 @@ export function CaseForm({ initialData }: { initialData?: any }) {
     }
   }, [caseTypes, formData.case_type_id, initialData]);
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
+  const handleInputChange = useCallback(
+    (field: string, value: string) => {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+    },
+    [setFormData]
+  );
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setCreateLoading(true);
-    const case_number =
-      dyajs().format('DD-MM') +
-      '-' +
-      Math.floor(10000000 + Math.random() * 90000000)
-        .toString()
-        .replace(/(\d{4})(\d{4})/, '$1-$2');
+  const handleSubmit = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault();
+      setCreateLoading(true);
+      const case_number =
+        dyajs().format('DD-MM') +
+        '-' +
+        Math.floor(10000000 + Math.random() * 90000000)
+          .toString()
+          .replace(/(\d{4})(\d{4})/, '$1-$2');
 
-    try {
-      if (initialData) {
-        await updateCase.mutateAsync({
-          caseId: initialData.id,
-          formData: formData
-        });
-      } else {
-        await createCase.mutateAsync({
-          ...formData,
-          case_number
-        });
+      try {
+        if (initialData) {
+          await updateCase.mutateAsync({
+            caseId: initialData.id,
+            formData: formData
+          });
+        } else {
+          await createCase.mutateAsync({
+            ...formData,
+            case_number
+          });
+        }
+        const type = caseTypes
+          .find((type) => type.id === formData.case_type_id)
+          ?.display_name.toLowerCase();
+        toast.success(
+          `Case ${initialData ? 'updated' : 'created'} successfully`
+        );
+        router.push(`/dashboard/cases?type=${type}`);
+      } catch (error) {
+        toast.error(`Case ${initialData ? 'update' : 'creation'} failed`);
+      } finally {
+        setCreateLoading(false);
       }
-      const type = caseTypes.find(
-        (type) => type.id === formData.case_type_id
-      )?.display_name.toLowerCase();
-      toast.success(`Case ${initialData ? 'updated' : 'created'} successfully`);
-      router.push(`/dashboard/cases?type=${type}`);
-    } catch (error) {
-      toast.error(`Case ${initialData ? 'update' : 'creation'} failed`);
-    } finally {
-      setCreateLoading(false);
-    }
-  };
+    },
+    [initialData, formData, createCase, updateCase, router, caseTypes]
+  );
 
   return (
     <form onSubmit={handleSubmit} className='space-y-6'>
@@ -236,6 +246,23 @@ export function CaseForm({ initialData }: { initialData?: any }) {
             </div>
           </div>
           <div className='flex flex-row justify-between gap-4'>
+            {/* Access */}
+            <div className='space-y-2'>
+              <Label htmlFor='access'>Access</Label>
+              <Select
+                value={formData.access}
+                onValueChange={(value) => handleInputChange('access', value)}
+              >
+                <SelectTrigger className='w-full'>
+                  <SelectValue placeholder='Select access' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='admin_only'>Admin Only</SelectItem>
+                  <SelectItem value='public'>Public</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Claimant */}
             <div className='space-y-2'>
               <Label htmlFor='claimant'>Claimant</Label>
@@ -342,14 +369,15 @@ export function CaseForm({ initialData }: { initialData?: any }) {
           <div className='flex justify-end gap-3 pt-4'>
             <Button
               variant='outline'
-              className='px-6'
-              onClick={() => router.push('/dashboard/cases')}
+              type='button'
+              className='cursor-pointer px-6'
+              onClick={() => window.history.back()}
             >
               Cancel
             </Button>
             <Button
               type='submit'
-              className='bg-red-600 px-6 hover:bg-red-700'
+              className='cursor-pointer bg-red-600 px-6 hover:bg-red-700'
               disabled={createLoading}
             >
               {createLoading ? 'Loading...' : 'Save'}

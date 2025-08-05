@@ -1055,7 +1055,7 @@ app.post("/cases", async (c) => {
   const userId = c.get("userId");
 
   try {
-    const { supabase, schema, user, member } = await getSupabaseAndOrgInfo(
+    const { supabase, schema, user } = await getSupabaseAndOrgInfo(
       orgId,
       userId
     );
@@ -1077,6 +1077,7 @@ app.post("/cases", async (c) => {
       claimant,
       respondent,
       case_manager,
+      access,
     } = body;
 
     if (!full_name) {
@@ -1133,6 +1134,7 @@ app.post("/cases", async (c) => {
         claimant,
         respondent,
         case_manager,
+        access,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -1206,6 +1208,7 @@ app.put("/cases/:id", async (c) => {
       claimant,
       respondent,
       case_manager,
+      access,
     } = body;
 
     if (!full_name && !case_type_id) {
@@ -1278,7 +1281,8 @@ app.put("/cases/:id", async (c) => {
     if (claimant !== undefined) updateData.claimant = claimant;
     if (respondent !== undefined) updateData.respondent = respondent;
     if (case_manager !== undefined) updateData.case_manager = case_manager;
-
+    if (access !== undefined) updateData.access = access;
+    
     const { data: updatedCase, error: updateError } = await supabase
       .schema(schema)
       .from("cases")

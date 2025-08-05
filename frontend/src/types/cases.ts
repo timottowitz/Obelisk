@@ -1,3 +1,5 @@
+export type CaseAccess = 'admin_only' | 'public';
+
 export interface FolderTemplate {
   id: string;
   name: string;
@@ -38,6 +40,7 @@ export interface Case {
   hearing_locale: string;
   case_tasks_count: number;
   documents_count: number;
+  access: CaseAccess;
   created_at: string;
   updated_at: string;
 }
