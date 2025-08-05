@@ -86,7 +86,7 @@ const MobileEventCard = memo(({ event }: { event: CaseEvent }) => (
       <div className='space-y-3'>
         <div className='flex items-start justify-between'>
           <h3 className='text-foreground font-semibold'>
-            {event.name || event.event_type || 'Unnamed Event'}
+            {event.event_type || 'Unnamed Event'}
           </h3>
         </div>
 
@@ -207,9 +207,7 @@ function EventsTable({
                         >
                           <TableCell className='px-6 py-4'>
                             <span className='text-foreground font-medium'>
-                              {event.name ||
-                                event.event_type ||
-                                'Unnamed Event'}
+                              {event.event_type || 'Unnamed Event'}
                             </span>
                           </TableCell>
                           <TableCell className='max-w-xs px-6 py-4'>
