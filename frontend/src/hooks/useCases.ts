@@ -164,11 +164,11 @@ export function useGetCase(caseId: string) {
   });
 }
 
-export function useGetCaseTasks(caseId: string) {
+export function useGetCaseTasks(caseId: string, page: number) {
   return useQuery({
-    queryKey: [...QUERY_KEYS.tasks, caseId],
+    queryKey: [...QUERY_KEYS.tasks, caseId, page],
     queryFn: async () => {
-      const response = await CasesAPI.getCaseTasks(caseId);
+      const response = await CasesAPI.getCaseTasks(caseId, page);
       return response;
     },
     enabled: !!caseId,

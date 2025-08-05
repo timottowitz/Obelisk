@@ -115,15 +115,21 @@ export default class CasesAPI {
     return handleApiResponse<Case>(response);
   }
 
-  static async getCaseTasks(caseId: string) {
+  static async getCaseTasks(caseId: string, page: number) {
     const headers = await getAuthHeaders();
     const uploadHeaders = createUploadHeaders(headers);
 
-    const response = await fetch(`${API_BASE_URL}/${caseId}/tasks`, {
-      method: 'GET',
-      headers: uploadHeaders
-    });
-    return handleApiResponse<Task[]>(response);
+    const response = await fetch(
+      `${API_BASE_URL}/${caseId}/tasks?page=${page}`,
+      {
+        method: 'GET',
+        headers: uploadHeaders
+      }
+    );
+    return handleApiResponse<{
+      tasks: Task[];
+      count: number;
+    }>(response);
   }
 
   static async createCaseTask(caseId: string, formData: any) {

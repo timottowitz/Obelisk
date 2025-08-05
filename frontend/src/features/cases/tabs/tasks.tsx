@@ -1,33 +1,42 @@
-import CaseDetailsTable from './table';
-import { tasksColumns } from './columns';
 import { Button } from '@/components/ui/button';
 import TaskModel from './components/task-modal';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useCasesOperations, useGetCaseTasks } from '@/hooks/useCases';
 import { toast } from 'sonner';
 import { useCallback } from 'react';
 import { Task } from '@/types/cases';
 import { AlertModal } from '@/components/modal/alert-modal';
+import TasksTable from './components/case-tasks-table';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 
 export default function Tasks({ caseId }: { caseId: string }) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(
+    parseInt(searchParams.get('page') || '1')
+  );
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const {
-    data: tasks,
-    isLoading: isLoadingTasks,
-    error
-  } = useGetCaseTasks(caseId);
+  const { data: tasks, isLoading: isLoadingTasks } = useGetCaseTasks(
+    caseId,
+    currentPage
+  );
   const { createCaseTask, deleteCaseTask, updateCaseTask } =
     useCasesOperations();
+
+  useEffect(() => {
+    router.push(`${pathname}?page=${currentPage}`);
+  }, [currentPage, router, pathname]);
 
   const openTaskModal = useCallback((task: Task | null) => {
     setIsOpen(true);
     setSelectedTask(task);
   }, []);
 
-  const openDeleteTaskModal = useCallback((task: Task) => {
+  const openDeleteModal = useCallback((task: Task) => {
     setIsDeleteOpen(true);
     setSelectedTask(task);
   }, []);
@@ -39,6 +48,7 @@ export default function Tasks({ caseId }: { caseId: string }) {
 
   const closeDeleteModal = useCallback(() => {
     setIsDeleteOpen(false);
+    setSelectedTask(null);
   }, []);
 
   const handleCreateTask = useCallback(
@@ -103,6 +113,10 @@ export default function Tasks({ caseId }: { caseId: string }) {
     [caseId, deleteCaseTask]
   );
 
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
+
   return (
     <div className='flex flex-col gap-4'>
       <h3 className='text-sm font-semibold text-gray-900'>Case Tasks</h3>
@@ -110,18 +124,21 @@ export default function Tasks({ caseId }: { caseId: string }) {
         size='lg'
         variant='outline'
         className='ml-auto flex w-fit items-center justify-end text-xs'
-        onClick={() => openTaskModal(null)}
+        onClick={() => {
+          setIsOpen(true);
+          setSelectedTask(null);
+        }}
       >
         Create A Task
       </Button>
-      <CaseDetailsTable
-        title='Tasks'
-        columns={tasksColumns}
-        data={tasks || []}
+      <TasksTable
+        tasks={tasks?.tasks || []}
         isLoading={isLoadingTasks}
-        error={error}
-        onEdit={openTaskModal}
-        onDelete={openDeleteTaskModal}
+        count={tasks?.count || 0}
+        currentPage={currentPage}
+        onPageChange={handlePageChange}
+        onOpenDeleteModal={openDeleteModal}
+        onOpenEditModal={openTaskModal}
       />
       <TaskModel
         isOpen={isOpen}

@@ -1402,16 +1402,24 @@ app.get("/cases/:id/tasks", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const caseId = c.req.param("id");
+  const url = new URL(c.req.url);
+  const page = parseInt(url.searchParams.get("page") || "1");
+  const limit = parseInt(url.searchParams.get("limit") || "5");
 
   try {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
 
-    const { data: tasks, error: selectError } = await supabase
+    const {
+      data: tasks,
+      error: selectError,
+      count,
+    } = await supabase
       .schema(schema)
       .from("case_tasks")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("case_id", caseId)
-      .order("due_date", { ascending: true });
+      .order("due_date", { ascending: true })
+      .range((page - 1) * limit, page * limit - 1);
 
     if (selectError || !tasks) {
       return c.json(
@@ -1420,7 +1428,7 @@ app.get("/cases/:id/tasks", async (c) => {
       );
     }
 
-    return c.json(tasks, 200);
+    return c.json({ tasks, count: count }, 200);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
