@@ -183,19 +183,6 @@ Deno.serve(async (req) => {
         ])
         .select()
         .single();
-
-      const { data: members, error: membersError } = await supabase.schema("org_2ycgcrzpztj0emidxp0u3iztcqy")
-        .from("members")
-        .insert({
-          user_id: data.id,
-          role: "owner",
-          permissions: ["read", "write"],
-          mfa_enabled: false,
-          created_at: new Date(event.data.created_at).toISOString(),
-          updated_at: new Date(event.data.updated_at).toISOString(),
-        })
-        .select()
-        .single();
         
       if (error) {
         console.error("Error creating organization:", error);
@@ -213,7 +200,7 @@ Deno.serve(async (req) => {
       }
 
       // Seed case types
-      await seedCaseTypes(supabase, schemaName);
+      await seedCaseTypes(supabase, schemaName.toLowerCase());
 
       return new Response(JSON.stringify({ data }), { status: 200 });
     }
