@@ -1192,6 +1192,35 @@ app.put("/cases/:id", async (c) => {
   try {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
 
+    const user = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+
+    const org = await supabase
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+
+    const { data: member, error: memberError } = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("*")
+      .eq("user_id", user.data.id)
+      .eq("organization_id", org.data.id)
+      .single();
+
+    if (memberError) {
+      return c.json(
+        { error: "Failed to fetch member", details: memberError },
+        500
+      );
+    }
+
     const body = await c.req.json();
     const {
       full_name,
@@ -1231,6 +1260,10 @@ app.put("/cases/:id", async (c) => {
 
     if (!existingCase) {
       return c.json({ error: "Case not found" }, 404);
+    }
+
+    if (existingCase.access === "admin_only" && member.role === "client") {
+      return c.json({ error: "You are not authorized to edit this case" }, 403);
     }
 
     // If name is being updated, check for uniqueness
@@ -1282,7 +1315,7 @@ app.put("/cases/:id", async (c) => {
     if (respondent !== undefined) updateData.respondent = respondent;
     if (case_manager !== undefined) updateData.case_manager = case_manager;
     if (access !== undefined) updateData.access = access;
-    
+
     const { data: updatedCase, error: updateError } = await supabase
       .schema(schema)
       .from("cases")
