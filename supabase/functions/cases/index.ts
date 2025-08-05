@@ -1625,16 +1625,24 @@ app.get("/cases/:id/events", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const caseId = c.req.param("id");
+  const url = new URL(c.req.url);
+  const page = parseInt(url.searchParams.get("page") || "1");
+  const limit = parseInt(url.searchParams.get("limit") || "5");
 
   try {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
 
-    const { data: events, error: selectError } = await supabase
+    const {
+      data: events,
+      error: selectError,
+      count,
+    } = await supabase
       .schema(schema)
       .from("case_events")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("case_id", caseId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range((page - 1) * limit, page * limit - 1);
 
     if (selectError) {
       return c.json(
@@ -1643,7 +1651,7 @@ app.get("/cases/:id/events", async (c) => {
       );
     }
 
-    return c.json(events, 200);
+    return c.json({ data: events, count: count }, 200);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }

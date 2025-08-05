@@ -216,14 +216,14 @@ export default class CasesAPI {
     return handleApiResponse(response);
   }
 
-  static async getCaseEvents(caseId: string) {
+  static async getCaseEvents(caseId: string, page: number = 1, pageSize: number = 5) {
     const headers = await getAuthHeaders();
     const uploadHeaders = createUploadHeaders(headers);
 
-    const response = await fetch(`${API_BASE_URL}/${caseId}/events`, {
+    const response = await fetch(`${API_BASE_URL}/${caseId}/events?page=${page}&page_size=${pageSize}`, {
       method: 'GET',
       headers: uploadHeaders
     });
-    return handleApiResponse<CaseEvent[]>(response);
+    return handleApiResponse<{ data: CaseEvent[]; count: number }>(response);
   }
 }

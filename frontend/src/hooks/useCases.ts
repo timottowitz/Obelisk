@@ -324,11 +324,11 @@ export function useDeleteFolderTemplate() {
   });
 }
 
-export function useGetCaseEvents(caseId: string) {
+export function useGetCaseEvents(caseId: string, page: number = 1) {
   return useQuery({
-    queryKey: [...QUERY_KEYS.events, caseId],
+    queryKey: [...QUERY_KEYS.events, caseId, page],
     queryFn: async () => {
-      const response = await CasesAPI.getCaseEvents(caseId);
+      const response = await CasesAPI.getCaseEvents(caseId, page);
       return response;
     },
     enabled: !!caseId,
