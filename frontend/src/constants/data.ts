@@ -63,6 +63,14 @@ export const navItems: NavItem[] = [
     ]
   },
   {
+    title: 'Call',
+    url: '/dashboard/meetings',
+    icon: 'callcaps',
+    isActive: false,
+    shortcut: ['c', 'r'],
+    items: []
+  },
+  {
     title: 'Events',
     url: '/dashboard/events',
     icon: 'calendar',
@@ -71,11 +79,11 @@ export const navItems: NavItem[] = [
     items: []
   },
   {
-    title: 'Call Caps',
-    url: '/dashboard/meetings',
-    icon: 'callcaps',
+    title: 'Email',
+    url: '/dashboard/contacts',
+    icon: 'mail',
     isActive: false,
-    shortcut: ['c', 'r'],
+    shortcut: ['e', 'e'],
     items: []
   },
   {
