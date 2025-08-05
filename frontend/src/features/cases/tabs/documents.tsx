@@ -55,7 +55,7 @@ import {
 } from '@/hooks/useDocuments';
 import { DocumentPreviewModal } from '@/features/documents/components/document-preview-modal';
 import { CreateFolderModal } from '@/features/documents/components/create-folder-modal';
-import { useUser } from '@clerk/nextjs';
+import { useGetCase } from '@/hooks/useCases';
 
 // Get file icon
 function getFileIcon(type: string, className?: string) {
@@ -86,7 +86,8 @@ export default function Documents({
   caseId: string;
   caseTypeName: string;
 }) {
-  const { user } = useUser();
+  const { data: caseData, isLoading: isLoadingCase } = useGetCase(caseId);
+
   // Use React Query hooks for all storage operations
   const {
     uploadDocument,
@@ -657,7 +658,11 @@ export default function Documents({
                     <BreadcrumbItem>
                       <BreadcrumbLink className='text-muted-foreground hover:text-primary flex items-center gap-1 text-sm font-medium transition-colors'>
                         <Sun className='h-4 w-4' />
-                        {user?.fullName}
+                        {isLoadingCase ? (
+                          <Loader2 className='h-3 w-3 animate-spin' />
+                        ) : (
+                          caseData?.full_name
+                        )}
                       </BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator>
