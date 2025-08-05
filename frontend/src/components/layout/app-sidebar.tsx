@@ -27,7 +27,6 @@ import {
 } from '@/components/ui/sidebar';
 import { UserAvatarProfile } from '@/components/user-avatar-profile';
 import { navItems, footerItems } from '@/constants/data';
-import { useMediaQuery } from '@/hooks/use-media-query';
 import { Button } from '@/components/ui/button';
 import { useUser, useOrganizationList, useAuth } from '@clerk/nextjs';
 import {
@@ -36,7 +35,9 @@ import {
   IconChevronsRight,
   IconCreditCard,
   IconLogout,
-  IconUserCircle
+  IconUserCircle,
+  IconFolderOpen,
+  IconFolder
 } from '@tabler/icons-react';
 import { SignOutButton } from '@clerk/nextjs';
 import Link from 'next/link';
@@ -142,7 +143,15 @@ export default function AppSidebar() {
                         className='flex cursor-pointer items-center gap-2'
                         onClick={() => setIsOpen(!isOpen)}
                       >
-                        <Icon style={{ width: '24px', height: '24px' }} />
+                        {isOpen ? (
+                          <IconFolderOpen
+                            style={{ width: '24px', height: '24px' }}
+                          />
+                        ) : (
+                          <IconFolder
+                            style={{ width: '24px', height: '24px' }}
+                          />
+                        )}
                         <span>{item.title}</span>
                         {isOpen ? (
                           <IconChevronsDown className='ml-auto size-4' />
@@ -163,9 +172,12 @@ export default function AppSidebar() {
                         const SubIcon = subItem.icon
                           ? Icons[subItem.icon]
                           : Icons.logo;
+
                         const isSubActive =
-                          searchParams.get('type') ===
-                          subItem.url.split('?')[1].split('=')[1];
+                          pathname === '/dashboard/cases'
+                            ? searchParams.get('type') ===
+                              subItem.title.split(' ')[0].toLowerCase()
+                            : pathname.includes(subItem.url);
                         return (
                           <SidebarMenuSubItem key={subItem.title}>
                             <SidebarMenuSubButton
@@ -178,7 +190,9 @@ export default function AppSidebar() {
                               )}
                             >
                               <Link href={subItem.url}>
-                                <SubIcon style={{ width: '24px', height: '24px' }} />
+                                <SubIcon
+                                  style={{ width: '24px', height: '24px' }}
+                                />
                                 <span className='text-sm'>{subItem.title}</span>
                               </Link>
                             </SidebarMenuSubButton>

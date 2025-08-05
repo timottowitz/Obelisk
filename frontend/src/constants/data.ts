@@ -52,15 +52,15 @@ export const navItems: NavItem[] = [
         shortcut: ['c', 'c'],
         items: []
       },
+      {
+        title: 'My Tasks',
+        url: '/dashboard/tasks',
+        icon: 'squareCheck',
+        isActive: false,
+        shortcut: ['t', 't'],
+        items: []
+      }
     ]
-  },
-  {
-    title: 'My Tasks',
-    url: '/dashboard/tasks',
-    icon: 'squareCheck',
-    isActive: false,
-    shortcut: ['t', 't'],
-    items: []
   },
   {
     title: 'Events',
@@ -116,7 +116,7 @@ export const practiceAreaItems: NavItem[] = [
   {
     title: 'Tasks',
     url: '/dashboard/tasks',
-    icon: 'tasks',
+    icon: 'squareCheck',
     isActive: false,
     label: '23',
     items: []

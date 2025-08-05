@@ -18,9 +18,25 @@ import {
   PaginationNext,
   PaginationPrevious
 } from '@/components/ui/pagination';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Calendar,
+  Clock,
+  FileText,
+  Hash,
+  User,
+  Filter
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Calendar, FileText, Hash } from 'lucide-react';
-import dayjs from 'dayjs';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem
+} from '@/components/ui/select';
 
 interface TasksTableProps {
   tasks: Task[];
@@ -87,33 +103,68 @@ const MobileTaskRow = memo(({ task }: { task: Task }) => (
     <div className='flex items-start justify-between'>
       <div className='flex items-center gap-2'>
         <Hash className='text-muted-foreground h-4 w-4' />
-        <span className='text-foreground font-semibold'>
-          {task.case_number}
-        </span>
+        <span className='text-foreground font-semibold'>{task.name}</span>
       </div>
       <div className='flex flex-wrap gap-2'>
         <span className='inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200'>
-          {task.claimant}
+          {task.assignee}
         </span>
         <span className='inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800 dark:bg-purple-900 dark:text-purple-200'>
-          {task.respondent}
+          {task.priority}
         </span>
       </div>
     </div>
 
-    {task.name && (
-      <p className='text-muted-foreground line-clamp-2 text-sm'>{task.name}</p>
+    {task.description && (
+      <p className='text-muted-foreground line-clamp-2 text-sm'>
+        {task.description}
+      </p>
     )}
 
     <div className='text-muted-foreground flex items-center gap-4 text-xs'>
       <div className='flex items-center gap-1'>
         <Calendar className='h-3 w-3' />
-        <span>{dayjs(task.due_date).format('DD/MM/YYYY')}</span>
+        <span>{formatDate(task.due_date)}</span>
       </div>
     </div>
   </div>
 ));
 MobileTaskRow.displayName = 'MobileTaskRow';
+
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case 'completed':
+      return <CheckCircle2 className='h-4 w-4 text-green-600' />;
+    case 'overdue':
+      return <AlertCircle className='h-4 w-4 text-red-600' />;
+    case 'in-progress':
+      return <Clock className='h-4 w-4 text-blue-600' />;
+    default:
+      return <Clock className='h-4 w-4 text-gray-400' />;
+  }
+};
+
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+};
+
+const getPriorityColor = (priority: string) => {
+  switch (priority) {
+    case 'high':
+      return 'text-red-600 bg-red-50 border-red-200';
+    case 'medium':
+      return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+    case 'low':
+      return 'text-green-600 bg-green-50 border-green-200';
+    default:
+      return 'text-gray-600 bg-gray-50 border-gray-200';
+  }
+};
 
 function TasksTable({
   tasks,
@@ -165,33 +216,54 @@ function TasksTable({
   );
 
   return (
-    <div className='space-y-4'>
-      {/* Mobile View */}
-      <div className='space-y-3 sm:hidden'>
-        {isLoading && <MobileLoadingState />}
-        {tasks &&
-          !isLoading &&
-          tasks.map((task) => <MobileTaskRow key={task.id} task={task} />)}
-        {tasks && !isLoading && tasks.length === 0 && <MobileEmptyState />}
-      </div>
+    <>
+      <Card className='pb-0'>
+        <CardHeader className='pb-0'>
+          <CardTitle className='flex items-center justify-between'>
+            <h1 className='text-2xl font-bold'>Case Tasks</h1>
+            <div className='flex items-center gap-2'>
+              <Select>
+                <SelectTrigger>
+                  <Filter className='h-4 w-4' />
+                  <SelectValue placeholder='Filter' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='all'>All</SelectItem>
+                  <SelectItem value='completed'>Completed</SelectItem>
+                  <SelectItem value='in-progress'>In Progress</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardTitle>
+        </CardHeader>
+        {/* Mobile View */}
+        <div className='space-y-3 sm:hidden'>
+          {isLoading && <MobileLoadingState />}
+          {tasks &&
+            !isLoading &&
+            tasks.map((task) => <MobileTaskRow key={task.id} task={task} />)}
+          {tasks && !isLoading && tasks.length === 0 && <MobileEmptyState />}
+        </div>
 
-      {/* Desktop View */}
-      <div className='border-muted bg-card hidden overflow-hidden rounded-lg border shadow-sm sm:block'>
-        <Table>
+        {/* Desktop View */}
+        <Table className='pb-0'>
           <TableHeader>
             <TableRow className='bg-muted/50 hover:bg-muted/50'>
+              <TableHead className='text-center font-semibold'>TASK</TableHead>
               <TableHead className='text-center font-semibold'>
-                Case Number
-              </TableHead>
-              <TableHead className='text-center font-semibold'>Task</TableHead>
-              <TableHead className='hidden text-center font-semibold lg:table-cell'>
-                Due Date
+                DUE DATE
               </TableHead>
               <TableHead className='text-center font-semibold'>
-                Claimant
+                ASSIGNEE
               </TableHead>
-              <TableHead className='hidden text-center font-semibold md:table-cell'>
-                Respondent
+              <TableHead className='text-center font-semibold'>
+                PRIORITY
+              </TableHead>
+              <TableHead className='text-center font-semibold'>
+                STATUS
+              </TableHead>
+              <TableHead className='text-center font-semibold'>
+                CATEGORY
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -204,25 +276,49 @@ function TasksTable({
                   key={task.id}
                   className='hover:bg-muted/50 text-center transition-colors duration-150'
                 >
-                  <TableCell className='font-medium'>
-                    {task.case_number}
+                  <TableCell className='py-4 font-medium'>
+                    {task.name}
+                    {task.description && (
+                      <p className='text-muted-foreground text-sm'>
+                        {task.description}
+                      </p>
+                    )}
                   </TableCell>
-                  <TableCell>
-                    <span className='inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200'>
-                      {task.name}
+                  <TableCell className='py-4'>
+                    <div className='flex items-center justify-center gap-1'>
+                      <Calendar className='mr-1 h-4 w-4 text-gray-600' />
+                      {formatDate(task.due_date)}
+                    </div>
+                  </TableCell>
+                  <TableCell className='text-muted-foreground hidden py-4 lg:table-cell'>
+                    <div className='flex items-center gap-2'>
+                      <div className='flex h-6 w-6 items-center justify-center rounded-full bg-gray-200'>
+                        <User className='h-3 w-3 text-gray-600' />
+                      </div>
+                      <span>{task.assignee}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className='py-4'>
+                    <span
+                      className={cn(
+                        'inline-flex items-center rounded-full border-1 px-2.5 py-0.5 text-xs font-medium',
+                        getPriorityColor(task.priority)
+                      )}
+                    >
+                      {task.priority}
                     </span>
                   </TableCell>
-                  <TableCell className='text-muted-foreground hidden lg:table-cell'>
-                    {dayjs(task.due_date).format('DD/MM/YYYY')}
+                  <TableCell className='hidden py-4 md:table-cell'>
+                    <div className='flex items-center justify-center gap-2'>
+                      {getStatusIcon(task.status)}
+                      <span className='text-sm capitalize'>
+                        {task.status.replace('-', ' ')}
+                      </span>
+                    </div>
                   </TableCell>
-                  <TableCell>
-                    <span className='inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200'>
-                      {task.claimant}
-                    </span>
-                  </TableCell>
-                  <TableCell className='hidden md:table-cell'>
+                  <TableCell className='py-4'>
                     <span className='inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800 dark:bg-purple-900 dark:text-purple-200'>
-                      {task.respondent}
+                      {task.category}
                     </span>
                   </TableCell>
                 </TableRow>
@@ -230,17 +326,15 @@ function TasksTable({
             {tasks && !isLoading && tasks.length === 0 && <DesktopEmptyState />}
           </TableBody>
         </Table>
-      </div>
+      </Card>
       <div className='mt-4 flex items-center justify-between'>
         {isLoading ? (
           <p>Loading...</p>
         ) : count && count > 0 ? (
-          <p>
-            <span className='text-muted-foreground text-sm'>
-              Showing {`${(currentPage - 1) * 5 + 1}`} -{' '}
-              {`${Math.min(currentPage * 5, count)}`} of {count} tasks
-            </span>
-          </p>
+          <span className='text-muted-foreground flex w-full items-center gap-2 text-sm font-medium'>
+            Showing{' '}
+            {`${(currentPage - 1) * 5 + 1}-${Math.min(currentPage * 5, count)} of ${count} tasks`}
+          </span>
         ) : null}
         {/* Pagination */}
         {totalPages > 1 && (
@@ -302,7 +396,7 @@ function TasksTable({
           </Pagination>
         )}
       </div>
-    </div>
+    </>
   );
 }
 

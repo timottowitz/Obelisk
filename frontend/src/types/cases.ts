@@ -51,9 +51,9 @@ export interface Task {
   description: string;
   status: string;
   due_date: string;
-  case_number: string;
-  claimant: string;
-  respondent: string;
+  priority: string;
+  assignee: string;
+  category: string;
   created_at: string;
   updated_at: string;
 }
