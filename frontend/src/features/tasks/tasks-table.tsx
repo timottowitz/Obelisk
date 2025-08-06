@@ -26,7 +26,8 @@ import {
   FileText,
   Hash,
   User,
-  Filter
+  Filter,
+  Plus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,6 +38,7 @@ import {
   SelectContent,
   SelectItem
 } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 
 interface TasksTableProps {
   tasks: Task[];
@@ -65,7 +67,7 @@ MobileLoadingState.displayName = 'MobileLoadingState';
 const DesktopLoadingState = memo(() => (
   <TableRow>
     <TableCell colSpan={6} className='py-16 text-center'>
-      <div className='flex flex-col items-center gap-3 justify-center'>
+      <div className='flex flex-col items-center justify-center gap-3'>
         <div className='border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent'></div>
         <span className='text-muted-foreground'>Loading tasks...</span>
       </div>
@@ -223,10 +225,10 @@ function TasksTable({
       <Card className='pb-0'>
         <CardHeader className='pb-0'>
           <CardTitle className='flex items-center justify-between'>
-            <h1 className='text-2xl font-bold'>Case Tasks</h1>
+            <h2 className='text-lg font-semibold text-gray-900'>Case Tasks</h2>
             <div className='flex items-center gap-2'>
               <Select>
-                <SelectTrigger>
+                <SelectTrigger className='flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50'>
                   <Filter className='h-4 w-4' />
                   <SelectValue placeholder='Filter' />
                 </SelectTrigger>
@@ -236,6 +238,10 @@ function TasksTable({
                   <SelectItem value='in-progress'>In Progress</SelectItem>
                 </SelectContent>
               </Select>
+              <Button className='flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50'>
+                <Plus className='h-4 w-4' />
+                Create A Task
+              </Button>
             </div>
           </CardTitle>
         </CardHeader>
@@ -249,37 +255,39 @@ function TasksTable({
         </div>
 
         {/* Desktop View */}
-        <Table className='pb-0'>
+        <Table className='border-b border-gray-200 bg-gray-50'>
           <TableHeader>
             <TableRow className='bg-muted/50 hover:bg-muted/50'>
-              <TableHead className='text-center font-semibold'>TASK</TableHead>
-              <TableHead className='text-center font-semibold'>
+              <TableHead className='px-6 py-4 text-left text-xs font-medium tracking-wider text-gray-500 uppercase'>
+                TASK
+              </TableHead>
+              <TableHead className='px-6 py-4 text-left text-xs font-medium tracking-wider text-gray-500 uppercase'>
                 DUE DATE
               </TableHead>
-              <TableHead className='text-center font-semibold'>
+              <TableHead className='px-6 py-4 text-left text-xs font-medium tracking-wider text-gray-500 uppercase'>
                 ASSIGNEE
               </TableHead>
-              <TableHead className='text-center font-semibold'>
+              <TableHead className='px-6 py-4 text-left text-xs font-medium tracking-wider text-gray-500 uppercase'>
                 PRIORITY
               </TableHead>
-              <TableHead className='text-center font-semibold'>
+              <TableHead className='px-6 py-4 text-left text-xs font-medium tracking-wider text-gray-500 uppercase'>
                 STATUS
               </TableHead>
-              <TableHead className='text-center font-semibold'>
+              <TableHead className='px-6 py-4 text-left text-xs font-medium tracking-wider text-gray-500 uppercase'>
                 CATEGORY
               </TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className='divide-y divide-gray-200 bg-white'>
             {isLoading && <DesktopLoadingState />}
             {tasks &&
               !isLoading &&
               tasks.map((task) => (
                 <TableRow
                   key={task.id}
-                  className='hover:bg-muted/50 text-center transition-colors duration-150'
+                  className='cursor-pointer transition-colors hover:bg-gray-50'
                 >
-                  <TableCell className='py-4 font-medium'>
+                  <TableCell className='px-6 py-4'>
                     {task.name}
                     {task.description && (
                       <p className='text-muted-foreground text-sm'>
@@ -287,39 +295,40 @@ function TasksTable({
                       </p>
                     )}
                   </TableCell>
-                  <TableCell className='py-4'>
-                    <div className='flex items-center justify-center gap-1'>
-                      <Calendar className='mr-1 h-4 w-4 text-gray-600' />
+                  <TableCell className='px-6 py-4 text-sm text-gray-900'>
+                    <div className='flex items-center gap-2'>
+                      <Calendar className='mr-1 h-4 w-4 text-gray-400' />
                       {formatDate(task.due_date)}
                     </div>
                   </TableCell>
-                  <TableCell className='text-muted-foreground hidden py-4 lg:table-cell'>
-                    <div className='flex items-center justify-center gap-2'>
+                  <TableCell className='px-6 py-4 text-sm text-gray-900'>
+                    <div className='flex items-center gap-2'>
                       <div className='flex h-6 w-6 items-center justify-center rounded-full bg-gray-200'>
                         <User className='h-3 w-3 text-gray-600' />
                       </div>
                       <span>{task.assignee}</span>
                     </div>
                   </TableCell>
-                  <TableCell className='py-4'>
+                  <TableCell className='px-6 py-4'>
                     <span
                       className={cn(
-                        'inline-flex items-center rounded-full border-1 px-2.5 py-0.5 text-xs font-medium',
+                        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
                         getPriorityColor(task.priority)
                       )}
                     >
-                      {task.priority}
+                      {task.priority.charAt(0).toUpperCase() +
+                        task.priority.slice(1)}
                     </span>
                   </TableCell>
-                  <TableCell className='hidden py-4 md:table-cell'>
-                    <div className='flex items-center justify-center gap-2'>
+                  <TableCell className='px-6 py-4'>
+                    <div className='flex items-center gap-2'>
                       {getStatusIcon(task.status)}
                       <span className='text-sm capitalize'>
                         {task.status.replace('-', ' ')}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className='py-4'>{task.category}</TableCell>
+                  <TableCell className='px-6 py-4'>{task.category}</TableCell>
                 </TableRow>
               ))}
             {tasks && !isLoading && tasks.length === 0 && <DesktopEmptyState />}

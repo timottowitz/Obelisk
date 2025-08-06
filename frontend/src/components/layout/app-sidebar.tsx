@@ -31,16 +31,13 @@ import { Button } from '@/components/ui/button';
 import { useUser, useOrganizationList, useAuth } from '@clerk/nextjs';
 import {
   IconBell,
-  IconChevronsDown,
-  IconChevronsRight,
   IconCreditCard,
   IconLogout,
   IconUserCircle,
   IconFolderOpen,
   IconFolder,
-  IconChevronCompactRight,
-  IconChevronCompactDown
 } from '@tabler/icons-react';
+import { ChevronRight, ChevronDown } from 'lucide-react';
 import { SignOutButton } from '@clerk/nextjs';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -156,9 +153,9 @@ export default function AppSidebar() {
                         )}
                         <span>{item.title}</span>
                         {isOpen ? (
-                          <IconChevronCompactDown className='ml-auto size-4' />
+                          <ChevronDown className='ml-auto size-4' />
                         ) : (
-                          <IconChevronCompactRight className='ml-auto size-4' />
+                          <ChevronRight className='ml-auto size-4' />
                         )}
                       </div>
                     ) : (
@@ -271,7 +268,7 @@ export default function AppSidebar() {
                       user={user}
                     />
                   )}
-                  <IconChevronsDown className='ml-auto size-4' />
+                  <ChevronDown className='ml-auto size-4' />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent

@@ -70,7 +70,14 @@ export default class CasesAPI {
     return handleApiResponse(response);
   }
 
-  static async getCases(type: string, page: number, search?: string, statusFilter?: string, sort?: string) {
+  static async getCases(
+    type: string,
+    page: number,
+    search?: string,
+    statusFilter?: string,
+    sortBy?: string,
+    order?: string
+  ) {
     const headers = await getAuthHeaders();
     const uploadHeaders = createUploadHeaders(headers);
 
@@ -78,8 +85,10 @@ export default class CasesAPI {
     params.append('page', page.toString());
     if (type) params.append('type', type);
     if (search) params.append('search', search);
-    if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
-    if (sort) params.append('sort', sort);
+    if (statusFilter && statusFilter !== 'all')
+      params.append('status', statusFilter);
+    if (sortBy) params.append('orderBy', sortBy);
+    if (order) params.append('sort', order);
 
     const response = await fetch(`${API_BASE_URL}?${params.toString()}`, {
       method: 'GET',
@@ -216,14 +225,21 @@ export default class CasesAPI {
     return handleApiResponse(response);
   }
 
-  static async getCaseEvents(caseId: string, page: number = 1, pageSize: number = 5) {
+  static async getCaseEvents(
+    caseId: string,
+    page: number = 1,
+    pageSize: number = 5
+  ) {
     const headers = await getAuthHeaders();
     const uploadHeaders = createUploadHeaders(headers);
 
-    const response = await fetch(`${API_BASE_URL}/${caseId}/events?page=${page}&page_size=${pageSize}`, {
-      method: 'GET',
-      headers: uploadHeaders
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/${caseId}/events?page=${page}&page_size=${pageSize}`,
+      {
+        method: 'GET',
+        headers: uploadHeaders
+      }
+    );
     return handleApiResponse<{ data: CaseEvent[]; count: number }>(response);
   }
 }

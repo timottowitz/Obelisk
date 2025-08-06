@@ -33,7 +33,6 @@ export function CaseForm({ initialData }: { initialData?: any }) {
   const { caseTypes: caseTypesData } = useCasesOperations();
   const caseTypes = caseTypesData.data || [];
   const caseTypesLoading = caseTypesData.isLoading;
-  const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
 
   const [formData, setFormData] = useState<{
     full_name: string;
@@ -54,6 +53,7 @@ export function CaseForm({ initialData }: { initialData?: any }) {
     access: string;
     next_event: string;
     initial_task: string;
+    documents: any[];
   }>({
     full_name: initialData?.full_name || '',
     phone: initialData?.phone || '',
@@ -72,7 +72,8 @@ export function CaseForm({ initialData }: { initialData?: any }) {
     hearing_locale: initialData?.hearing_locale || '',
     access: initialData?.access || 'admin_only',
     next_event: initialData?.next_event || '',
-    initial_task: initialData?.initial_task || ''
+    initial_task: initialData?.initial_task || '',
+    documents: initialData?.documents || []
   });
 
   const { createCase, updateCase } = useCasesOperations();
@@ -121,19 +122,26 @@ export function CaseForm({ initialData }: { initialData?: any }) {
           id: uuidv1(),
           file: file
         }));
-        setUploadedFiles([...uploadedFiles, ...newFiles]);
+        setFormData((prev) => ({
+          ...prev,
+          documents: [...prev.documents, ...newFiles]
+        }));
       }
     },
-    [uploadedFiles]
+    [setFormData]
   );
 
   const removeFile = useCallback((fileId: string) => {
-    setUploadedFiles((prev) => prev.filter((file) => file.id !== fileId));
+    setFormData((prev) => ({
+      ...prev,
+      documents: prev.documents.filter((file) => file.id !== fileId)
+    }));
   }, []);
 
   const handleSubmit = useCallback(
     async (event: React.FormEvent) => {
       event.preventDefault();
+      console.log('here');
       setCreateLoading(true);
       const case_number =
         dyajs().format('DD-MM') +
@@ -455,13 +463,13 @@ export function CaseForm({ initialData }: { initialData?: any }) {
                 </label>
               </div>
 
-              {uploadedFiles.length > 0 && (
+              {formData.documents.length > 0 && (
                 <div className='space-y-3'>
                   <h3 className='font-medium text-gray-900'>
-                    Uploaded Documents ({uploadedFiles.length})
+                    Uploaded Documents ({formData.documents.length})
                   </h3>
                   <div className='space-y-2'>
-                    {uploadedFiles.map((file) => (
+                    {formData.documents.map((file) => (
                       <div
                         key={file.id}
                         className='flex items-center justify-between rounded-lg border bg-gray-50 p-4'
@@ -493,38 +501,38 @@ export function CaseForm({ initialData }: { initialData?: any }) {
             </div>
           </CardContent>
         </Card>
-      </form>
-      {/* Action Buttons */}
-      <Card>
-        <CardContent>
-          <div className='flex items-center justify-between gap-2'>
-            <div className='flex flex-col gap-2'>
-              <h2 className='text-lg font-bold'>Ready to Submit</h2>
-              <p className='text-sm text-gray-500'>
-                Review your information and submit your case filing.
-              </p>
+        {/* Action Buttons */}
+        <Card>
+          <CardContent>
+            <div className='flex items-center justify-between gap-2'>
+              <div className='flex flex-col gap-2'>
+                <h2 className='text-lg font-bold'>Ready to Submit</h2>
+                <p className='text-sm text-gray-500'>
+                  Review your information and submit your case filing.
+                </p>
+              </div>
+              <div className='flex items-center gap-3 pt-4'>
+                <Button
+                  variant='outline'
+                  type='button'
+                  className='cursor-pointer px-6'
+                  onClick={() => window.history.back()}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type='submit'
+                  variant='default'
+                  className='cursor-pointer px-6'
+                  disabled={createLoading}
+                >
+                  {createLoading ? 'Submitting...' : 'Submit Case Filing'}
+                </Button>
+              </div>
             </div>
-            <div className='flex items-center gap-3 pt-4'>
-              <Button
-                variant='outline'
-                type='button'
-                className='cursor-pointer px-6'
-                onClick={() => window.history.back()}
-              >
-                Cancel
-              </Button>
-              <Button
-                type='submit'
-                variant='default'
-                className='cursor-pointer px-6'
-                disabled={createLoading}
-              >
-                {createLoading ? 'Submitting...' : 'Submit Case Filing'}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </form> 
     </>
   );
 }
