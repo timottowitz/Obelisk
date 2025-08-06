@@ -11,12 +11,20 @@ import {
   AlertCircle,
   Video,
   Mic,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 import { CallRecording, OrganizationMember } from '@/types/callcaps';
 import { useQuery } from '@tanstack/react-query';
 import { getAuthHeaders } from '@/config/api';
 import { ShareRecordingDialog } from './share-recording-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 
 const statusColors = {
   processed:
@@ -59,6 +67,7 @@ const RecordingCard = ({
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const {
     data: members = [],
@@ -90,7 +99,7 @@ const RecordingCard = ({
     e.preventDefault();
     e.stopPropagation();
 
-    if (!recording.s3Key) {
+    if (!recording.s3_key) {
       console.log('No video URL available for recording');
       return;
     }
@@ -100,7 +109,7 @@ const RecordingCard = ({
 
     console.log('=== Starting video load process ===');
     console.log('Recording ID:', recording.id);
-    console.log('Recording s3Key:', recording.s3Key);
+    console.log('Recording s3_key:', recording.s3_key);
     console.log('Proxy URL:', proxyUrl);
 
     try {
@@ -378,9 +387,54 @@ const RecordingCard = ({
               >
                 <Share2 className='h-4 w-4' />
               </button>
-              <button className='text-muted-foreground hover:text-foreground hover:bg-muted rounded-[calc(var(--radius)-2px)] p-2'>
-                <MoreVertical className='h-4 w-4' />
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant='ghost'
+                    size='icon'
+                    className='text-muted-foreground hover:text-foreground hover:bg-muted rounded-[calc(var(--radius)-2px)] p-2'
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <MoreVertical className='h-4 w-4' />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align='end' onClick={e => e.stopPropagation()}>
+                  <DropdownMenuItem
+                    variant='destructive'
+                    disabled={deleting}
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDeleting(true);
+                      try {
+                        const headers = await getAuthHeaders();
+                        const response = await fetch(
+                          `https://rnmjwdxqtsvsbelcftzg.supabase.co/functions/v1/call-recordings/${recording.id}`,
+                          {
+                            method: 'DELETE',
+                            headers
+                          }
+                        );
+                        if (!response.ok)
+                          throw new Error('Failed to delete recording');
+                        if (onRecordingUpdated) onRecordingUpdated();
+                      } catch (err) {
+                        alert(
+                          'Failed to delete recording: ' +
+                            (err instanceof Error ? err.message : err)
+                        );
+                      } finally {
+                        setDeleting(false);
+                      }
+                    }}
+                  >
+                    <span className='flex items-center'>
+                      <Trash2 className='mr-2 h-4 w-4' />
+                      {deleting ? 'Deleting...' : 'Delete'}
+                    </span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>

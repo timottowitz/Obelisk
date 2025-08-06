@@ -20,6 +20,9 @@ import {
 import { CallRecording } from '@/types/callcaps';
 import { getAuthHeaders } from '@/config/api';
 import { ShareRecordingDialog } from './share-recording-dialog';
+import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { format } from 'date-fns';
 
 const RecordingDetailModal = ({
   recording,
@@ -37,6 +40,13 @@ const RecordingDetailModal = ({
   const [videoLoading, setVideoLoading] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Format date, time, and duration from start_date and duration (ms)
+  const formattedDate = recording.start_time ? format(new Date(recording.start_time), 'PPP') : '';
+  const formattedTime = recording.start_time ? format(new Date(recording.start_time), 'p') : '';
+  const formattedDuration = typeof recording.duration === 'number'
+    ? `${Math.floor(recording.duration / 60000)}:${String(Math.floor((recording.duration % 60000) / 1000)).padStart(2, '0')}`
+    : '';
 
   const tabs = [
     { id: 'summary', label: 'Summary', icon: FileText },
@@ -59,43 +69,46 @@ const RecordingDetailModal = ({
       return;
     }
 
-    if (!recording.s3Key) {
-      console.log('No video URL available for recording');
+    // Support both legacy and enhanced fields
+    const hasGcsBlob = recording.gcs_video_blob_name || recording.videoUrl;
+    if (!recording.id || !hasGcsBlob) {
+      console.log('No video file available for recording');
+      alert('No video file available for this recording.');
       return;
     }
 
     setVideoLoading(true);
 
     try {
-      // Construct the proxy URL
+      // If the backend provides a direct videoUrl (GCS signed URL), use it directly
+      if (recording.videoUrl) {
+        setVideoUrl(recording.videoUrl);
+        setTimeout(() => {
+          if (videoRef.current) {
+            videoRef.current.play().catch(console.error);
+          }
+        }, 100);
+        setVideoLoading(false);
+        return;
+      }
+
+      // Otherwise, use the proxy endpoint
       const proxyUrl = `https://rnmjwdxqtsvsbelcftzg.supabase.co/functions/v1/call-recordings/${recording.id}/video`;
-
-      console.log('Loading video from proxy URL:', proxyUrl);
-
-      // Get authentication headers
       const headers = await getAuthHeaders();
       const filteredHeaders = Object.fromEntries(
         Object.entries(headers).filter(
           ([key]) => key.toLowerCase() !== 'content-type'
         )
       );
-
-      // Fetch the video with authentication
       const videoResponse = await fetch(proxyUrl, {
         headers: filteredHeaders
       });
-
       if (!videoResponse.ok) {
         throw new Error(`Failed to load video: ${videoResponse.status}`);
       }
-
-      // Create blob URL
       const videoBlob = await videoResponse.blob();
       const blobUrl = URL.createObjectURL(videoBlob);
-
       setVideoUrl(blobUrl);
-
-      // Auto-play after loading
       setTimeout(() => {
         if (videoRef.current) {
           videoRef.current.play().catch(console.error);
@@ -138,8 +151,8 @@ const RecordingDetailModal = ({
   };
 
   return (
-    <div className='fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4 backdrop-blur-sm'>
-      <div className='bg-card flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-[var(--radius)]'>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent showCloseButton={false} className='bg-card h-[80vh] w-full !max-w-7xl overflow-hidden rounded-[var(--radius)] p-0'>
         {/* Header */}
         <div className='border-border flex items-center justify-between border-b p-6'>
           <div className='flex-1'>
@@ -149,11 +162,11 @@ const RecordingDetailModal = ({
             <div className='text-muted-foreground mt-2 flex items-center space-x-4 text-sm'>
               <span className='flex items-center'>
                 <Calendar className='mr-1 h-4 w-4' />
-                {recording.date} at {recording.time}
+                {formattedDate} at {formattedTime}
               </span>
               <span className='flex items-center'>
                 <Clock className='mr-1 h-4 w-4' />
-                {recording.duration}
+                {formattedDuration}
               </span>
               <span className='flex items-center'>
                 <Users className='mr-1 h-4 w-4' />
@@ -174,21 +187,45 @@ const RecordingDetailModal = ({
             <button className='text-muted-foreground hover:text-foreground hover:bg-muted rounded-[calc(var(--radius)-2px)] p-2'>
               <Trash2 className='h-5 w-5' />
             </button>
-            <button
-              onClick={handleClose}
-              className='text-muted-foreground hover:text-foreground hover:bg-muted rounded-[calc(var(--radius)-2px)] p-2'
-            >
-              <X className='h-5 w-5' />
-            </button>
+            <DialogClose asChild>
+              <button className='text-muted-foreground hover:text-foreground hover:bg-muted rounded-[calc(var(--radius)-2px)] p-2'>
+                <X className='h-5 w-5' />
+              </button>
+            </DialogClose>
+            {/* Add process/analysis button if not processed */}
+            {recording.status !== 'processed' && (
+              <button
+                onClick={async () => {
+                  try {
+                    // Call process API
+                    await import('@/services/call-recordings-api').then(
+                      ({ CallRecordingsAPI }) =>
+                        CallRecordingsAPI.processRecording(recording.id)
+                    );
+                    // Call onRecordingUpdated to revalidate/fetch
+                    if (onRecordingUpdated) onRecordingUpdated();
+                  } catch (err) {
+                    alert(
+                      'Failed to process recording: ' +
+                        (err instanceof Error ? err.message : err)
+                    );
+                  }
+                }}
+                className='bg-primary text-primary-foreground hover:bg-primary/90 ml-2 rounded-[calc(var(--radius)-2px)] p-2 text-xs font-semibold'
+              >
+                <Brain className='mr-1 inline-block h-4 w-4' /> Analyze
+              </button>
+            )}
           </div>
         </div>
 
+        {/* Main Content Area */}
         <div className='flex flex-1 overflow-hidden'>
           {/* Video Player Sidebar */}
-          <div className='bg-muted border-border flex w-80 flex-col border-r p-6'>
-            {/* Video Player */}
+          <ScrollArea className='w-80 h-[calc(80vh-120px)] border-r bg-muted p-6'>
+            {/* Video Player and sidebar content here */}
             <div
-              className='relative mb-4 overflow-hidden rounded-[var(--radius)] bg-black'
+              className='relative mb-4 min-h-[150px] overflow-hidden rounded-[var(--radius)] bg-black'
               style={{ aspectRatio: '16/9' }}
             >
               {videoUrl ? (
@@ -228,7 +265,7 @@ const RecordingDetailModal = ({
                     </button>
                   </div>
                   <div className='bg-opacity-75 absolute right-4 bottom-4 rounded bg-black px-2 py-1 text-xs text-white'>
-                    {recording.duration}
+                    {formattedDuration}
                   </div>
                 </>
               )}
@@ -325,331 +362,330 @@ const RecordingDetailModal = ({
                 </div>
               )}
             </div>
-          </div>
+          </ScrollArea>
+          {/* Main Tabs Content */}
+          <ScrollArea className='flex-1 h-[calc(80vh-120px)]'>
+            <div className='flex flex-col h-full'>
+              {/* Tabs */}
+              <div className='border-border border-b'>
+                <nav className='flex space-x-8 px-6'>
+                  {tabs.map((tab) => {
+                    const IconComponent = tab.icon;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`flex items-center border-b-2 px-1 py-4 text-sm font-medium ${
+                          activeTab === tab.id
+                            ? 'border-primary text-primary'
+                            : 'text-muted-foreground hover:text-foreground hover:border-border border-transparent'
+                        }`}
+                      >
+                        <IconComponent className='mr-2 h-4 w-4' />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </nav>
+                {/* Tab Content */}
+                <div className='flex-1 overflow-auto p-6'>
+                  {activeTab === 'summary' && recording.transcript && (
+                    <div className='space-y-6'>
+                      <div>
+                        <h3 className='text-foreground mb-3 text-lg font-semibold'>
+                          Executive Summary
+                        </h3>
+                        <div className='prose prose-sm max-w-none'>
+                          <p className='text-foreground/80 leading-relaxed'>
+                            {recording.transcript.summary}
+                          </p>
+                        </div>
+                      </div>
 
-          {/* Main Content Area */}
-          <div className='flex flex-1 flex-col overflow-hidden'>
-            {/* Tabs */}
-            <div className='border-border border-b'>
-              <nav className='flex space-x-8 px-6'>
-                {tabs.map((tab) => {
-                  const IconComponent = tab.icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center border-b-2 px-1 py-4 text-sm font-medium ${
-                        activeTab === tab.id
-                          ? 'border-primary text-primary'
-                          : 'text-muted-foreground hover:text-foreground hover:border-border border-transparent'
-                      }`}
-                    >
-                      <IconComponent className='mr-2 h-4 w-4' />
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
-
-            {/* Tab Content */}
-            <div className='flex-1 overflow-auto p-6'>
-              {activeTab === 'summary' && recording.transcript && (
-                <div className='space-y-6'>
-                  <div>
-                    <h3 className='text-foreground mb-3 text-lg font-semibold'>
-                      Executive Summary
-                    </h3>
-                    <div className='prose prose-sm max-w-none'>
-                      <p className='text-foreground/80 leading-relaxed'>
-                        {recording.transcript.summary}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className='text-foreground mb-3 text-lg font-semibold'>
-                      Quick Actions
-                    </h3>
-                    <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
-                      {recording.transcript.actionItems
-                        .slice(0, 4)
-                        .map((item, index) => (
-                          <div
-                            key={index}
-                            className='bg-accent border-accent rounded-[var(--radius)] border p-4'
-                          >
-                            <div className='flex items-start space-x-2'>
-                              <CheckCircle className='text-accent-foreground mt-0.5 h-5 w-5 flex-shrink-0' />
-                              <div className='flex flex-col'>
-                                <p className='text-accent-foreground text-sm font-medium'>
-                                  {item.task}
-                                </p>
-                                <div className='text-accent-foreground/80 mt-1 flex flex-wrap gap-2 text-xs'>
-                                  <span>
-                                    <span className='font-semibold'>Due:</span>{' '}
-                                    {item.dueDate}
-                                  </span>
-                                  <span>
-                                    <span className='font-semibold'>
-                                      Assignee:
-                                    </span>{' '}
-                                    {item.assignee}
-                                  </span>
+                      <div>
+                        <h3 className='text-foreground mb-3 text-lg font-semibold'>
+                          Quick Actions
+                        </h3>
+                        <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
+                          {recording.transcript.actionItems
+                            .slice(0, 4)
+                            .map((item, index) => (
+                              <div
+                                key={index}
+                                className='bg-accent border-accent rounded-[var(--radius)] border p-4'
+                              >
+                                <div className='flex items-start space-x-2'>
+                                  <CheckCircle className='text-accent-foreground mt-0.5 h-5 w-5 flex-shrink-0' />
+                                  <div className='flex flex-col'>
+                                    <p className='text-accent-foreground text-sm font-medium'>
+                                      {item.task}
+                                    </p>
+                                    <div className='text-accent-foreground/80 mt-1 flex flex-wrap gap-2 text-xs'>
+                                      <span>
+                                        <span className='font-semibold'>Due:</span>{' '}
+                                        {item.dueDate}
+                                      </span>
+                                      <span>
+                                        <span className='font-semibold'>
+                                          Assignee:
+                                        </span>{' '}
+                                        {item.assignee}
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === 'transcript' && (
+                    <div>
+                      <div className='mb-4 flex items-center justify-between'>
+                        <h3 className='text-foreground text-lg font-semibold'>
+                          Full Transcript
+                        </h3>
+                        <button
+                          onClick={(event) => {
+                            const transcriptText = `Meeting: ${recording.title}
+                              Date: ${formattedDate} at ${formattedTime}
+                              Participants: ${recording.participants.join(', ')}
+                              Duration: ${formattedDuration}
+
+                              ${recording.transcript_text}
+
+                              --- End of Transcript ---
+                              Generated by Call Caps AI Processing System`;
+                            navigator.clipboard
+                              .writeText(transcriptText)
+                              .then(() => {
+                                // Show success feedback
+                                const button = event.target as HTMLButtonElement;
+                                const originalText = button.innerHTML;
+                                button.innerHTML = `<svg class="w-4 h-4 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>Copied!`;
+                                button.className = button.className.replace(
+                                  'text-gray-700 bg-white hover:bg-gray-50',
+                                  'text-green-700 bg-green-50'
+                                );
+                                setTimeout(() => {
+                                  button.innerHTML = originalText;
+                                  button.className = button.className.replace(
+                                    'text-green-700 bg-green-50',
+                                    'text-gray-700 bg-white hover:bg-gray-50'
+                                  );
+                                }, 2000);
+                              })
+                              .catch(() => {
+                                alert('Failed to copy transcript to clipboard');
+                              });
+                          }}
+                          className='inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none'
+                        >
+                          <svg
+                            className='mr-2 h-4 w-4'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth={2}
+                              d='M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z'
+                            />
+                          </svg>
+                          Copy Transcript
+                        </button>
+                      </div>
+                      <div className='bg-muted rounded-[var(--radius)] p-6'>
+                        {Array.isArray(recording.transcript_segments) &&
+                        recording.transcript_segments.length > 0 ? (
+                          <div className='space-y-2'>
+                            {recording.transcript_segments.map(
+                              (segment: any, idx: number) => (
+                                <div key={idx} className='flex'>
+                                  <p>
+                                    <span className='text-primary mr-2 font-semibold'>
+                                      {segment.speaker}:
+                                    </span>
+                                    <span className='text-foreground/80'>
+                                      {segment.transcription}
+                                    </span>
+                                  </p>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        ) : (
+                          <p className='text-foreground/80 whitespace-pre-line'>
+                            {recording.transcript_text}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === 'actions' && recording.transcript && (
+                    <div>
+                      <h3 className='text-foreground mb-4 text-lg font-semibold'>
+                        Action Items & Follow-ups
+                      </h3>
+                      <div className='space-y-4'>
+                        {recording.transcript.actionItems.map((item, index) => (
+                          <div
+                            key={index}
+                            className='bg-card border-border rounded-lg border p-4 transition-shadow hover:shadow-sm'
+                          >
+                            <div className='flex items-start space-x-3'>
+                              <input
+                                type='checkbox'
+                                className='text-primary mt-1 h-4 w-4 rounded border-gray-300'
+                              />
+                              <div className='flex-1'>
+                                <p className='text-foreground font-medium'>
+                                  {item.task}
+                                </p>
+                                <div className='mt-2 flex items-center space-x-4 text-sm text-gray-500'>
+                                  <span>Priority: High</span>
+                                  <span>Due: June 10th</span>
+                                  <span>Assigned: TBD</span>
+                                </div>
+                              </div>
+                              <button className='text-gray-400 hover:text-gray-600'>
+                                <MoreVertical className='h-4 w-4' />
+                              </button>
                             </div>
                           </div>
                         ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'transcript' && (
-                <div>
-                  <div className='mb-4 flex items-center justify-between'>
-                    <h3 className='text-foreground text-lg font-semibold'>
-                      Full Transcript
-                    </h3>
-                    <button
-                      onClick={(event) => {
-                        const transcriptText = `Meeting: ${recording.title}
-Date: ${recording.date} at ${recording.time}
-Participants: ${recording.participants.join(', ')}
-Duration: ${recording.duration}
-
-${recording.transcript_text}
-
---- End of Transcript ---
-Generated by Call Caps AI Processing System`;
-                        navigator.clipboard
-                          .writeText(transcriptText)
-                          .then(() => {
-                            // Show success feedback
-                            const button = event.target as HTMLButtonElement;
-                            const originalText = button.innerHTML;
-                            button.innerHTML = `<svg class="w-4 h-4 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                          </svg>Copied!`;
-                            button.className = button.className.replace(
-                              'text-gray-700 bg-white hover:bg-gray-50',
-                              'text-green-700 bg-green-50'
-                            );
-                            setTimeout(() => {
-                              button.innerHTML = originalText;
-                              button.className = button.className.replace(
-                                'text-green-700 bg-green-50',
-                                'text-gray-700 bg-white hover:bg-gray-50'
-                              );
-                            }, 2000);
-                          })
-                          .catch(() => {
-                            alert('Failed to copy transcript to clipboard');
-                          });
-                      }}
-                      className='inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none'
-                    >
-                      <svg
-                        className='mr-2 h-4 w-4'
-                        fill='none'
-                        stroke='currentColor'
-                        viewBox='0 0 24 24'
-                      >
-                        <path
-                          strokeLinecap='round'
-                          strokeLinejoin='round'
-                          strokeWidth={2}
-                          d='M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z'
-                        />
-                      </svg>
-                      Copy Transcript
-                    </button>
-                  </div>
-                  <div className='bg-muted rounded-[var(--radius)] p-6'>
-                    {Array.isArray(recording.transcript_segments) &&
-                    recording.transcript_segments.length > 0 ? (
-                      <div className='space-y-2'>
-                        {recording.transcript_segments.map(
-                          (segment: any, idx: number) => (
-                            <div key={idx} className='flex'>
-                              <p>
-                                <span className='text-primary mr-2 font-semibold'>
-                                  {segment.speaker}:
-                                </span>
-                                <span className='text-foreground/80'>
-                                  {segment.transcription}
-                                </span>
-                              </p>
-                            </div>
-                          )
-                        )}
                       </div>
-                    ) : (
-                      <p className='text-foreground/80 whitespace-pre-line'>
-                        {recording.transcript_text}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
+                    </div>
+                  )}
 
-              {activeTab === 'actions' && recording.transcript && (
-                <div>
-                  <h3 className='text-foreground mb-4 text-lg font-semibold'>
-                    Action Items & Follow-ups
-                  </h3>
-                  <div className='space-y-4'>
-                    {recording.transcript.actionItems.map((item, index) => (
-                      <div
-                        key={index}
-                        className='bg-card border-border rounded-lg border p-4 transition-shadow hover:shadow-sm'
-                      >
-                        <div className='flex items-start space-x-3'>
-                          <input
-                            type='checkbox'
-                            className='text-primary mt-1 h-4 w-4 rounded border-gray-300'
-                          />
-                          <div className='flex-1'>
-                            <p className='text-foreground font-medium'>
-                              {item.task}
-                            </p>
-                            <div className='mt-2 flex items-center space-x-4 text-sm text-gray-500'>
-                              <span>Priority: High</span>
-                              <span>Due: June 10th</span>
-                              <span>Assigned: TBD</span>
-                            </div>
-                          </div>
-                          <button className='text-gray-400 hover:text-gray-600'>
-                            <MoreVertical className='h-4 w-4' />
-                          </button>
+                  {activeTab === 'analysis' && (
+                    <div>
+                      <h3 className='text-foreground mb-4 text-lg font-semibold'>
+                        Risk Analysis & Compliance
+                      </h3>
+                      <div className='space-y-6'>
+                        <div className='bg-destructive/10 border-destructive/30 rounded-[var(--radius)] border p-4'>
+                          <h4 className='text-destructive mb-2 font-medium'>
+                            High Priority Risks
+                          </h4>
+                          <ul className='text-destructive space-y-2 text-sm'>
+                            <li>
+                              • Client deadline requirements need immediate
+                              attention
+                            </li>
+                            <li>
+                              • Resource allocation conflicts with existing
+                              commitments
+                            </li>
+                          </ul>
+                        </div>
+
+                        <div className='bg-accent/10 border-accent/30 rounded-[var(--radius)] border p-4'>
+                          <h4 className='text-accent-foreground mb-2 font-medium'>
+                            Medium Priority Items
+                          </h4>
+                          <ul className='text-accent-foreground space-y-2 text-sm'>
+                            <li>
+                              • Technology integration timeline needs monitoring
+                            </li>
+                            <li>• Staff training requirements for new processes</li>
+                          </ul>
+                        </div>
+
+                        <div className='bg-primary/10 border-primary/30 rounded-[var(--radius)] border p-4'>
+                          <h4 className='text-primary mb-2 font-medium'>
+                            Compliance Notes
+                          </h4>
+                          <ul className='text-primary space-y-2 text-sm'>
+                            <li>
+                              • Attorney-client privilege maintained throughout
+                              discussion
+                            </li>
+                            <li>
+                              • All documentation requirements noted for file
+                              retention
+                            </li>
+                          </ul>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'analysis' && (
-                <div>
-                  <h3 className='text-foreground mb-4 text-lg font-semibold'>
-                    Risk Analysis & Compliance
-                  </h3>
-                  <div className='space-y-6'>
-                    <div className='bg-destructive/10 border-destructive/30 rounded-[var(--radius)] border p-4'>
-                      <h4 className='text-destructive mb-2 font-medium'>
-                        High Priority Risks
-                      </h4>
-                      <ul className='text-destructive space-y-2 text-sm'>
-                        <li>
-                          • Client deadline requirements need immediate
-                          attention
-                        </li>
-                        <li>
-                          • Resource allocation conflicts with existing
-                          commitments
-                        </li>
-                      </ul>
                     </div>
+                  )}
 
-                    <div className='bg-accent/10 border-accent/30 rounded-[var(--radius)] border p-4'>
-                      <h4 className='text-accent-foreground mb-2 font-medium'>
-                        Medium Priority Items
-                      </h4>
-                      <ul className='text-accent-foreground space-y-2 text-sm'>
-                        <li>
-                          • Technology integration timeline needs monitoring
-                        </li>
-                        <li>• Staff training requirements for new processes</li>
-                      </ul>
-                    </div>
+                  {activeTab === 'insights' && (
+                    <div>
+                      <h3 className='text-foreground mb-4 text-lg font-semibold'>
+                        AI-Generated Insights
+                      </h3>
+                      <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
+                        <div className='bg-primary/10 rounded-[var(--radius)] p-4'>
+                          <h4 className='text-primary mb-2 font-medium'>
+                            Meeting Effectiveness
+                          </h4>
+                          <div className='text-primary text-2xl font-bold'>
+                            8.5/10
+                          </div>
+                          <p className='text-primary mt-1 text-sm'>
+                            Well-structured with clear outcomes
+                          </p>
+                        </div>
 
-                    <div className='bg-primary/10 border-primary/30 rounded-[var(--radius)] border p-4'>
-                      <h4 className='text-primary mb-2 font-medium'>
-                        Compliance Notes
-                      </h4>
-                      <ul className='text-primary space-y-2 text-sm'>
-                        <li>
-                          • Attorney-client privilege maintained throughout
-                          discussion
-                        </li>
-                        <li>
-                          • All documentation requirements noted for file
-                          retention
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              )}
+                        <div className='bg-success/10 rounded-[var(--radius)] p-4'>
+                          <h4 className='text-success mb-2 font-medium'>
+                            Action Clarity
+                          </h4>
+                          <div className='text-success text-2xl font-bold'>92%</div>
+                          <p className='text-success mt-1 text-sm'>
+                            Clear actionable items identified
+                          </p>
+                        </div>
 
-              {activeTab === 'insights' && (
-                <div>
-                  <h3 className='text-foreground mb-4 text-lg font-semibold'>
-                    AI-Generated Insights
-                  </h3>
-                  <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
-                    <div className='bg-primary/10 rounded-[var(--radius)] p-4'>
-                      <h4 className='text-primary mb-2 font-medium'>
-                        Meeting Effectiveness
-                      </h4>
-                      <div className='text-primary text-2xl font-bold'>
-                        8.5/10
+                        <div className='bg-accent/10 rounded-[var(--radius)] p-4'>
+                          <h4 className='text-accent-foreground mb-2 font-medium'>
+                            Participation Balance
+                          </h4>
+                          <div className='text-accent-foreground text-2xl font-bold'>
+                            Good
+                          </div>
+                          <p className='text-accent-foreground mt-1 text-sm'>
+                            Balanced discussion among participants
+                          </p>
+                        </div>
+
+                        <div className='bg-accent/10 rounded-[var(--radius)] p-4'>
+                          <h4 className='text-accent-foreground mb-2 font-medium'>
+                            Follow-up Required
+                          </h4>
+                          <div className='text-accent-foreground text-2xl font-bold'>
+                            {recording.transcript?.actionItems.length || 0}
+                          </div>
+                          <p className='text-accent-foreground mt-1 text-sm'>
+                            Items need follow-up
+                          </p>
+                        </div>
                       </div>
-                      <p className='text-primary mt-1 text-sm'>
-                        Well-structured with clear outcomes
-                      </p>
                     </div>
-
-                    <div className='bg-success/10 rounded-[var(--radius)] p-4'>
-                      <h4 className='text-success mb-2 font-medium'>
-                        Action Clarity
-                      </h4>
-                      <div className='text-success text-2xl font-bold'>92%</div>
-                      <p className='text-success mt-1 text-sm'>
-                        Clear actionable items identified
-                      </p>
-                    </div>
-
-                    <div className='bg-accent/10 rounded-[var(--radius)] p-4'>
-                      <h4 className='text-accent-foreground mb-2 font-medium'>
-                        Participation Balance
-                      </h4>
-                      <div className='text-accent-foreground text-2xl font-bold'>
-                        Good
-                      </div>
-                      <p className='text-accent-foreground mt-1 text-sm'>
-                        Balanced discussion among participants
-                      </p>
-                    </div>
-
-                    <div className='bg-accent/10 rounded-[var(--radius)] p-4'>
-                      <h4 className='text-accent-foreground mb-2 font-medium'>
-                        Follow-up Required
-                      </h4>
-                      <div className='text-accent-foreground text-2xl font-bold'>
-                        {recording.transcript?.actionItems.length || 0}
-                      </div>
-                      <p className='text-accent-foreground mt-1 text-sm'>
-                        Items need follow-up
-                      </p>
-                    </div>
-                  </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
-          </div>
+          </ScrollArea>
         </div>
-      </div>
-
-      {/* Share Dialog */}
-      <ShareRecordingDialog
-        recording={recording}
-        isOpen={isShareDialogOpen}
-        onClose={() => setIsShareDialogOpen(false)}
-        onSuccess={handleShareSuccess}
-      />
-    </div>
+        {/* Share Dialog */}
+        <ShareRecordingDialog
+          recording={recording}
+          isOpen={isShareDialogOpen}
+          onClose={() => setIsShareDialogOpen(false)}
+          onSuccess={handleShareSuccess}
+        />
+      </DialogContent>
+    </Dialog>
   );
 };
 

@@ -9,13 +9,14 @@ import { Hono } from "jsr:@hono/hono";
 import { cors } from "jsr:@hono/hono/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
 import { extractUserAndOrgId } from "../_shared/index.ts";
-import { AzureBlobStorageService } from "../_shared/azure-storage.ts";
+import { GeminiMeetingIntelligence } from "./gemini-meeting-intelligence.ts";
 import {
   GoogleGenAI,
   createUserContent,
   createPartFromUri,
   FileState,
 } from "https://esm.sh/@google/genai@1.9.0";
+import { GoogleCloudStorageService } from "../_shared/google-storage.ts";
 
 console.log("Hello from Functions!");
 
@@ -191,6 +192,7 @@ app.use(
 );
 
 app.use("/call-recordings", extractUserAndOrgId);
+app.use("/call-recordings/:id", extractUserAndOrgId);
 app.use("/call-recordings/:id/process", extractUserAndOrgId);
 app.use("/call-recordings/:id/video", extractUserAndOrgId);
 app.use("/call-recordings/:id/share", extractUserAndOrgId);
@@ -198,6 +200,8 @@ app.use("/call-recordings/:id/shares", extractUserAndOrgId);
 app.use("/call-recordings/upload", extractUserAndOrgId);
 app.use("/call-recordings/organization-members", extractUserAndOrgId);
 app.use("/call-recordings/accessible", extractUserAndOrgId);
+app.use("/call-recordings/meeting-types", extractUserAndOrgId);
+app.use("/call-recordings/meeting-types/:id", extractUserAndOrgId);
 
 app.options("*", (c) => {
   return c.text("", 200);
@@ -403,6 +407,7 @@ app.post("/call-recordings", async (c) => {
       endTime,
       title,
       participants,
+      meetingTypeId
     } = body;
 
     if (!recordingBlob || !mimeType || !duration || !startTime || !title) {
@@ -416,41 +421,7 @@ app.post("/call-recordings", async (c) => {
     }
 
     const recordingsTable = `call_recordings`;
-    const settingsTable = `user_settings`;
     const queueTable = `processing_queue`;
-
-    // Get user's Azure credentials from settings, fallback to environment variables
-    const { data: settings, error: settingsError } = await supabase
-      .schema(schema)
-      .from(settingsTable)
-      .select("azure_connection_string")
-      .eq("member_id", member.data?.id)
-      .single();
-
-    // Use user settings if available, otherwise use environment variables
-    let azureConnectionString = settings?.azure_connection_string;
-    if (!azureConnectionString) {
-      azureConnectionString = Deno.env.get("AZURE_CONNECTION_STRING");
-    }
-
-    if (!azureConnectionString) {
-      return c.json(
-        {
-          error:
-            "Azure storage not configured. Please add your Azure connection string in settings or configure AZURE_CONNECTION_STRING environment variable.",
-        },
-        400
-      );
-    }
-
-    // Parse Azure connection string
-    const connectionString = azureConnectionString;
-    const accountName = connectionString.match(/AccountName=([^;]+)/)?.[1];
-    const accountKey = connectionString.match(/AccountKey=([^;]+)/)?.[1];
-
-    if (!accountName || !accountKey) {
-      return c.json({ error: "Invalid Azure connection string format" }, 400);
-    }
 
     // Create recording record in database
     const { data: recording, error: insertError } = await supabase
@@ -467,6 +438,7 @@ app.post("/call-recordings", async (c) => {
         status: "uploading",
         has_video: true,
         has_audio: true,
+        meeting_type_id: meetingTypeId,
       })
       .select()
       .single();
@@ -481,11 +453,7 @@ app.post("/call-recordings", async (c) => {
 
     try {
       // Initialize Azure Blob Storage
-      const azureStorage = new AzureBlobStorageService({
-        accountName,
-        accountKey,
-        containerName: "callcaps-recordings",
-      });
+      const gcsService = getGcsService();
 
       // Convert base64 to ArrayBuffer
       const binaryString = atob(recordingBlob);
@@ -495,7 +463,7 @@ app.post("/call-recordings", async (c) => {
       }
 
       // Upload to Azure Blob Storage
-      const uploadResult = await azureStorage.uploadVideo(
+      const uploadResult = await gcsService.uploadVideo(
         user.data?.id,
         recording.id,
         bytes,
@@ -507,8 +475,8 @@ app.post("/call-recordings", async (c) => {
         .schema(schema)
         .from(recordingsTable)
         .update({
-          azure_video_url: uploadResult.blobUrl,
-          azure_video_blob_name: uploadResult.blobName,
+          gcs_video_url: uploadResult.blobUrl,
+          gcs_video_blob_name: uploadResult.blobName,
           file_size: bytes.length,
           status: "uploaded",
         })
@@ -542,7 +510,7 @@ app.post("/call-recordings", async (c) => {
             id: recording.id,
             title: recording.title,
             status: "uploaded",
-            azure_video_url: uploadResult.blobUrl,
+            gcs_video_url: uploadResult.blobUrl,
             duration: recording.duration,
             start_time: recording.start_time,
             end_time: recording.end_time,
@@ -645,7 +613,7 @@ app.post("/call-recordings/upload", async (c) => {
       );
     }
 
-    const { mimeType, duration, startTime, endTime, title, participants } =
+    const { mimeType, duration, startTime, endTime, title, participants, meetingTypeId } =
       metadata;
 
     if (!mimeType || !duration || !startTime || !title) {
@@ -662,39 +630,6 @@ app.post("/call-recordings/upload", async (c) => {
     const settingsTable = `user_settings`;
     const queueTable = `processing_queue`;
 
-    // Get user's Azure credentials from settings, fallback to environment variables
-    const { data: settings, error: settingsError } = await supabase
-      .schema(schema)
-      .from(settingsTable)
-      .select("azure_connection_string")
-      .eq("member_id", member.data?.id)
-      .single();
-
-    // Use user settings if available, otherwise use environment variables
-    let azureConnectionString = settings?.azure_connection_string;
-    if (!azureConnectionString) {
-      azureConnectionString = Deno.env.get("AZURE_CONNECTION_STRING");
-    }
-
-    if (!azureConnectionString) {
-      return c.json(
-        {
-          error:
-            "Azure storage not configured. Please add your Azure connection string in settings or configure AZURE_CONNECTION_STRING environment variable.",
-        },
-        400
-      );
-    }
-
-    // Parse Azure connection string
-    const connectionString = azureConnectionString;
-    const accountName = connectionString.match(/AccountName=([^;]+)/)?.[1];
-    const accountKey = connectionString.match(/AccountKey=([^;]+)/)?.[1];
-
-    if (!accountName || !accountKey) {
-      return c.json({ error: "Invalid Azure connection string format" }, 400);
-    }
-
     // Create recording record in database
     const { data: recording, error: insertError } = await supabase
       .schema(schema)
@@ -710,6 +645,7 @@ app.post("/call-recordings/upload", async (c) => {
         status: "uploading",
         has_video: true,
         has_audio: true,
+        meeting_type_id: meetingTypeId,
       })
       .select()
       .single();
@@ -724,18 +660,14 @@ app.post("/call-recordings/upload", async (c) => {
 
     try {
       // Initialize Azure Blob Storage
-      const azureStorage = new AzureBlobStorageService({
-        accountName,
-        accountKey,
-        containerName: "callcaps-recordings",
-      });
+      const gcsService = getGcsService();
 
       // Convert File to ArrayBuffer
       const fileArrayBuffer = await file.arrayBuffer();
       const bytes = new Uint8Array(fileArrayBuffer);
 
       // Upload to Azure Blob Storage
-      const uploadResult = await azureStorage.uploadVideo(
+      const uploadResult = await gcsService.uploadVideo(
         user.data?.id,
         recording.id,
         bytes,
@@ -747,8 +679,8 @@ app.post("/call-recordings/upload", async (c) => {
         .schema(schema)
         .from(recordingsTable)
         .update({
-          azure_video_url: uploadResult.blobUrl,
-          azure_video_blob_name: uploadResult.blobName,
+          gcs_video_url: uploadResult.blobUrl,
+          gcs_video_blob_name: uploadResult.blobName,
           file_size: bytes.length,
           status: "uploaded",
         })
@@ -782,7 +714,7 @@ app.post("/call-recordings/upload", async (c) => {
             id: recording.id,
             title: recording.title,
             status: "uploaded",
-            azure_video_url: uploadResult.blobUrl,
+            gcs_video_url: uploadResult.blobUrl,
             duration: recording.duration,
             start_time: recording.start_time,
             end_time: recording.end_time,
@@ -868,15 +800,11 @@ app.post("/call-recordings/:id/process", async (c) => {
       return c.json({ error: "Recording ID required" }, 400);
     }
 
-    // Parse request body
-    const body = await c.req.json();
-    const { taskType = "all" } = body;
-
     const recordingsTable = `call_recordings`;
     const settingsTable = `user_settings`;
     const queueTable = `processing_queue`;
 
-    // Get recording details
+    // Get recording details including processing preferences
     const { data: recording, error: recordingError } = await supabase
       .schema(schema)
       .from(recordingsTable)
@@ -889,29 +817,25 @@ app.post("/call-recordings/:id/process", async (c) => {
       return c.json({ error: "Recording not found" }, 404);
     }
 
+    // Extract processing configuration from the recording
+    const meetingTypeId = recording.meeting_type_id;
+
     // Get user settings for API keys, fallback to environment variables
     const { data: settings, error: settingsError } = await supabase
       .schema(schema)
       .from(settingsTable)
-      .select(
-        "openai_api_key, azure_connection_string, ai_model, temperature, custom_prompts"
-      )
+      .select("openai_api_key, ai_model, temperature, custom_prompts")
       .eq("member_id", member.data?.id)
       .single();
 
     // Use user settings if available, otherwise use environment variables
     let openaiApiKey = settings?.openai_api_key;
-    let azureConnectionString = settings?.azure_connection_string;
 
     if (!openaiApiKey) {
       openaiApiKey = Deno.env.get("OPENAI_API_KEY");
     }
 
     const googleApiKey = Deno.env.get("GOOGLE_API_KEY");
-
-    if (!azureConnectionString) {
-      azureConnectionString = Deno.env.get("AZURE_CONNECTION_STRING");
-    }
 
     if (!openaiApiKey) {
       return c.json(
@@ -933,7 +857,7 @@ app.post("/call-recordings/:id/process", async (c) => {
       );
     }
 
-    // Update recording status
+    // Update recording status to processing
     await supabase
       .schema(schema)
       .from(recordingsTable)
@@ -945,31 +869,14 @@ app.post("/call-recordings/:id/process", async (c) => {
       let transcriptSegments = recording.transcript_segments;
 
       // Step 1: Transcribe if needed
-      if (
-        (taskType === "transcribe" || taskType === "all") &&
-        !transcriptText
-      ) {
+      if (!transcriptText) {
         console.log("Starting transcription...");
 
-        // Parse Azure connection string
-        const connectionString = azureConnectionString;
-        const accountName = connectionString.match(/AccountName=([^;]+)/)?.[1];
-        const accountKey = connectionString.match(/AccountKey=([^;]+)/)?.[1];
-
-        if (!accountName || !accountKey) {
-          throw new Error("Invalid Azure connection string");
-        }
-
-        // Initialize Azure Blob Storage
-        const azureStorage = new AzureBlobStorageService({
-          accountName,
-          accountKey,
-          containerName: "callcaps-recordings",
-        });
+        const gcsService = getGcsService();
 
         // Download video from Azure and prepare for Gemini upload
-        const videoBytes = await azureStorage.downloadBlob(
-          recording.azure_video_blob_name
+        const videoBytes = await gcsService.downloadBlob(
+          recording.gcs_video_blob_name
         );
 
         // Convert bytes to Blob (supported in Deno)
@@ -982,7 +889,7 @@ app.post("/call-recordings/:id/process", async (c) => {
           file: videoBlob,
           config: {
             mimeType: recording.mime_type,
-            displayName: recording.azure_video_blob_name,
+            displayName: recording.gcs_video_blob_name,
           },
         });
 
@@ -1033,8 +940,6 @@ Do not include any commentary, explanation, or markdown formatting. The output m
 
         console.log("Raw JSON text:", rawJsonText);
 
-
-
         // Attempt to parse JSON. If it fails, try to locate the first JSON object/array in the text.
         let transcript;
         try {
@@ -1045,7 +950,9 @@ Do not include any commentary, explanation, or markdown formatting. The output m
             transcript = JSON.parse(jsonMatch[0]);
           } else {
             throw new Error(
-              `Failed to parse transcript JSON: ${(parseErr as Error)?.message}. Raw response: ${rawText ?? ""}`
+              `Failed to parse transcript JSON: ${
+                (parseErr as Error)?.message
+              }. Raw response: ${rawText ?? ""}`
             );
           }
         }
@@ -1069,91 +976,45 @@ Do not include any commentary, explanation, or markdown formatting. The output m
 
       // Step 2: Analyze transcript if needed
       let analysis = recording.ai_analysis;
-      if (
-        (taskType === "analyze" || taskType === "all") &&
-        transcriptText &&
-        !analysis
-      ) {
+      if (transcriptText && !analysis) {
         console.log("Starting AI analysis...");
 
-        const systemPrompt =
-          settings?.custom_prompts?.analysis ||
-          `You are an AI assistant that analyzes meeting recordings and call transcripts for legal professionals. 
-        Provide a structured analysis including:
-        1. Executive summary
-        2. Key points and decisions
-        3. Action items with clear ownership
-        4. Risk analysis and compliance notes
-        5. Follow-up tasks
+        // Get meeting type system prompt and output format if meetingTypeId is available
+        let systemPrompt;
+        let outputFormat = "json";
         
-        IMPORTANT: Return ONLY a valid JSON object. Do not wrap your response in markdown code blocks or any other formatting. Your response should start with { and end with }.
-        
-        Use exactly this JSON structure:
-        {
-          "summary": "Brief executive summary",
-          "keyPoints": ["point 1", "point 2"],
-          "actionItems": [{"task": "task description", "assignee": "person", "dueDate": "date"}],
-          "decisions": ["decision 1", "decision 2"],
-          "risks": [{"risk": "description", "severity": "high/medium/low", "mitigation": "steps"}],
-          "compliance": ["note 1", "note 2"],
-          "followUp": ["task 1", "task 2"],
-          "sentiment": "positive|neutral|negative",
-          "topics": ["topic 1", "topic 2"]
-        }`;
-
-        // Call OpenAI GPT for analysis
-        const gptResponse = await fetch(
-          "https://api.openai.com/v1/chat/completions",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: settings?.ai_model || "gpt-4o-mini",
-              messages: [
-                {
-                  role: "system",
-                  content: systemPrompt,
-                },
-                {
-                  role: "user",
-                  content: `Please analyze this legal meeting transcript:\n\n${transcriptText}`,
-                },
-              ],
-              temperature: settings?.temperature || 0.3,
-              max_tokens: 2000,
-            }),
+        if (meetingTypeId) {
+          const { data: meetingTypeData, error: meetingTypeError } = await supabase
+            .schema(schema)
+            .rpc('get_meeting_type_prompt', { meeting_type_id_param: meetingTypeId });
+          
+          if (!meetingTypeError && meetingTypeData && meetingTypeData.length > 0) {
+            systemPrompt = meetingTypeData[0].system_prompt;
+            outputFormat = meetingTypeData[0].output_format || "json";
+            console.log("Using custom meeting type prompt for:", meetingTypeData[0].display_name);
+          } else {
+            return c.json({ error: "Meeting type not found or inactive" }, 400);
           }
-        );
-
-        if (!gptResponse.ok) {
-          const error = await gptResponse.text();
-          throw new Error(`GPT API error: ${error}`);
+        } else {
+          // If no meeting type provided, return error
+          return c.json({ error: "Meeting type is required. Please create and select a meeting type to process this recording." }, 400);
         }
 
-        const gptResult = await gptResponse.json();
-        const analysisText = gptResult.choices[0].message.content;
-
+        // Use Gemini Meeting Intelligence for analysis with custom prompt
+        const geminiIntelligence = new GeminiMeetingIntelligence(googleApiKey);
+        
         try {
-          analysis = JSON.parse(analysisText);
-        } catch (parseError) {
-          console.error("JSON parsing error:", parseError);
-          console.error("Raw analysis text:", analysisText);
-
-          // Fallback if JSON parsing fails
-          analysis = {
-            summary: analysisText,
-            keyPoints: [],
-            actionItems: [],
-            decisions: [],
-            risks: [],
-            compliance: [],
-            followUp: [],
-            sentiment: "neutral",
-            topics: [],
-          };
+          analysis = await geminiIntelligence.analyzeWithCustomPrompt(
+            transcriptText,
+            transcriptSegments || [],
+            systemPrompt,
+            outputFormat
+          );
+          
+          console.log("Gemini analysis completed:", analysis);
+        } catch (analysisError) {
+          console.error("Gemini analysis failed:", analysisError);
+          throw new Error(`AI analysis failed: ${analysisError instanceof Error ? analysisError.message : 'Unknown error'}`);
         }
 
         // Update recording with analysis
@@ -1181,38 +1042,27 @@ Do not include any commentary, explanation, or markdown formatting. The output m
           analysis
         );
 
-        // Parse Azure connection string
-        const connectionString = azureConnectionString;
-        const accountName = connectionString.match(/AccountName=([^;]+)/)?.[1];
-        const accountKey = connectionString.match(/AccountKey=([^;]+)/)?.[1];
+        // Initialize Azure Blob Storage
+        const gcsService = getGcsService();
 
-        if (accountName && accountKey) {
-          // Initialize Azure Blob Storage
-          const azureStorage = new AzureBlobStorageService({
-            accountName,
-            accountKey,
-            containerName: "callcaps-recordings",
-          });
+        // Upload markdown to Azure
+        const transcriptResult = await gcsService.uploadTranscript(
+          user.data?.id,
+          recordingId,
+          markdown
+        );
 
-          // Upload markdown to Azure
-          const transcriptResult = await azureStorage.uploadTranscript(
-            user.data?.id,
-            recordingId,
-            markdown
-          );
-
-          // Update recording with transcript URL
-          await supabase
-            .schema(schema)
-            .from(recordingsTable)
-            .update({
-              azure_transcript_url: transcriptResult.blobUrl,
-              azure_transcript_blob_name: transcriptResult.blobName,
-              status: "processed",
-              processed_at: new Date().toISOString(),
-            })
-            .eq("id", recordingId);
-        }
+        // Update recording with transcript URL
+        await supabase
+          .schema(schema)
+          .from(recordingsTable)
+          .update({
+            gcs_transcript_url: transcriptResult.blobUrl,
+            gcs_transcript_blob_name: transcriptResult.blobName,
+            status: "processed",
+            processed_at: new Date().toISOString(),
+          })
+          .eq("id", recordingId);
       }
 
       // Update processing queue
@@ -1224,7 +1074,7 @@ Do not include any commentary, explanation, or markdown formatting. The output m
           completed_at: new Date().toISOString(),
         })
         .eq("recording_id", recordingId)
-        .eq("task_type", taskType === "all" ? "transcribe" : taskType);
+        .eq("task_type", "transcribe");
 
       return c.json(
         {
@@ -1336,46 +1186,15 @@ app.get("/call-recordings/:id/video", async (c) => {
       return c.json({ error: "Recording not found" }, 404);
     }
 
-    if (!recording.azure_video_blob_name) {
+    if (!recording.gcs_video_blob_name) {
       return c.json({ error: "Video file not found" }, 404);
     }
 
-    // Get Azure credentials
-    const { data: settings } = await supabase
-      .schema(schema)
-      .from("user_settings")
-      .select("azure_connection_string")
-      .eq("member_id", member.data?.id)
-      .single();
-
-    let azureConnectionString = settings?.azure_connection_string;
-    if (!azureConnectionString) {
-      azureConnectionString = Deno.env.get("AZURE_CONNECTION_STRING");
-    }
-
-    if (!azureConnectionString) {
-      return c.json({ error: "Azure storage not configured" }, 500);
-    }
-
-    // Parse Azure connection string
-    const connectionString = azureConnectionString;
-    const accountName = connectionString.match(/AccountName=([^;]+)/)?.[1];
-    const accountKey = connectionString.match(/AccountKey=([^;]+)/)?.[1];
-
-    if (!accountName || !accountKey) {
-      return c.json({ error: "Invalid Azure connection string" }, 500);
-    }
-
-    // Initialize Azure Blob Storage
-    const azureStorage = new AzureBlobStorageService({
-      accountName,
-      accountKey,
-      containerName: "callcaps-recordings",
-    });
+    const gcsService = getGcsService();
 
     // Download video from Azure
-    const videoData = await azureStorage.downloadBlob(
-      recording.azure_video_blob_name
+    const videoData = await gcsService.downloadBlob(
+      recording.gcs_video_blob_name
     );
 
     // Return video with proper headers
@@ -1699,11 +1518,14 @@ app.get("/call-recordings/accessible", async (c) => {
   }
 });
 
-// Share a recording with specific members
-app.post("/call-recordings/:id/share", async (c) => {
+// Meeting Types endpoints
+app.use("/call-recordings/meeting-types", extractUserAndOrgId);
+app.use("/call-recordings/meeting-types/:id", extractUserAndOrgId);
+
+// Get all meeting types for current user
+app.get("/call-recordings/meeting-types", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
-  const recordingId = c.req.param("id");
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -1722,6 +1544,9 @@ app.post("/call-recordings/:id/share", async (c) => {
       return c.json({ error: "Organization not found" }, 404);
     }
     const schema = org.data?.schema_name.toLowerCase();
+    if (!schema) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
 
     const user = await supabase
       .schema("private")
@@ -1732,7 +1557,138 @@ app.post("/call-recordings/:id/share", async (c) => {
     if (user.error) {
       return c.json({ error: "User not found" }, 404);
     }
+    const member = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("*")
+      .eq("user_id", user.data?.id)
+      .eq("organization_id", org.data?.id)
+      .single();
+    if (member.error) {
+      return c.json({ error: "Member not found" }, 404);
+    }
 
+    // Get meeting types for current user
+    const { data: meetingTypes, error } = await supabase
+      .schema(schema)
+      .from("meeting_types")
+      .select("*")
+      .eq("member_id", member.data?.id)
+      .eq("is_active", true)
+      .order("display_name");
+
+    if (error) {
+      return c.json({ error: "Failed to fetch meeting types", details: error }, 500);
+    }
+
+    return c.json({ meetingTypes: meetingTypes || [] }, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get a specific meeting type by ID
+app.get("/call-recordings/meeting-types/:id", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const meetingTypeId = c.req.param("id");
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
+
+    const org = await supabase
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+    if (org.error) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+    const schema = org.data?.schema_name.toLowerCase();
+    if (!schema) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+
+    const user = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+    if (user.error) {
+      return c.json({ error: "User not found" }, 404);
+    }
+    const member = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("*")
+      .eq("user_id", user.data?.id)
+      .eq("organization_id", org.data?.id)
+      .single();
+    if (member.error) {
+      return c.json({ error: "Member not found" }, 404);
+    }
+
+    // Get specific meeting type
+    const { data: meetingType, error } = await supabase
+      .schema(schema)
+      .from("meeting_types")
+      .select("*")
+      .eq("id", meetingTypeId)
+      .eq("member_id", member.data?.id)
+      .eq("is_active", true)
+      .single();
+
+    if (error || !meetingType) {
+      return c.json({ error: "Meeting type not found" }, 404);
+    }
+
+    return c.json({ meetingType }, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Create a new meeting type
+app.post("/call-recordings/meeting-types", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
+
+    const org = await supabase
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+    if (org.error) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+    const schema = org.data?.schema_name.toLowerCase();
+    if (!schema) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+
+    const user = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+    if (user.error) {
+      return c.json({ error: "User not found" }, 404);
+    }
     const member = await supabase
       .schema("private")
       .from("organization_members")
@@ -1746,83 +1702,233 @@ app.post("/call-recordings/:id/share", async (c) => {
 
     // Parse request body
     const body = await c.req.json();
-    const { memberIds, permissionLevel = "view", expiresAt } = body;
+    const { name, display_name, description, system_prompt, output_format = 'json' } = body;
 
-    if (!memberIds || !Array.isArray(memberIds) || memberIds.length === 0) {
-      return c.json({ error: "Member IDs are required" }, 400);
+    if (!name || !display_name || !system_prompt) {
+      return c.json({
+        error: "Missing required fields: name, display_name, system_prompt"
+      }, 400);
     }
 
-    // Verify recording exists and user owns it
-    const { data: recording, error: recordingError } = await supabase
+    // Validate name format (no spaces, lowercase, underscores allowed)
+    const nameRegex = /^[a-z0-9_]+$/;
+    if (!nameRegex.test(name)) {
+      return c.json({
+        error: "Name must contain only lowercase letters, numbers, and underscores"
+      }, 400);
+    }
+
+    // Check if name is unique for this user
+    const { data: existing } = await supabase
       .schema(schema)
-      .from("call_recordings")
-      .select("*")
-      .eq("id", recordingId)
-      .eq("member_id", member.data?.id)
-      .single();
-
-    if (recordingError || !recording) {
-      return c.json({ error: "Recording not found or access denied" }, 404);
-    }
-
-    // Verify all member IDs belong to the same organization
-    const { data: orgMembers, error: orgMembersError } = await supabase
-      .schema("private")
-      .from("organization_members")
+      .from("meeting_types")
       .select("id")
-      .eq("organization_id", org.data?.id)
-      .in("id", memberIds);
+      .eq("member_id", member.data?.id)
+      .eq("name", name)
+      .eq("is_active", true);
 
-    if (orgMembersError || orgMembers.length !== memberIds.length) {
-      return c.json({ error: "Invalid member IDs" }, 400);
+    if (existing && existing.length > 0) {
+      return c.json({ error: "A meeting type with this name already exists" }, 400);
     }
 
-    // Create share records
-    const shareRecords = memberIds.map((memberId: string) => ({
-      recording_id: recordingId,
-      shared_by_member_id: member.data?.id,
-      shared_with_member_id: memberId,
-      permission_level: permissionLevel,
-      expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
-    }));
-
-    const { data: shares, error: sharesError } = await supabase
+    // Create meeting type
+    const { data: meetingType, error } = await supabase
       .schema(schema)
-      .from("recording_shares")
-      .upsert(shareRecords, {
-        onConflict: "recording_id,shared_with_member_id",
+      .from("meeting_types")
+      .insert({
+        name,
+        display_name,
+        description,
+        system_prompt,
+        output_format,
+        member_id: member.data?.id
       })
-      .select();
+      .select()
+      .single();
 
-    if (sharesError) {
-      return c.json(
-        { error: "Failed to create shares", details: sharesError },
-        500
-      );
+    if (error) {
+      return c.json({ error: "Failed to create meeting type", details: error }, 500);
     }
 
-    // Update recording to mark as shared
-    await supabase
-      .schema(schema)
-      .from("call_recordings")
-      .update({ is_shared: true })
-      .eq("id", recordingId);
-
-    return c.json(
-      {
-        success: true,
-        message: `Recording shared with ${memberIds.length} member(s)`,
-        shares: shares,
-      },
-      200
-    );
+    return c.json({ meetingType }, 201);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
 });
 
-// Get sharing information for a recording
-app.get("/call-recordings/:id/shares", async (c) => {
+// Update a meeting type
+app.put("/call-recordings/meeting-types/:id", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const meetingTypeId = c.req.param("id");
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
+
+    const org = await supabase
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+    if (org.error) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+    const schema = org.data?.schema_name.toLowerCase();
+    if (!schema) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+
+    const user = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+    if (user.error) {
+      return c.json({ error: "User not found" }, 404);
+    }
+    const member = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("*")
+      .eq("user_id", user.data?.id)
+      .eq("organization_id", org.data?.id)
+      .single();
+    if (member.error) {
+      return c.json({ error: "Member not found" }, 404);
+    }
+
+    // Parse request body
+    const body = await c.req.json();
+    const { name, display_name, description, system_prompt, output_format, is_active } = body;
+
+    // If name is being updated, validate it
+    if (name) {
+      const nameRegex = /^[a-z0-9_]+$/;
+      if (!nameRegex.test(name)) {
+        return c.json({
+          error: "Name must contain only lowercase letters, numbers, and underscores"
+        }, 400);
+      }
+
+      // Check if name is unique for this user (excluding current record)
+      const { data: existing } = await supabase
+        .schema(schema)
+        .from("meeting_types")
+        .select("id")
+        .eq("member_id", member.data?.id)
+        .eq("name", name)
+        .eq("is_active", true)
+        .neq("id", meetingTypeId);
+
+      if (existing && existing.length > 0) {
+        return c.json({ error: "A meeting type with this name already exists" }, 400);
+      }
+    }
+
+    // Update meeting type
+    const updateData: any = { updated_at: new Date().toISOString() };
+    if (name !== undefined) updateData.name = name;
+    if (display_name !== undefined) updateData.display_name = display_name;
+    if (description !== undefined) updateData.description = description;
+    if (system_prompt !== undefined) updateData.system_prompt = system_prompt;
+    if (output_format !== undefined) updateData.output_format = output_format;
+    if (is_active !== undefined) updateData.is_active = is_active;
+
+    const { data: meetingType, error } = await supabase
+      .schema(schema)
+      .from("meeting_types")
+      .update(updateData)
+      .eq("id", meetingTypeId)
+      .eq("member_id", member.data?.id)
+      .select()
+      .single();
+
+    if (error || !meetingType) {
+      return c.json({ error: "Meeting type not found or update failed", details: error }, 404);
+    }
+
+    return c.json({ meetingType }, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Delete a meeting type (soft delete)
+app.delete("/call-recordings/meeting-types/:id", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const meetingTypeId = c.req.param("id");
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
+
+    const org = await supabase
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+    if (org.error) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+    const schema = org.data?.schema_name.toLowerCase();
+    if (!schema) {
+      return c.json({ error: "Organization not found" }, 404);
+    }
+
+    const user = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+    if (user.error) {
+      return c.json({ error: "User not found" }, 404);
+    }
+    const member = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("*")
+      .eq("user_id", user.data?.id)
+      .eq("organization_id", org.data?.id)
+      .single();
+    if (member.error) {
+      return c.json({ error: "Member not found" }, 404);
+    }
+
+    // Soft delete meeting type
+    const { error } = await supabase
+      .schema(schema)
+      .from("meeting_types")
+      .update({ 
+        is_active: false, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq("id", meetingTypeId)
+      .eq("member_id", member.data?.id);
+
+    if (error) {
+      return c.json({ error: "Failed to delete meeting type", details: error }, 500);
+    }
+
+    return c.json({ success: true }, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Update DELETE endpoint for hard delete
+app.delete("/call-recordings/:id", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const recordingId = c.req.param("id");
@@ -1844,139 +1950,9 @@ app.get("/call-recordings/:id/shares", async (c) => {
       return c.json({ error: "Organization not found" }, 404);
     }
     const schema = org.data?.schema_name.toLowerCase();
-
-    const user = await supabase
-      .schema("private")
-      .from("users")
-      .select("*")
-      .eq("clerk_user_id", userId)
-      .single();
-    if (user.error) {
-      return c.json({ error: "User not found" }, 404);
-    }
-
-    const member = await supabase
-      .schema("private")
-      .from("organization_members")
-      .select("*")
-      .eq("user_id", user.data?.id)
-      .eq("organization_id", org.data?.id)
-      .single();
-    if (member.error) {
-      return c.json({ error: "Member not found" }, 404);
-    }
-
-    // Verify recording exists and user has access (owner or shared with)
-    const { data: recording, error: recordingError } = await supabase
-      .schema(schema)
-      .from("accessible_recordings")
-      .select("*")
-      .eq("id", recordingId)
-      .or(
-        `member_id.eq.${member.data?.id},shared_with_member_id.eq.${member.data?.id}`
-      )
-      .single();
-
-    if (recordingError || !recording) {
-      return c.json({ error: "Recording not found or access denied" }, 404);
-    }
-
-    // Get all shares for this recording
-    const { data: shares, error: sharesError } = await supabase
-      .schema(schema)
-      .from("recording_shares")
-      .select(
-        `
-        id,
-        permission_level,
-        expires_at,
-        created_at,
-        updated_at,
-        shared_with_member:shared_with_member_id (
-          id,
-          role,
-          users:user_id (
-            email,
-            full_name
-          )
-        ),
-        shared_by_member:shared_by_member_id (
-          id,
-          role,
-          users:user_id (
-            email,
-            full_name
-          )
-        )
-      `
-      )
-      .eq("recording_id", recordingId)
-      .or("expires_at.is.null,expires_at.gt.now()");
-
-    if (sharesError) {
-      return c.json(
-        { error: "Failed to fetch shares", details: sharesError },
-        500
-      );
-    }
-
-    const formattedShares = shares.map((share: any) => ({
-      id: share.id,
-      permissionLevel: share.permission_level,
-      expiresAt: share.expires_at,
-      createdAt: share.created_at,
-      updatedAt: share.updated_at,
-      sharedWith: {
-        id: share.shared_with_member.id,
-        email: share.shared_with_member.users.email,
-        fullName: share.shared_with_member.users.full_name,
-        role: share.shared_with_member.role,
-      },
-      sharedBy: {
-        id: share.shared_by_member.id,
-        email: share.shared_by_member.users.email,
-        fullName: share.shared_by_member.users.full_name,
-        role: share.shared_by_member.role,
-      },
-    }));
-
-    return c.json(
-      {
-        recordingId: recordingId,
-        isOwner: recording.member_id === member.data?.id,
-        shares: formattedShares,
-      },
-      200
-    );
-  } catch (error: any) {
-    return c.json({ error: error.message }, 500);
-  }
-});
-
-// Remove sharing for a recording
-app.delete("/call-recordings/:id/share/:memberId", async (c) => {
-  const orgId = c.get("orgId");
-  const userId = c.get("userId");
-  const recordingId = c.req.param("id");
-  const sharedMemberId = c.req.param("memberId");
-
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { persistSession: false },
-    });
-
-    const org = await supabase
-      .schema("private")
-      .from("organizations")
-      .select("*")
-      .eq("clerk_organization_id", orgId)
-      .single();
-    if (org.error) {
+    if (!schema) {
       return c.json({ error: "Organization not found" }, 404);
     }
-    const schema = org.data?.schema_name.toLowerCase();
 
     const user = await supabase
       .schema("private")
@@ -1987,7 +1963,6 @@ app.delete("/call-recordings/:id/share/:memberId", async (c) => {
     if (user.error) {
       return c.json({ error: "User not found" }, 404);
     }
-
     const member = await supabase
       .schema("private")
       .from("organization_members")
@@ -1999,7 +1974,7 @@ app.delete("/call-recordings/:id/share/:memberId", async (c) => {
       return c.json({ error: "Member not found" }, 404);
     }
 
-    // Verify recording exists and user owns it
+    // Only allow owner to delete
     const { data: recording, error: recordingError } = await supabase
       .schema(schema)
       .from("call_recordings")
@@ -2007,58 +1982,59 @@ app.delete("/call-recordings/:id/share/:memberId", async (c) => {
       .eq("id", recordingId)
       .eq("member_id", member.data?.id)
       .single();
-
     if (recordingError || !recording) {
       return c.json({ error: "Recording not found or access denied" }, 404);
     }
 
-    // Remove the share
+    // Hard delete: remove the row from the database
     const { error: deleteError } = await supabase
       .schema(schema)
-      .from("recording_shares")
+      .from("call_recordings")
       .delete()
-      .eq("recording_id", recordingId)
-      .eq("shared_with_member_id", sharedMemberId);
-
+      .eq("id", recordingId);
     if (deleteError) {
-      return c.json(
-        { error: "Failed to remove share", details: deleteError },
-        500
-      );
+      console.error("Error deleting recording:", deleteError);
+      return c.json({ error: "Failed to delete recording", details: deleteError }, 500);
     }
 
-    // Check if there are any remaining shares
-    const { data: remainingShares, error: remainingError } = await supabase
-      .schema(schema)
-      .from("recording_shares")
-      .select("id")
-      .eq("recording_id", recordingId)
-      .limit(1);
-
-    if (remainingError) {
-      console.error("Error checking remaining shares:", remainingError);
+    // Remove blobs from GCS if present
+    try {
+      const gcsService = getGcsService();
+      if (recording.gcs_video_blob_name) {
+        await gcsService.deleteFile(recording.gcs_video_blob_name);
+      }
+      if (recording.gcs_transcript_blob_name) {
+        await gcsService.deleteFile(recording.gcs_transcript_blob_name);
+      }
+    } catch (blobError) {
+      // Log but don't fail the request
+      console.error("Failed to delete blobs from GCS:", blobError);
     }
 
-    // Update recording's is_shared status if no shares remain
-    if (!remainingShares || remainingShares.length === 0) {
-      await supabase
-        .schema(schema)
-        .from("call_recordings")
-        .update({ is_shared: false })
-        .eq("id", recordingId);
-    }
-
-    return c.json(
-      {
-        success: true,
-        message: "Recording share removed successfully",
-      },
-      200
-    );
+    return c.json({ success: true, message: "Recording deleted" }, 200);
   } catch (error: any) {
+    console.error("Error deleting recording:", error);
     return c.json({ error: error.message }, 500);
   }
 });
+
+// Place getGcsService at the top so it's in scope for all endpoints
+function getGcsService() {
+  const gcsKeyRaw = Deno.env.get("GCS_JSON_KEY");
+  const bucketName = Deno.env.get("GCS_BUCKET_NAME");
+  if (!gcsKeyRaw || !bucketName) {
+    throw new Error(
+      "GCS storage not configured. Please set GCS_JSON_KEY and GCS_BUCKET_NAME in environment variables."
+    );
+  }
+  let credentials;
+  try {
+    credentials = JSON.parse(gcsKeyRaw);
+  } catch (e: any) {
+    throw new Error("Invalid GCS_JSON_KEY: " + (e?.message || e));
+  }
+  return new GoogleCloudStorageService({ bucketName, credentials });
+}
 
 export default app;
 

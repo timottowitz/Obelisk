@@ -1,9 +1,6 @@
 'use client';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger
-} from '@/components/ui/collapsible';
+
+import { useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,78 +15,82 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
   SidebarMenuSub,
-  SidebarMenuSubButton,
   SidebarMenuSubItem,
-  SidebarRail
+  SidebarMenuSubButton,
+  useSidebar
 } from '@/components/ui/sidebar';
 import { UserAvatarProfile } from '@/components/user-avatar-profile';
-import { navItems } from '@/constants/data';
-import { useMediaQuery } from '@/hooks/use-media-query';
+import { navItems, footerItems } from '@/constants/data';
+import { Button } from '@/components/ui/button';
 import { useUser, useOrganizationList, useAuth } from '@clerk/nextjs';
 import {
   IconBell,
-  IconChevronRight,
-  IconChevronsDown,
   IconCreditCard,
   IconLogout,
-  IconPhotoUp,
-  IconSun,
-  IconUserCircle
+  IconUserCircle,
+  IconFolderOpen,
+  IconFolder,
 } from '@tabler/icons-react';
+import { ChevronRight, ChevronDown } from 'lucide-react';
 import { SignOutButton } from '@clerk/nextjs';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import * as React from 'react';
 import { Icons } from '../icons';
 import { OrgSwitcher } from '../org-switcher';
 import { Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { cn } from '@/lib/utils';
 
 export default function AppSidebar() {
   const pathname = usePathname();
-  const { isOpen } = useMediaQuery();
+  const searchParams = useSearchParams();
+  const [isOpen, setIsOpen] = useState(searchParams.get('type') ? true : false);
+  const { state } = useSidebar();
   const { user } = useUser();
-  const auth = useAuth();
   const { userMemberships, setActive: setActiveTenant } = useOrganizationList({
-    userMemberships: true
+    userMemberships: {
+      infinite: true
+    }
   });
+  const auth = useAuth();
+
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const handleSwitchTenant = (_tenantId: string) => {
+  const handleSwitchTenant = async (_tenantId: string) => {
     if (setActiveTenant) {
-      setActiveTenant({
+      await setActiveTenant({
         organization: _tenantId
       });
     }
-    // Reset react-query cache when switching organization
     queryClient.clear();
   };
+
+  React.useEffect(() => {
+    router.refresh();
+  }, []);
 
   const activeTenant = userMemberships.data?.find(
     (membership) => membership.organization.id === auth.orgId
   );
 
-  React.useEffect(() => {
-    // Side effects based on sidebar state changes
-  }, [isOpen]);
-
   return (
     <Sidebar collapsible='icon'>
-      <SidebarHeader>
+      <SidebarHeader className='px-3 py-4'>
         {userMemberships.isLoading || !activeTenant ? (
           <div className='flex h-full items-center justify-center'>
             <Loader2 className='h-4 w-4 animate-spin' />
           </div>
         ) : (
           <OrgSwitcher
-            tenants={(userMemberships?.data || []).map((membership) => ({
+            tenants={(userMemberships.data || []).map((membership) => ({
               name: membership.organization.name,
               id: membership.organization.id
             }))}
@@ -102,56 +103,130 @@ export default function AppSidebar() {
         )}
       </SidebarHeader>
       <SidebarContent className='overflow-x-hidden'>
+        {/* File a New Case Button */}
+        <div className='px-3 py-4'>
+          <Link href='/dashboard/cases/create'>
+            <Button
+              className='w-full cursor-pointer rounded-lg bg-black text-white hover:bg-gray-800'
+              size='lg'
+            >
+              <Icons.add className='h-4 w-4' />
+              {state === 'expanded' && 'File a New Case'}
+            </Button>
+          </Link>
+        </div>
+
+        {/* Main Navigation */}
         <SidebarGroup>
           <SidebarMenu>
             {navItems.map((item) => {
               const Icon = item.icon ? Icons[item.icon] : Icons.logo;
-              return item?.items && item?.items?.length > 0 ? (
-                <Collapsible
-                  key={item.title}
-                  asChild
-                  defaultOpen={item.isActive}
-                  className='group/collapsible'
-                >
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
-                        tooltip={item.title}
-                        isActive={pathname === item.url}
-                      >
-                        {item.icon && <Icon />}
-                        <span>{item.title}</span>
-                        <IconChevronRight className='ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90' />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {item.items?.map((subItem) => (
-                          <SidebarMenuSubItem key={subItem.title}>
-                            <SidebarMenuSubButton
-                              asChild
-                              isActive={pathname === subItem.url}
-                            >
-                              <Link href={subItem.url}>
-                                <span>{subItem.title}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              ) : (
+              const isActive =
+                item.url === '/dashboard'
+                  ? pathname === '/dashboard/overview'
+                  : pathname.includes(item.url);
+              return (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
                     tooltip={item.title}
-                    isActive={pathname === item.url}
+                    className={cn(
+                      'text-md flex w-full items-center rounded-lg px-4 py-5 text-left transition-colors',
+                      isActive
+                        ? 'border border-blue-200 bg-blue-50 text-blue-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    )}
+                  >
+                    {item.items && item.items.length > 0 ? (
+                      <div
+                        className='flex cursor-pointer items-center gap-2'
+                        onClick={() => setIsOpen(!isOpen)}
+                      >
+                        {isOpen ? (
+                          <IconFolderOpen
+                            style={{ width: '24px', height: '24px' }}
+                          />
+                        ) : (
+                          <IconFolder
+                            style={{ width: '24px', height: '24px' }}
+                          />
+                        )}
+                        <span>{item.title}</span>
+                        {isOpen ? (
+                          <ChevronDown className='ml-auto size-4' />
+                        ) : (
+                          <ChevronRight className='ml-auto size-4' />
+                        )}
+                      </div>
+                    ) : (
+                      <Link href={item.url}>
+                        <Icon style={{ width: '24px', height: '24px' }} />
+                        <span className='text-sm'>{item.title}</span>
+                      </Link>
+                    )}
+                  </SidebarMenuButton>
+                  {item.items && item.items.length > 0 && isOpen && (
+                    <SidebarMenuSub key={item.title}>
+                      {item.items.map((subItem) => {
+                        const SubIcon = subItem.icon
+                          ? Icons[subItem.icon]
+                          : Icons.logo;
+
+                        const isSubActive =
+                          pathname === '/dashboard/cases'
+                            ? searchParams.get('type') ===
+                              subItem.title.split(' ')[0].toLowerCase()
+                            : pathname.includes(subItem.url);
+                        return (
+                          <SidebarMenuSubItem key={subItem.title}>
+                            <SidebarMenuSubButton
+                              asChild
+                              className={cn(
+                                'text-md flex w-full items-center rounded-lg px-4 py-5 text-left transition-colors',
+                                isSubActive
+                                  ? 'border border-blue-200 bg-blue-50 text-blue-700'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                              )}
+                            >
+                              <Link href={subItem.url}>
+                                <SubIcon
+                                  style={{ width: '24px', height: '24px' }}
+                                />
+                                <span className='text-sm'>{subItem.title}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
+                    </SidebarMenuSub>
+                  )}
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        {/* Footer Navigation */}
+        <SidebarGroup className='mt-auto'>
+          <SidebarMenu>
+            {footerItems.map((item) => {
+              const Icon = item.icon ? Icons[item.icon] : Icons.logo;
+              const isActive = pathname === item.url;
+              return (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip={item.title}
+                    className={cn(
+                      'text-md flex w-full items-center rounded-lg px-4 py-5 text-left transition-colors',
+                      isActive
+                        ? 'border border-blue-200 bg-blue-50 text-blue-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    )}
                   >
                     <Link href={item.url}>
-                      <Icon />
-                      <span>{item.title}</span>
+                      <Icon style={{ width: '24px', height: '24px' }} />
+                      <span className='text-sm'>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -159,6 +234,23 @@ export default function AppSidebar() {
             })}
           </SidebarMenu>
         </SidebarGroup>
+
+        {/* Support Section */}
+        {state === 'expanded' && (
+          <div className='text-muted-foreground px-6 py-4 text-xs'>
+            <p className='mb-2'>
+              For case-related questions and assistance, please contact your
+              case manager. For other questions, please email Customer Service
+              at:
+            </p>
+            <a
+              href='mailto:CustomerService@adr.org'
+              className='text-blue-400 hover:text-blue-300'
+            >
+              CustomerService@adr.org
+            </a>
+          </div>
+        )}
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
@@ -176,7 +268,7 @@ export default function AppSidebar() {
                       user={user}
                     />
                   )}
-                  <IconChevronsDown className='ml-auto size-4' />
+                  <ChevronDown className='ml-auto size-4' />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent

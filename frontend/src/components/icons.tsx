@@ -31,13 +31,23 @@ import {
   IconX,
   IconLayoutKanban,
   IconBrandGithub,
-  IconVideo
+  IconVideo,
+  IconHome,
+  IconClipboardList,
+  IconCalendar,
+  IconScale,
+  IconBuilding,
+  IconCurrencyDollar,
+  IconSquareCheck,
+  IconMail,
+  IconPhoneCall
 } from '@tabler/icons-react';
 
 export type Icon = React.ComponentType<IconProps>;
 
 export const Icons = {
   dashboard: IconLayoutDashboard,
+  home: IconHome,
   logo: IconCommand,
   login: IconLogin,
   close: IconX,
@@ -68,5 +78,13 @@ export const Icons = {
   github: IconBrandGithub,
   twitter: IconBrandTwitter,
   check: IconCheck,
-  callcaps: IconVideo
+  callcaps: IconVideo,
+  calendar: IconCalendar,
+  tasks: IconClipboardList,
+  litigation: IconScale,
+  imva: IconBuilding,
+  dollar: IconCurrencyDollar,
+  squareCheck: IconSquareCheck,
+  mail: IconMail,
+  call: IconPhoneCall
 };

@@ -1,5 +1,5 @@
 'use client';
-import { OrganizationList, OrganizationSwitcher, useOrganizationList } from '@clerk/nextjs';
+import { CreateOrganizationForm } from '@/components/organization/create-organization-form';
 import { useAuth } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import { useEffect } from 'react';
@@ -14,8 +14,6 @@ const DASHBOARD_ROUTE = '/dashboard/overview';
  */
 export default function CreateOrganizationPage() {
   const { orgId, userId, isLoaded } = useAuth();
-  console.log('orgId, userId :', orgId, userId);
-  const { setActive } = useOrganizationList();
   const router = useRouter();
 
   useEffect(() => {
@@ -36,18 +34,7 @@ export default function CreateOrganizationPage() {
         <p className='text-muted-foreground mb-6 text-center'>
           You must belong to an organization to access the dashboard.
         </p>
-        {/* Clerk's built-in organization creation/join UI */}
-        <OrganizationList
-          hidePersonal
-          afterCreateOrganizationUrl={DASHBOARD_ROUTE}
-          afterSelectOrganizationUrl={(organization) => {
-            if (organization && setActive) {
-              setActive({ organization: organization.id });
-            }
-            return DASHBOARD_ROUTE;
-          }}
-          // afterLeaveOrganizationUrl is not a valid prop in Clerk v6
-        />
+        <CreateOrganizationForm />
         <div className='mt-6 flex justify-center'>
           <form action='/auth/sign-out' method='post'>
             <Button type='submit' variant='outline'>

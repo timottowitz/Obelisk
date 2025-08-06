@@ -7,9 +7,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { Hono } from "jsr:@hono/hono";
 import { cors } from "jsr:@hono/hono/cors";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
 import { extractUserAndOrgId } from "../_shared/index.ts";
-import { AzureBlobStorageService } from "../_shared/azure-storage.ts";
+import { GoogleCloudStorageService } from "../_shared/google-storage.ts";
 
 const app = new Hono();
 
@@ -32,30 +32,22 @@ app.options("*", (c) => {
   return c.text("", 200);
 });
 
-// Initialize Azure Storage
-function getAzureStorage(containerName: string = "callcaps-recordings") {
-  const azureConnectionString = Deno.env.get("AZURE_CONNECTION_STRING");
-
-  if (!azureConnectionString) {
+// Place getGcsService at the top so it's in scope for all endpoints
+function getGcsService(bucketNameOverride?: string) {
+  const gcsKeyRaw = Deno.env.get("GCS_JSON_KEY");
+  const bucketName = bucketNameOverride || Deno.env.get("GCS_BUCKET_NAME");
+  if (!gcsKeyRaw || !bucketName) {
     throw new Error(
-      "Azure storage not configured. Please add your Azure connection string in settings or configure AZURE_CONNECTION_STRING environment variable."
+      "GCS storage not configured. Please set GCS_JSON_KEY and GCS_BUCKET_NAME in environment variables."
     );
   }
-
-  // Parse Azure connection string
-  const connectionString = azureConnectionString;
-  const accountName = connectionString.match(/AccountName=([^;]+)/)?.[1];
-  const accountKey = connectionString.match(/AccountKey=([^;]+)/)?.[1];
-
-  if (!accountName || !accountKey) {
-    throw new Error("Invalid Azure connection string format");
+  let credentials;
+  try {
+    credentials = JSON.parse(gcsKeyRaw);
+  } catch (e: any) {
+    throw new Error("Invalid GCS_JSON_KEY: " + (e?.message || e));
   }
-
-  return new AzureBlobStorageService({
-    accountName: accountName,
-    accountKey: accountKey,
-    containerName: containerName,
-  });
+  return new GoogleCloudStorageService({ bucketName, credentials });
 }
 
 // Get Supabase client with tenant schema
@@ -92,15 +84,16 @@ app.post("/storage/upload", async (c) => {
     }
 
     const supabaseClient = await getSupabaseClient();
-    const azureStorage = getAzureStorage("storage");
+    const gcsService = getGcsService("storage");
 
-    const result = await handleFileUpload(supabaseClient, azureStorage, {
+    const result = await handleFileUpload(supabaseClient, gcsService, {
       userId,
       folderId,
       fileName,
       fileData,
       mimeType,
       tenantId: orgId,
+      schema: orgId,
     });
 
     return c.json({ success: true, data: result });
@@ -129,9 +122,9 @@ app.get("/storage/download/:fileId", async (c) => {
       .eq("clerk_organization_id", orgId)
       .single();
 
-    const azureStorage = getAzureStorage();
+    const gcsService = getGcsService();
 
-    const result = await handleFileDownload(supabaseClient, azureStorage, {
+    const result = await handleFileDownload(supabaseClient, gcsService, {
       userId,
       fileId,
       tenantId: orgId,
@@ -157,7 +150,7 @@ app.delete("/storage/files/:fileId", async (c) => {
     }
 
     const supabaseClient = await getSupabaseClient();
-    const azureStorage = getAzureStorage();
+    const gcsService = getGcsService();
 
     const org = await supabaseClient
       .schema("private")
@@ -173,7 +166,7 @@ app.delete("/storage/files/:fileId", async (c) => {
       .eq("clerk_user_id", userId)
       .single();
 
-    const result = await handleFileDelete(supabaseClient, azureStorage, {
+    const result = await handleFileDelete(supabaseClient, gcsService, {
       userId: user.data?.id,
       fileId,
       tenantId: orgId,
@@ -253,9 +246,8 @@ app.post("/storage/folder-cases", async (c) => {
     }
 
     const result = await handleCreateFolderCase(supabaseClient, {
-      userId: user.data?.id,
       folderCaseName,
-      tenantId: orgId,
+      userId: user.data?.id,
       schema: org.data?.schema_name.toLowerCase(),
     });
 
@@ -266,8 +258,8 @@ app.post("/storage/folder-cases", async (c) => {
   }
 });
 
-// Get folder cases endpoint
-app.get("/storage/folder-cases", async (c) => {
+// Get case types endpoint
+app.get("/storage/case-types", async (c) => {
   try {
     const orgId = c.get("orgId");
     const userId = c.get("userId");
@@ -280,26 +272,25 @@ app.get("/storage/folder-cases", async (c) => {
       .select("*")
       .eq("clerk_user_id", userId)
       .single();
-      
-      const org = await supabaseClient
+
+    const org = await supabaseClient
       .schema("private")
       .from("organizations")
       .select("*")
       .eq("clerk_organization_id", orgId)
       .single();
 
-    const result = await handleGetFolderCases(supabaseClient, {
+    const result = await handleGetCaseTypes(supabaseClient, {
       userId: user.data?.id,
-      tenantId: orgId,
       schema: org.data?.schema_name.toLowerCase(),
     });
 
-    return c.json({ success: true, data: result }); 
+    return c.json({ success: true, data: result });
   } catch (error: any) {
     console.error("Get folder cases error:", error);
     return c.json({ success: false, error: error.message }, 500);
-  } 
-})
+  }
+});
 
 // Create folder endpoint
 app.post("/storage/folders", async (c) => {
@@ -344,10 +335,11 @@ app.post("/storage/folders", async (c) => {
   }
 });
 
-app.get("/storage/folders/tree", async (c) => {
+app.get("/storage/folders/:caseId/tree", async (c) => {
   try {
     const orgId = c.get("orgId");
     const userId = c.get("userId");
+    const caseId = c.req.param("caseId");
 
     const supabaseClient = await getSupabaseClient();
 
@@ -365,7 +357,13 @@ app.get("/storage/folders/tree", async (c) => {
       .eq("clerk_organization_id", orgId)
       .single();
 
-    const result = await handleGetFolders(supabaseClient, user.data?.id, org.data?.schema_name.toLowerCase(), org.data?.id);
+    const result = await handleGetFolders(
+      supabaseClient,
+      user.data?.id,
+      org.data?.schema_name.toLowerCase(),
+      org.data?.id,
+      caseId
+    );
 
     return c.json({ success: true, data: result });
   } catch (error: any) {
@@ -386,7 +384,7 @@ app.delete("/storage/folders/:folderId", async (c) => {
     }
 
     const supabaseClient = await getSupabaseClient();
-    const azureStorage = getAzureStorage();
+    const gcsService = getGcsService();
 
     const user = await supabaseClient
       .schema("private")
@@ -402,7 +400,7 @@ app.delete("/storage/folders/:folderId", async (c) => {
       .eq("clerk_organization_id", orgId)
       .single();
 
-    const result = await handleDeleteFolder(supabaseClient, azureStorage, {
+    const result = await handleDeleteFolder(supabaseClient, gcsService, {
       userId: user.data?.id,
       folderId,
       tenantId: orgId,
@@ -531,14 +529,14 @@ app.post("/storage/upload-direct", async (c) => {
     }
 
     const supabaseClient = await getSupabaseClient();
-    const azureStorage = getAzureStorage();
+    const gcsService = getGcsService();
 
     const user = await supabaseClient
       .schema("private")
       .from("users")
       .select("*")
       .eq("clerk_user_id", userId)
-      .single()
+      .single();
 
     const org = await supabaseClient
       .schema("private")
@@ -546,6 +544,10 @@ app.post("/storage/upload-direct", async (c) => {
       .select("*")
       .eq("clerk_organization_id", orgId)
       .single();
+
+    if (!user || !org) {
+      return c.json({ error: "User or organization not found" }, 404);
+    }
 
     const member = await supabaseClient
       .schema("private")
@@ -555,7 +557,7 @@ app.post("/storage/upload-direct", async (c) => {
       .eq("organization_id", org.data?.id)
       .single();
 
-    const result = await handleDirectFileUpload(supabaseClient, azureStorage, {
+    const result = await handleDirectFileUpload(supabaseClient, gcsService, {
       userId: user.data?.id,
       folderId: folderId || undefined,
       fileName: file.name || "untitled",
@@ -565,6 +567,32 @@ app.post("/storage/upload-direct", async (c) => {
       uploadedBy: member.data?.id,
       schema: org.data?.schema_name.toLowerCase(),
     });
+
+    const { data: folderData, error: folderError } = await supabaseClient
+      .schema(org.data?.schema_name.toLowerCase())
+      .from("storage_folders")
+      .select("*")
+      .eq("id", folderId)
+      .single();
+
+    if (folderError || !folderData) {
+      return c.json({ error: "Folder not found" }, 404);
+    }
+
+    const { error: eventError } = await supabaseClient
+      .schema(org.data?.schema_name.toLowerCase())
+      .from("case_events")
+      .insert({
+        case_id: folderData.case_id,
+        event_type: "file_uploaded",
+        description: `${user.data?.email} uploaded file ${file.name || "untitled"}`,
+        date: new Date().toISOString().split("T")[0],
+        time: new Date().toISOString().split("T")[1].split(".")[0],
+      });
+
+    if (eventError) {
+      console.error("Failed to create event:", eventError);
+    }
 
     return c.json({ success: true, data: result });
   } catch (error: any) {
@@ -577,17 +605,19 @@ app.post("/storage/upload-direct", async (c) => {
 
 async function handleFileUpload(
   supabaseClient: any,
-  azureStorage: AzureBlobStorageService,
+  gcsService: GoogleCloudStorageService,
   params: {
     userId: string;
     folderId?: string;
     fileName: string;
-    fileData: Uint8Array<ArrayBuffer>;
+    fileData: Uint8Array;
     mimeType: string;
     tenantId: string;
+    schema: string;
   }
 ) {
-  const { userId, folderId, fileName, fileData, mimeType, tenantId } = params;
+  const { userId, folderId, fileName, fileData, mimeType, tenantId, schema } =
+    params;
 
   // Check if user has permission to upload to this folder
   if (folderId) {
@@ -602,40 +632,37 @@ async function handleFileUpload(
     }
   }
 
-  // Decode base64 file data
-  const fileBytes = Uint8Array.from(atob(fileData), (c) => c.charCodeAt(0));
-
   // Calculate checksum
-  const checksum = await calculateChecksum(fileBytes);
+  const checksum = await calculateChecksum(fileData);
 
   // Get folder path
   const folderPath = folderId
-    ? await getFolderPath(supabaseClient, folderId)
+    ? await getFolderPath(supabaseClient, folderId, schema)
     : "root";
 
-  // Upload to Azure
-  const uploadResult = await azureStorage.uploadFile(
+  // Upload to GCS
+  const uploadResult = await gcsService.uploadFile(
     tenantId,
     userId,
     folderPath,
     fileName,
-    fileBytes,
+    fileData,
     mimeType,
     { checksum, uploadedBy: userId }
   );
 
   // Save file metadata to database
   const { data: fileRecord, error } = await supabaseClient
-    .schema("org_2ycgcrzpztj0emidxp0u3iztcqy")
+    .schema(schema)
     .from("storage_files")
     .insert({
       name: fileName,
       original_name: fileName,
       folder_id: folderId,
-      azure_blob_name: uploadResult.blobName,
-      azure_blob_url: uploadResult.blobUrl,
+      gcs_blob_name: uploadResult.blobName,
+      gcs_blob_url: uploadResult.blobUrl,
       mime_type: mimeType,
-      size_bytes: fileBytes.length,
+      size_bytes: fileData.length,
       checksum: checksum,
       uploaded_by: userId,
     })
@@ -650,7 +677,7 @@ async function handleFileUpload(
     action: "upload",
     resourceType: "file",
     resourceId: fileRecord.id,
-    details: { fileName, size: fileBytes.length, mimeType },
+    details: { fileName, size: fileData.length, mimeType },
     schema,
   });
 
@@ -659,12 +686,12 @@ async function handleFileUpload(
 
 async function handleFileDownload(
   supabaseClient: any,
-  azureStorage: AzureBlobStorageService,
+  gcsService: GoogleCloudStorageService,
   params: {
     userId: string;
     fileId: string;
     tenantId: string;
-    schema: string
+    schema: string;
   }
 ) {
   const { userId, fileId, tenantId, schema } = params;
@@ -692,12 +719,11 @@ async function handleFileDownload(
   //   throw new Error("Insufficient permissions to download this file");
   // }
 
-  // Download from Azure
-  const fileData = await azureStorage.downloadFile(fileRecord.azure_blob_name);
-
-  // Generate SAS URL for direct access
-  const sasUrl = await azureStorage.generateSasUrl(
-    fileRecord.azure_blob_name,
+  // Download from GCS
+  const fileData = await gcsService.downloadFile(fileRecord.gcs_blob_name);
+  // Generate signed URL for direct access
+  const signedUrl = await gcsService.generateSignedUrl(
+    fileRecord.gcs_blob_name,
     1
   );
 
@@ -712,15 +738,14 @@ async function handleFileDownload(
   });
 
   return {
-    // fileData: btoa(String.fromCharCode(...fileData)),
-    sasUrl,
+    signedUrl,
     metadata: fileRecord,
   };
 }
 
 async function handleFileDelete(
   supabaseClient: any,
-  azureStorage: AzureBlobStorageService,
+  gcsService: GoogleCloudStorageService,
   params: {
     userId: string;
     fileId: string;
@@ -762,10 +787,41 @@ async function handleFileDelete(
 
   if (updateError) throw updateError;
 
-  console.log("successfully deleted file");
+  // Delete from GCS
+  await gcsService.deleteFile(fileRecord.gcs_blob_name);
 
-  // Delete from Azure
-  await azureStorage.deleteFile(fileRecord.azure_blob_name);
+  const { data: folderData, error: folderError } = await supabaseClient
+    .schema(schema)
+    .from("storage_folders")
+    .select("*")
+    .eq("id", fileRecord.folder_id)
+    .single();
+
+  if (folderError || !folderData) {
+    throw new Error("Folder not found");
+  }
+
+  const { data: user } = await supabaseClient
+    .schema("private")
+    .from("users")
+    .select("*")
+    .eq("clerk_user_id", userId)
+    .single();
+
+  const { error: eventError } = await supabaseClient
+    .schema(schema)
+    .from("case_events")
+    .insert({
+      case_id: folderData.case_id,
+      event_type: "file_deleted",
+      description: `${user.data?.email} deleted file ${fileRecord.name}`,
+      date: new Date().toISOString().split("T")[0],
+      time: new Date().toISOString().split("T")[1].split(".")[0],
+    });
+
+  if (eventError) {
+    throw eventError;
+  }
 
   // Log activity
   await logStorageActivity(supabaseClient, {
@@ -895,7 +951,7 @@ async function handleCreateFolder(
 
 async function handleDeleteFolder(
   supabaseClient: any,
-  azureStorage: AzureBlobStorageService,
+  gcsService: GoogleCloudStorageService,
   params: {
     userId: string;
     folderId: string;
@@ -969,9 +1025,9 @@ async function handleDeleteFolder(
 
   if (deleteFilesError) throw deleteFilesError;
 
-  // Delete files from Azure
+  // Delete files from GCS
   for (const file of files) {
-    await azureStorage.deleteFile(file.azure_blob_name);
+    await gcsService.deleteFile(file.gcs_blob_name);
   }
 
   // Log activity
@@ -1030,7 +1086,7 @@ async function handleShareResource(
 
   // Create share record
   const { data: shareRecord, error } = await supabaseClient
-    .schema("org_2ycgcrzpztj0emidxp0u3iztcqy")
+    .schema(tenantId)
     .from("storage_shares")
     .upsert({
       resource_type: resourceType,
@@ -1051,7 +1107,7 @@ async function handleShareResource(
     resourceType: resourceType,
     resourceId: resourceId,
     details: { sharedWith: shareWith, permission },
-    schema,
+    schema: tenantId,
   });
 
   return shareRecord;
@@ -1094,7 +1150,7 @@ async function handleUnshareResource(
 
   // Delete share record
   const { error } = await supabaseClient
-    .schema("org_2ycgcrzpztj0emidxp0u3iztcqy")
+    .schema(tenantId)
     .from("storage_shares")
     .delete()
     .eq("resource_type", resourceType)
@@ -1110,7 +1166,7 @@ async function handleUnshareResource(
     resourceType: resourceType,
     resourceId: resourceId,
     details: { unsharedWith: shareWith },
-    schema,
+    schema: tenantId,
   });
 
   return { success: true };
@@ -1128,7 +1184,7 @@ async function handleGetMetadata(
 
   // Get file record
   const { data: fileRecord, error } = await supabaseClient
-    .schema("org_2ycgcrzpztj0emidxp0u3iztcqy")
+    .schema(tenantId)
     .from("storage_files")
     .select("*")
     .eq("id", fileId)
@@ -1210,11 +1266,13 @@ async function checkResourcePermission(
 async function getFolderPath(
   supabaseClient: any,
   folderId: string,
-  schema: string,
+  schema: string
 ): Promise<string> {
-  const { data, error } = await supabaseClient.schema(schema).rpc("get_folder_path", {
-    folder_uuid: folderId,
-  });
+  const { data, error } = await supabaseClient
+    .schema(schema)
+    .rpc("get_folder_path", {
+      folder_uuid: folderId,
+    });
 
   if (error) throw error;
   return data || "";
@@ -1239,7 +1297,10 @@ async function logStorageActivity(
 ) {
   const { userId, action, resourceType, resourceId, details, schema } = params;
 
-  await supabaseClient.schema(schema).from("storage_activity_log").insert({
+  await supabaseClient
+    .schema(schema)
+    .from("storage_activity_log")
+    .insert({
       user_id: userId,
       action: action,
       resource_type: resourceType,
@@ -1251,7 +1312,7 @@ async function logStorageActivity(
 // Direct file upload handler (no base64 conversion)
 async function handleDirectFileUpload(
   supabaseClient: any,
-  azureStorage: AzureBlobStorageService,
+  gcsService: GoogleCloudStorageService,
   params: {
     userId: string;
     folderId?: string;
@@ -1259,11 +1320,20 @@ async function handleDirectFileUpload(
     fileData: Uint8Array; // Direct buffer
     mimeType: string;
     tenantId: string;
-    uploadedBy: string,
-    schema: string,
+    uploadedBy: string;
+    schema: string;
   }
 ) {
-  const { userId, folderId, fileName, fileData, mimeType, tenantId, uploadedBy, schema } = params;
+  const {
+    userId,
+    folderId,
+    fileName,
+    fileData,
+    mimeType,
+    tenantId,
+    uploadedBy,
+    schema,
+  } = params;
 
   // Check if user has permission to upload to this folder
   // if (folderId) {
@@ -1286,13 +1356,13 @@ async function handleDirectFileUpload(
     ? await getFolderPath(supabaseClient, folderId, schema)
     : "root";
 
-  // Upload to Azure directly with buffer
-  const uploadResult = await azureStorage.uploadFile(
+  // Upload to GCS
+  const uploadResult = await gcsService.uploadFile(
     tenantId,
     userId,
     folderPath,
     fileName,
-    fileData, // Direct buffer
+    fileData,
     mimeType,
     { checksum, uploadedBy }
   );
@@ -1305,8 +1375,8 @@ async function handleDirectFileUpload(
       name: fileName,
       original_name: fileName,
       folder_id: folderId,
-      azure_blob_name: uploadResult.blobName,
-      azure_blob_url: uploadResult.blobUrl,
+      gcs_blob_name: uploadResult.blobName,
+      gcs_blob_url: uploadResult.blobUrl,
       mime_type: mimeType,
       size_bytes: fileData.length,
       checksum: checksum,
@@ -1342,11 +1412,14 @@ async function handleGetFolders(
   userId: string,
   schema: string,
   orgId: string,
+  caseId: string
 ) {
-  const { data: folders, error: foldersError } = await supabaseClient.schema(schema)
+  const { data: folders, error: foldersError } = await supabaseClient
+    .schema(schema)
     .from("storage_folders")
     .select("*")
     .eq("created_by", userId)
+    .eq("case_id", caseId)
     .is("deleted_at", null);
 
   const member = await supabaseClient
@@ -1357,34 +1430,41 @@ async function handleGetFolders(
     .eq("organization_id", orgId)
     .single();
 
-  const { data: files, error: filesError } = await supabaseClient.schema(schema)
+  const { data: files, error: filesError } = await supabaseClient
+    .schema(schema)
     .from("storage_files")
     .select("*")
     .eq("uploaded_by", member.data?.id)
     .is("deleted_at", null);
 
   // Build tree structure from flat folder and files data
-  const buildFolderTree = (folders: any[], parentId: string | null = null): any[] => {
-    const folderMap = new Map();
+  const buildFolderTree = (
+    folders: any[],
+    parentId: string | null = null
+  ): any[] => {
+    const folderMap = new Map<string, any>();
     const rootFolders: any[] = [];
 
     // First pass: create a map of all folders by ID
-    folders.forEach(folder => {
+    folders.forEach((folder: any) => {
       folderMap.set(folder.id, {
         ...folder,
-        children: [],
-        documents: []
+        children: [] as any[],
+        documents: [] as any[],
       });
     });
 
     // Second pass: build the tree structure
-    folders.forEach(folder => {
+    folders.forEach((folder: any) => {
       const folderNode = folderMap.get(folder.id);
 
       // Add files to this folder
-      const folderFiles = files?.filter(file => file.folder_id === folder.id) || [];
+      const folderFiles =
+        files?.filter((file: any) => file.folder_id === folder.id) || [];
 
-      folderNode.documents = folderFiles.sort((a, b) => a.name.localeCompare(b.name));
+      folderNode.documents = folderFiles.sort((a: any, b: any) =>
+        a.name.localeCompare(b.name)
+      );
 
       if (folder.parent_folder_id === parentId) {
         // This is a root level folder for the current query
@@ -1398,12 +1478,16 @@ async function handleGetFolders(
     // Sort children and documents at each level
     const sortTree = (nodes: any[]): any[] => {
       return nodes
-        .map(node => ({
+        .map((node: any) => ({
           ...node,
-          children: sortTree(node.children.sort((a, b) => a.name.localeCompare(b.name))),
-          documents: node.documents.sort((a, b) => a.name.localeCompare(b.name))
+          children: sortTree(
+            node.children.sort((a: any, b: any) => a.name.localeCompare(b.name))
+          ),
+          documents: node.documents.sort((a: any, b: any) =>
+            a.name.localeCompare(b.name)
+          ),
         }))
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .sort((a: any, b: any) => a.name.localeCompare(b.name));
     };
 
     return sortTree(rootFolders);
@@ -1426,58 +1510,30 @@ async function handleCreateFolderCase(
   }
 ) {
   const { folderCaseName, schema, userId } = params;
-  console.log("handleCreateFolderCase", folderCaseName);
 
   const { data: folderCase, error: folderCaseError } = await supabaseClient
     .schema(schema)
-    .from("folder_cases")
+    .from("cases")
     .insert({
-      name: folderCaseName,
+      title: folderCaseName,
+      case_number: `CASE-${Date.now()}`,
+      status: "active",
+      client_name_encrypted: folderCaseName,
+      lead_attorney_id: userId,
+      team_member_ids: [userId],
+      client_portal_enabled: false,
+      retention_policy: "standard",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     })
     .select()
     .single();
-
-  const defaultFolders = [
-    {
-      name: "Contracts",
-      path: "/contracts",
-    },
-    {
-      name: "Financial",
-      path: "/financial",
-    },
-    {
-      name: "Documents",
-      path: "/documents",
-    },
-    {
-      name: "Evidence Documentation",
-      path: "/evidence-documentation",
-    },
-    {
-      name: "Correspondence",
-      path: "/correspondence",
-    },
-    {
-      name: "Legal Documents",
-      path: "/legal-documents",
-    },
-  ];
-
-  for (const folder of defaultFolders) {
-    await supabaseClient.schema(schema).from("storage_folders").insert({
-      name: folder.name,
-      path: folder.path,
-      case: folderCase.id,
-      created_by: userId,
-    });
-  }
 
   if (folderCaseError) throw folderCaseError;
   return folderCase;
 }
 
-async function handleGetFolderCases(
+async function handleGetCaseTypes(
   supabaseClient: any,
   params: {
     userId: string;
@@ -1486,11 +1542,14 @@ async function handleGetFolderCases(
 ) {
   const { userId, schema } = params;
 
-  const { data: folderCases, error: folderCasesError } = await supabaseClient.schema(schema).from("folder_cases").select("*");
+  const { data: caseTypes, error: caseTypesError } = await supabaseClient
+    .schema(schema)
+    .from("case_types")
+    .select("*");
 
-  if (folderCasesError) throw folderCasesError;
+  if (caseTypesError) throw caseTypesError;
 
-  return folderCases;
+  return caseTypes;
 }
 
 export default app;

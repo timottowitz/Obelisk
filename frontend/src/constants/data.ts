@@ -14,181 +14,138 @@ export type Product = {
 //Info: The following data is used for the sidebar navigation and Cmd K bar.
 export const navItems: NavItem[] = [
   {
-    title: 'Overview',
-    url: '/dashboard/overview',
-    icon: 'dashboard',
-    isActive: true,
-    shortcut: ['o', 'o'],
+    title: 'Home',
+    url: '/dashboard',
+    icon: 'home',
+    isActive: false,
+    shortcut: ['h', 'h'],
     items: []
   },
   {
-    title: 'Cases',
-    url: '#',
+    title: 'My Cases',
+    url: '/dashboard/cases',
     icon: 'page',
     isActive: false,
     shortcut: ['c', 'c'],
     items: [
       {
-        title: 'Active Cases',
-        url: '/dashboard/cases/active',
-        icon: 'page',
-        shortcut: ['c', 'a']
+        title: 'Solar Cases',
+        url: '/dashboard/cases?type=solar',
+        icon: 'sun',
+        isActive: false,
+        shortcut: ['c', 'c'],
+        items: []
       },
       {
-        title: 'Closed Cases',
-        url: '/dashboard/cases/closed',
-        icon: 'page',
-        shortcut: ['c', 'c']
+        title: 'Litigation',
+        url: '/dashboard/cases?type=litigation',
+        icon: 'litigation',
+        isActive: false,
+        shortcut: ['c', 'c'],
+        items: []
+      },
+      {
+        title: 'IMVA',
+        url: '/dashboard/cases?type=imva',
+        icon: 'imva',
+        isActive: false,
+        shortcut: ['c', 'c'],
+        items: []
+      },
+      {
+        title: 'My Tasks',
+        url: '/dashboard/tasks',
+        icon: 'squareCheck',
+        isActive: false,
+        shortcut: ['t', 't'],
+        items: []
       }
     ]
   },
   {
-    title: 'Documents',
-    url: '#',
-    icon: 'post',
-    isActive: false,
-    shortcut: ['d', 'd'],
-    items: [
-      {
-        title: 'All Documents',
-        url: '/dashboard/documents',
-        icon: 'post',
-        shortcut: ['d', 'a']
-      },
-      {
-        title: 'Contracts',
-        url: '/dashboard/documents/contracts',
-        icon: 'post',
-        shortcut: ['d', 'c']
-      },
-      {
-        title: 'Evidence',
-        url: '/dashboard/documents/evidence',
-        icon: 'post',
-        shortcut: ['d', 'e']
-      }
-    ]
-  },
-  {
-    title: 'Call Recordings',
-    url: '/dashboard/callcaps',
-    icon: 'callcaps',
+    title: 'Call',
+    url: '/dashboard/meetings',
+    icon: 'call',
     isActive: false,
     shortcut: ['c', 'r'],
     items: []
   },
   {
-    title: 'Legal Research',
-    url: '#',
-    icon: 'help',
+    title: 'Events',
+    url: '/dashboard/events',
+    icon: 'calendar',
     isActive: false,
-    shortcut: ['l', 'r'],
-    items: [
-      {
-        title: 'Case Law',
-        url: '/dashboard/research/case-law',
-        icon: 'help',
-        shortcut: ['l', 'c']
-      },
-      {
-        title: 'Statutes',
-        url: '/dashboard/research/statutes',
-        icon: 'post',
-        shortcut: ['l', 's']
-      }
-    ]
-  },
-  {
-    title: 'Financial',
-    url: '#',
-    icon: 'billing',
-    isActive: false,
-    shortcut: ['f', 'f'],
-    items: [
-      {
-        title: 'Invoices',
-        url: '/dashboard/financial/invoices',
-        icon: 'billing',
-        shortcut: ['f', 'i']
-      },
-      {
-        title: 'Expenses',
-        url: '/dashboard/financial/expenses',
-        icon: 'billing',
-        shortcut: ['f', 'e']
-      },
-      {
-        title: 'Reports',
-        url: '/dashboard/financial/reports',
-        icon: 'post',
-        shortcut: ['f', 'r']
-      }
-    ]
-  },
-  {
-    title: 'AI Assistant',
-    url: '/dashboard/ai-assistant',
-    icon: 'callcaps',
-    isActive: false,
-    shortcut: ['a', 'i'],
+    shortcut: ['e', 'c'],
     items: []
   },
   {
-    title: 'Analytics',
-    url: '#',
-    icon: 'dashboard',
+    title: 'Email',
+    url: '/dashboard/contacts',
+    icon: 'mail',
     isActive: false,
-    shortcut: ['a', 'n'],
-    items: [
-      {
-        title: 'Performance',
-        url: '/dashboard/analytics/performance',
-        icon: 'dashboard',
-        shortcut: ['a', 'p']
-      },
-      {
-        title: 'Insights',
-        url: '/dashboard/analytics/insights',
-        icon: 'dashboard',
-        shortcut: ['a', 'i']
-      }
-    ]
-  },
-  {
-    title: 'Communications',
-    url: '#',
-    icon: 'media',
-    isActive: false,
-    shortcut: ['c', 'm'],
-    items: [
-      {
-        title: 'Emails',
-        url: '/dashboard/communications/emails',
-        icon: 'media',
-        shortcut: ['c', 'e']
-      },
-      {
-        title: 'Notes',
-        url: '/dashboard/communications/notes',
-        icon: 'post',
-        shortcut: ['c', 'n']
-      }
-    ]
-  },
-  {
-    title: 'Clients',
-    url: '/dashboard/clients',
-    icon: 'user',
-    isActive: false,
-    shortcut: ['c', 'l'],
+    shortcut: ['e', 'e'],
     items: []
   },
+  {
+    title: 'Expenses',
+    url: '/dashboard/expenses',
+    icon: 'dollar',
+    isActive: false,
+    shortcut: ['p', 'p'],
+    items: []
+  }
+];
+
+export const practiceAreaItems: NavItem[] = [
+  {
+    title: 'Solar',
+    url: '/dashboard/practice-areas/solar',
+    icon: 'sun',
+    isActive: false,
+    label: '12',
+    items: []
+  },
+  {
+    title: 'Litigation',
+    url: '/dashboard/practice-areas/litigation',
+    icon: 'litigation',
+    isActive: false,
+    label: '8',
+    items: []
+  },
+  {
+    title: 'IMMA',
+    url: '/dashboard/practice-areas/imma',
+    icon: 'page',
+    isActive: false,
+    label: '5',
+    items: []
+  },
+  {
+    title: 'Tasks',
+    url: '/dashboard/tasks',
+    icon: 'squareCheck',
+    isActive: false,
+    label: '23',
+    items: []
+  }
+];
+
+export const footerItems: NavItem[] = [
   {
     title: 'Settings',
-    url: '/dashboard/settings',
+    url: '/dashboard/settings/caseTypes',
     icon: 'settings',
     isActive: false,
     shortcut: ['s', 's'],
+    items: []
+  },
+  {
+    title: 'Help & Support',
+    url: '/dashboard/help',
+    icon: 'help',
+    isActive: false,
+    shortcut: ['h', 's'],
     items: []
   }
 ];
