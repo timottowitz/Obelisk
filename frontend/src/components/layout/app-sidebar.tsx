@@ -37,7 +37,9 @@ import {
   IconLogout,
   IconUserCircle,
   IconFolderOpen,
-  IconFolder
+  IconFolder,
+  IconChevronCompactRight,
+  IconChevronCompactDown
 } from '@tabler/icons-react';
 import { SignOutButton } from '@clerk/nextjs';
 import Link from 'next/link';
@@ -154,9 +156,9 @@ export default function AppSidebar() {
                         )}
                         <span>{item.title}</span>
                         {isOpen ? (
-                          <IconChevronsDown className='ml-auto size-4' />
+                          <IconChevronCompactDown className='ml-auto size-4' />
                         ) : (
-                          <IconChevronsRight className='ml-auto size-4' />
+                          <IconChevronCompactRight className='ml-auto size-4' />
                         )}
                       </div>
                     ) : (

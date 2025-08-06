@@ -39,7 +39,8 @@ import {
   IconBuilding,
   IconCurrencyDollar,
   IconSquareCheck,
-  IconMail
+  IconMail,
+  IconPhoneCall
 } from '@tabler/icons-react';
 
 export type Icon = React.ComponentType<IconProps>;
@@ -84,5 +85,6 @@ export const Icons = {
   imva: IconBuilding,
   dollar: IconCurrencyDollar,
   squareCheck: IconSquareCheck,
-  mail: IconMail
+  mail: IconMail,
+  call: IconPhoneCall
 };

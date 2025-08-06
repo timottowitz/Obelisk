@@ -65,7 +65,7 @@ export const navItems: NavItem[] = [
   {
     title: 'Call',
     url: '/dashboard/meetings',
-    icon: 'callcaps',
+    icon: 'call',
     isActive: false,
     shortcut: ['c', 'r'],
     items: []

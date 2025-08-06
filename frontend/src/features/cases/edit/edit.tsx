@@ -1,13 +1,12 @@
 'use client';
 
 import { useMemo } from 'react';
-import { CaseForm } from '../create/case-form';
+import { CaseForm } from '../form/case-form';
 import { useGetCase } from '@/hooks/useCases';
-import { CaseSidebar } from '../create/case-sidebar';
 import { Loader2 } from 'lucide-react';
 import { useOrganization, useUser } from '@clerk/nextjs';
 
-export default function Edit({ caseId }: { caseId: string }) {
+export default function EditCase({ caseId }: { caseId: string }) {
   const { data: caseData, isLoading: caseLoading } = useGetCase(caseId);
   const { organization } = useOrganization();
   const { user } = useUser();
@@ -30,10 +29,7 @@ export default function Edit({ caseId }: { caseId: string }) {
   }
 
   return (
-    <div className='container mx-auto px-4 py-6'>
-      <div className='grid grid-cols-1 gap-6 lg:grid-cols-3'>
-        {/* Main Form - Left Side */}
-        <div className='lg:col-span-2'>
+    <div className='w-[80%] mx-auto px-10 py-10'>
           {caseLoading ? (
             <div className='flex items-center justify-center'>
               <Loader2 className='h-10 w-10 animate-spin' />
@@ -41,13 +37,6 @@ export default function Edit({ caseId }: { caseId: string }) {
           ) : (
             <CaseForm initialData={caseData} />
           )}
-        </div>
-
-        {/* Right Sidebar */}
-        <div className='hidden lg:block'>
-          <CaseSidebar />
-        </div>
-      </div>
     </div>
   );
 }
