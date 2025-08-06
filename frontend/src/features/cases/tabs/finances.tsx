@@ -40,7 +40,7 @@ export default function Finances() {
         </div>
         <div className='flex items-center space-x-4'>
           <a href='#' className='text-sm text-blue-600 underline'>
-            What's the difference?
+            What&apos;s the difference?
           </a>
           <Button
             variant={activeTab === 'statements' ? 'default' : 'outline'}
