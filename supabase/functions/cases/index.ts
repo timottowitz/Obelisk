@@ -1444,12 +1444,12 @@ app.post("/cases/:id/tasks", async (c) => {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
     const body = await c.req.json();
 
-    const { name, description, due_date } = body;
+    const { name, description, due_date, assignee_id, priority, category_id } = body;
 
     const { data: newTask, error: insertError } = await supabase
       .schema(schema)
       .from("case_tasks")
-      .insert({ case_id, name, description, due_date })
+      .insert({ case_id, name, description, due_date, assignee_id, priority, category_id })
       .select()
       .single();
 

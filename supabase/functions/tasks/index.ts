@@ -110,6 +110,20 @@ app.get("/tasks", async (c) => {
 
     const caseDetailedTasks = [];
     for (const task of tasks) {
+      const { data: assignee, error: assigneeError } = await supabase
+        .schema("private")
+        .from("users")
+        .select("*")
+        .eq("id", task.assignee_id)
+        .single();
+
+      if (assigneeError || !assignee) {
+        return c.json(
+          { "Failed to fetch assignee": assigneeError.message },
+          500
+        );
+      }
+
       const { data: caseData, error: caseError } = await supabase
         .schema(schema)
         .from("cases")
@@ -121,11 +135,27 @@ app.get("/tasks", async (c) => {
         return c.json({ "Failed to fetch case": caseError.message }, 500);
       }
 
+      const { data: category, error: categoryError } = await supabase
+        .schema(schema)
+        .from("task_categories")
+        .select("*")
+        .eq("id", task.category_id)
+        .single();
+
+      if (categoryError) {
+        return c.json(
+          { "Failed to fetch category": categoryError.message },
+          500
+        );
+      }
+
       caseDetailedTasks.push({
         ...task,
+        assignee: assignee.email,
         case_number: caseData.case_number,
         claimant: caseData.claimant,
         respondent: caseData.respondent,
+        category: category.name,
       });
     }
     return c.json({

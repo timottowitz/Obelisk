@@ -64,8 +64,8 @@ MobileLoadingState.displayName = 'MobileLoadingState';
 
 const DesktopLoadingState = memo(() => (
   <TableRow>
-    <TableCell colSpan={5} className='py-16 text-center'>
-      <div className='flex flex-col items-center gap-3'>
+    <TableCell colSpan={6} className='py-16 text-center'>
+      <div className='flex flex-col items-center gap-3 justify-center'>
         <div className='border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent'></div>
         <span className='text-muted-foreground'>Loading tasks...</span>
       </div>
@@ -86,7 +86,10 @@ MobileEmptyState.displayName = 'MobileEmptyState';
 
 const DesktopEmptyState = memo(() => (
   <TableRow>
-    <TableCell colSpan={5} className='py-16 text-center'>
+    <TableCell
+      colSpan={6}
+      className='flex items-center justify-center py-16 text-center'
+    >
       <div className='flex flex-col items-center gap-3'>
         <div className='bg-muted inline-flex h-16 w-16 items-center justify-center rounded-full'>
           <FileText className='text-muted-foreground h-8 w-8' />
@@ -155,11 +158,11 @@ const formatDate = (dateString: string) => {
 
 const getPriorityColor = (priority: string) => {
   switch (priority) {
-    case 'high':
+    case 'High':
       return 'text-red-600 bg-red-50 border-red-200';
-    case 'medium':
+    case 'Medium':
       return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-    case 'low':
+    case 'Low':
       return 'text-green-600 bg-green-50 border-green-200';
     default:
       return 'text-gray-600 bg-gray-50 border-gray-200';
@@ -291,7 +294,7 @@ function TasksTable({
                     </div>
                   </TableCell>
                   <TableCell className='text-muted-foreground hidden py-4 lg:table-cell'>
-                    <div className='flex items-center gap-2'>
+                    <div className='flex items-center justify-center gap-2'>
                       <div className='flex h-6 w-6 items-center justify-center rounded-full bg-gray-200'>
                         <User className='h-3 w-3 text-gray-600' />
                       </div>
@@ -316,11 +319,7 @@ function TasksTable({
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className='py-4'>
-                    <span className='inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800 dark:bg-purple-900 dark:text-purple-200'>
-                      {task.category}
-                    </span>
-                  </TableCell>
+                  <TableCell className='py-4'>{task.category}</TableCell>
                 </TableRow>
               ))}
             {tasks && !isLoading && tasks.length === 0 && <DesktopEmptyState />}
