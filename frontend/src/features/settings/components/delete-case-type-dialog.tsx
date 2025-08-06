@@ -40,7 +40,7 @@ export function DeleteCaseTypeDialog({
         <DialogHeader>
           <DialogTitle>Delete Case Type</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete "{caseTypeName}"? This action cannot
+            Are you sure you want to delete {caseTypeName}? This action cannot
             be undone.
           </DialogDescription>
         </DialogHeader>

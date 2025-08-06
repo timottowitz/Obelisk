@@ -1,37 +1,47 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import EventsTable from '@/features/events/event-table';
-import { useEvents } from '@/hooks/useEvents';
-import { useSearchParams, useRouter } from 'next/navigation';
+import * as React from 'react';
+import { EventsTable } from '@/features/events/events-table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 
-export default function EventsPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const page = searchParams.get('page') || 1;
-  const [currentPage, setCurrentPage] = useState(Number(page));
-  const { data: events, isLoading } = useEvents(currentPage);
-  const eventsData = events?.data || [];
-  const eventsCount = events?.count || 0;
+export interface EventsPageProps {}
 
-  useEffect(() => {
-    router.push(`/dashboard/events?page=${currentPage}`);
-  }, [currentPage]);
-
-  const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(page);
-  }, []);
-
+export default function EventsPage({}: EventsPageProps) {
   return (
-    <div className='container mx-auto flex w-[80%] flex-col gap-4 px-10 py-10'>
-      <h1 className='text-2xl font-bold'>Case Events</h1>
-      <EventsTable
-        events={eventsData || []}
-        isLoading={isLoading}
-        count={eventsCount}
-        currentPage={currentPage}
-        onPageChange={handlePageChange}
-      />
+    <div className='flex-1 overflow-auto bg-white p-6'>
+      <div className='mx-auto max-w-7xl'>
+        {/* Header */}
+        <div className='mb-6'>
+          <h1 className='mb-4 text-2xl font-semibold text-gray-900'>
+            Case Events
+          </h1>
+
+          {/* Filter Controls */}
+          <div className='flex gap-3'>
+            {/* Status Filter Dropdown */}
+            <Select value='all'>
+              <SelectTrigger>
+                <SelectValue placeholder='Select Status' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>All Events</SelectItem>
+                <SelectItem value='active'>Active</SelectItem>
+                <SelectItem value='scheduled'>Scheduled</SelectItem>
+                <SelectItem value='completed'>Completed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Events Table Component */}
+        <EventsTable events={[]} isLoading={false} />
+      </div>
     </div>
   );
 }

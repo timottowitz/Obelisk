@@ -52,14 +52,22 @@ export const navItems: NavItem[] = [
         shortcut: ['c', 'c'],
         items: []
       },
+      {
+        title: 'My Tasks',
+        url: '/dashboard/tasks',
+        icon: 'squareCheck',
+        isActive: false,
+        shortcut: ['t', 't'],
+        items: []
+      }
     ]
   },
   {
-    title: 'My Tasks',
-    url: '/dashboard/tasks',
-    icon: 'tasks',
+    title: 'Call',
+    url: '/dashboard/meetings',
+    icon: 'call',
     isActive: false,
-    shortcut: ['t', 't'],
+    shortcut: ['c', 'r'],
     items: []
   },
   {
@@ -71,11 +79,11 @@ export const navItems: NavItem[] = [
     items: []
   },
   {
-    title: 'Call Caps',
-    url: '/dashboard/meetings',
-    icon: 'callcaps',
+    title: 'Email',
+    url: '/dashboard/contacts',
+    icon: 'mail',
     isActive: false,
-    shortcut: ['c', 'r'],
+    shortcut: ['e', 'e'],
     items: []
   },
   {
@@ -116,7 +124,7 @@ export const practiceAreaItems: NavItem[] = [
   {
     title: 'Tasks',
     url: '/dashboard/tasks',
-    icon: 'tasks',
+    icon: 'squareCheck',
     isActive: false,
     label: '23',
     items: []

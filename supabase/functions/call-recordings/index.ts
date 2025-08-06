@@ -16,6 +16,7 @@ import {
   createPartFromUri,
   FileState,
 } from "https://esm.sh/@google/genai@1.9.0";
+import { GoogleCloudStorageService } from "../_shared/google-storage.ts";
 
 console.log("Hello from Functions!");
 

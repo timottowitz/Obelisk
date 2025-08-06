@@ -39,7 +39,7 @@ export default function FormGenerator() {
               {/* Description */}
               <p className="text-black leading-relaxed">
                 The AAA provides these forms as a courtesy to the users of our services. 
-                The use of these forms do not constitute legal advice or remove any party's 
+                The use of these forms do not constitute legal advice or remove any party&apos;s 
                 obligation of service to all parties in an arbitration or mediation.
               </p>
 

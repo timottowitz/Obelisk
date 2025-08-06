@@ -1055,7 +1055,7 @@ app.post("/cases", async (c) => {
   const userId = c.get("userId");
 
   try {
-    const { supabase, schema, user, member } = await getSupabaseAndOrgInfo(
+    const { supabase, schema, user } = await getSupabaseAndOrgInfo(
       orgId,
       userId
     );
@@ -1077,6 +1077,7 @@ app.post("/cases", async (c) => {
       claimant,
       respondent,
       case_manager,
+      access,
     } = body;
 
     if (!full_name) {
@@ -1133,6 +1134,7 @@ app.post("/cases", async (c) => {
         claimant,
         respondent,
         case_manager,
+        access,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -1190,6 +1192,35 @@ app.put("/cases/:id", async (c) => {
   try {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
 
+    const user = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+
+    const org = await supabase
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+
+    const { data: member, error: memberError } = await supabase
+      .schema("private")
+      .from("organization_members")
+      .select("*")
+      .eq("user_id", user.data.id)
+      .eq("organization_id", org.data.id)
+      .single();
+
+    if (memberError) {
+      return c.json(
+        { error: "Failed to fetch member", details: memberError },
+        500
+      );
+    }
+
     const body = await c.req.json();
     const {
       full_name,
@@ -1206,6 +1237,7 @@ app.put("/cases/:id", async (c) => {
       claimant,
       respondent,
       case_manager,
+      access,
     } = body;
 
     if (!full_name && !case_type_id) {
@@ -1228,6 +1260,10 @@ app.put("/cases/:id", async (c) => {
 
     if (!existingCase) {
       return c.json({ error: "Case not found" }, 404);
+    }
+
+    if (existingCase.access === "admin_only" && member.role === "client") {
+      return c.json({ error: "You are not authorized to edit this case" }, 403);
     }
 
     // If name is being updated, check for uniqueness
@@ -1278,6 +1314,7 @@ app.put("/cases/:id", async (c) => {
     if (claimant !== undefined) updateData.claimant = claimant;
     if (respondent !== undefined) updateData.respondent = respondent;
     if (case_manager !== undefined) updateData.case_manager = case_manager;
+    if (access !== undefined) updateData.access = access;
 
     const { data: updatedCase, error: updateError } = await supabase
       .schema(schema)
@@ -1365,16 +1402,24 @@ app.get("/cases/:id/tasks", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const caseId = c.req.param("id");
+  const url = new URL(c.req.url);
+  const page = parseInt(url.searchParams.get("page") || "1");
+  const limit = parseInt(url.searchParams.get("limit") || "5");
 
   try {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
 
-    const { data: tasks, error: selectError } = await supabase
+    const {
+      data: tasks,
+      error: selectError,
+      count,
+    } = await supabase
       .schema(schema)
       .from("case_tasks")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("case_id", caseId)
-      .order("due_date", { ascending: true });
+      .order("due_date", { ascending: true })
+      .range((page - 1) * limit, page * limit - 1);
 
     if (selectError || !tasks) {
       return c.json(
@@ -1383,7 +1428,7 @@ app.get("/cases/:id/tasks", async (c) => {
       );
     }
 
-    return c.json(tasks, 200);
+    return c.json({ tasks, count: count }, 200);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -1399,12 +1444,12 @@ app.post("/cases/:id/tasks", async (c) => {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
     const body = await c.req.json();
 
-    const { name, description, due_date } = body;
+    const { name, description, due_date, assignee_id, priority, category_id } = body;
 
     const { data: newTask, error: insertError } = await supabase
       .schema(schema)
       .from("case_tasks")
-      .insert({ case_id, name, description, due_date })
+      .insert({ case_id, name, description, due_date, assignee_id, priority, category_id })
       .select()
       .single();
 
@@ -1580,16 +1625,24 @@ app.get("/cases/:id/events", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const caseId = c.req.param("id");
+  const url = new URL(c.req.url);
+  const page = parseInt(url.searchParams.get("page") || "1");
+  const limit = parseInt(url.searchParams.get("limit") || "5");
 
   try {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
 
-    const { data: events, error: selectError } = await supabase
+    const {
+      data: events,
+      error: selectError,
+      count,
+    } = await supabase
       .schema(schema)
       .from("case_events")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("case_id", caseId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range((page - 1) * limit, page * limit - 1);
 
     if (selectError) {
       return c.json(
@@ -1598,7 +1651,7 @@ app.get("/cases/:id/events", async (c) => {
       );
     }
 
-    return c.json(events, 200);
+    return c.json({ data: events, count: count }, 200);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }

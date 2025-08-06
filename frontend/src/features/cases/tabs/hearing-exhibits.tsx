@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -10,141 +11,150 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Search,
+  Filter,
+  Calendar,
   RefreshCw,
   Trash2,
   Printer,
   Download,
   Flag,
-  Info,
-  Square
+  Plus,
+  Minus,
+  Save,
+  Expand,
+  ChevronDown
 } from 'lucide-react';
-import { HearingExhibitFilterGroup } from './components/filters';
-import CaseDetailsTable from './table';
-import { hearingExhibitColumns } from './columns';
 
-export default function HearingExhibits() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState('all');
-  const [selectedDate, setSelectedDate] = useState('');
+export default function Finances() {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [exhibitsFilter, setExhibitsFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('');
 
   return (
     <div className='space-y-6'>
-      {/* Page Header */}
+      {/* Header Section */}
       <div className='flex items-center justify-between'>
-        <h1 className='text-2xl font-bold text-gray-900'>Hearing Exhibits</h1>
-        <Button className='bg-blue-600 text-white hover:bg-blue-700'>
+        <h1 className='text-2xl font-bold tracking-tight'>Hearing Exhibits</h1>
+        <Button>
+          <Plus className='mr-2 h-4 w-4' />
           Add New Exhibits
         </Button>
       </div>
 
-      <HearingExhibitFilterGroup
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        selectedFilter={selectedFilter}
-        setSelectedFilter={setSelectedFilter}
-        selectedDate={selectedDate}
-        setSelectedDate={setSelectedDate}
-      />
+      {/* Search and Filter Bar */}
+      <div className='flex items-center space-x-4'>
+        <div className='relative max-w-md flex-1'>
+          <Search className='text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2' />
+          <Input
+            placeholder='Find by keyword or number'
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className='pl-10'
+          />
+        </div>
 
-      {/* Action Toolbar */}
-      <div className='flex items-center gap-4 rounded-md border border-gray-200 p-2'>
-        {/* Actions Dropdown */}
-        <Select>
-          <SelectTrigger className='h-6 w-24 rounded-md border border-gray-200 bg-white'>
-            <SelectValue className='text-xs' placeholder='Actions' />
+        <Select value={exhibitsFilter} onValueChange={setExhibitsFilter}>
+          <SelectTrigger className='w-[140px]'>
+            <Filter className='mr-2 h-4 w-4' />
+            <SelectValue placeholder='All Exhibits' />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value='add-flag' className='text-xs'>
-              Add Flag
-            </SelectItem>
-            <SelectItem value='remove-flag' className='text-xs'>
-              Remove Flag
-            </SelectItem>
-            <SelectItem value='mark-all-as-read' className='text-xs'>
-              Mark All as Read
-            </SelectItem>
+            <SelectItem value='all'>All Exhibits</SelectItem>
+            <SelectItem value='pending'>Pending</SelectItem>
+            <SelectItem value='approved'>Approved</SelectItem>
+            <SelectItem value='rejected'>Rejected</SelectItem>
           </SelectContent>
         </Select>
 
-        {/* Action Buttons */}
-        <div className='flex items-center gap-4'>
-          <Button
-            variant='outline'
-            size='sm'
-            className='flex items-center gap-1'
-          >
-            <RefreshCw className='h-3 w-3' />
-            Refresh
-          </Button>
-
-          <Button
-            variant='outline'
-            size='sm'
-            className='flex items-center gap-1 text-red-600 hover:text-red-700'
-          >
-            <Trash2 className='h-3 w-3' />
-            Delete
-          </Button>
-
-          <Button
-            variant='outline'
-            size='sm'
-            className='flex items-center gap-1'
-          >
-            <Printer className='h-3 w-3' />
-            Print List
-          </Button>
-
-          <Button
-            variant='outline'
-            size='sm'
-            className='flex items-center gap-1'
-          >
-            <Download className='h-3 w-3' />
-            Download
-          </Button>
-
-          <Button
-            variant='outline'
-            size='sm'
-            className='flex items-center gap-1'
-          >
-            <Flag className='h-3 w-3' />
-            Add
-          </Button>
-
-          <Button
-            variant='outline'
-            size='sm'
-            className='flex items-center gap-1'
-          >
-            <Flag className='h-3 w-3' />
-            Remove
-          </Button>
-
-          <Button
-            size='sm'
-            className='bg-blue-600 text-white hover:bg-blue-700'
-          >
-            Save
-          </Button>
-
-          <a
-            href='#'
-            className='flex items-center gap-1 text-xs text-blue-600 transition-colors hover:text-blue-800'
-          >
-            <Info className='h-3 w-3' />
-            What is Clearbrief?
-          </a>
-
-          <Button variant='outline' size='sm' className='p-1'>
-            <Square className='h-3 w-3' />
-          </Button>
+        <div className='relative'>
+          <Calendar className='text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2' />
+          <Input
+            placeholder='Date'
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className='w-[120px] pl-10'
+          />
         </div>
       </div>
 
-      {/* Exhibit Table */}
-      <CaseDetailsTable columns={hearingExhibitColumns} data={[]} />
+      {/* Action Bar (Toolbar) */}
+      <div className='flex items-center space-x-2'>
+        <Button variant='outline' size='sm'>
+          <RefreshCw className='mr-2 h-4 w-4' />
+          Refresh
+        </Button>
+        <Button
+          variant='outline'
+          size='sm'
+          className='text-red-600 hover:text-red-700'
+        >
+          <Trash2 className='mr-2 h-4 w-4' />
+          Delete
+        </Button>
+        <Button variant='outline' size='sm'>
+          <Printer className='mr-2 h-4 w-4' />
+          Print List
+        </Button>
+        <Button variant='outline' size='sm'>
+          <Download className='mr-2 h-4 w-4' />
+          Download
+        </Button>
+        <Button variant='outline' size='sm'>
+          <Flag className='mr-2 h-4 w-4' />
+          Add
+        </Button>
+        <Button variant='outline' size='sm'>
+          <Minus className='mr-2 h-4 w-4' />
+          Remove
+        </Button>
+        <Button size='sm'>
+          <Save className='mr-2 h-4 w-4' />
+          Save
+        </Button>
+        <Button variant='outline' size='sm'>
+          <Expand className='mr-2 h-4 w-4' />
+        </Button>
+      </div>
+
+      {/* Data Table */}
+      <div className='rounded-md border bg-white'>
+        <Table>
+          <TableHeader>
+            <TableRow className='bg-muted/50'>
+              <TableHead className='w-12'>
+                <Checkbox />
+              </TableHead>
+              <TableHead>View</TableHead>
+              <TableHead>New</TableHead>
+              <TableHead>Exhibit No. & Description</TableHead>
+              <TableHead>Joint?</TableHead>
+              <TableHead>Source</TableHead>
+              <TableHead>Upload Date</TableHead>
+              <TableHead>Flag</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow>
+              <TableCell
+                colSpan={8}
+                className='text-muted-foreground h-24 text-center'
+              >
+                No data to display.
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

@@ -1,19 +1,35 @@
-import { eventsColumns } from './columns';
-import CaseDetailsTable from './table';
+'use client';
+
+import { useEffect, useState } from 'react';
+import EventsTable from './components/case-events-table';
 import { useGetCaseEvents } from '@/hooks/useCases';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 export default function Events({ caseId }: { caseId: string }) {
-  const { data: events, isLoading, error } = useGetCaseEvents(caseId);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [currentPage, setCurrentPage] = useState(
+    Number(searchParams.get('page')) || 1
+  );
+
+  useEffect(() => {
+    router.push(`/dashboard/cases/${caseId}?page=${currentPage}`);
+  }, [currentPage, router, caseId]);
+
+  const { data: events, isLoading } = useGetCaseEvents(caseId, currentPage);
+  console.log(events?.data);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   return (
-    <div className='flex flex-col gap-4'>
-      <h2 className='text-2xl font-bold'>Events</h2>
-      <CaseDetailsTable
-        columns={eventsColumns}
-        data={events || []}
-        isLoading={isLoading}
-        error={error}
-      />
-    </div>
+    <EventsTable
+      events={events?.data || []}
+      isLoading={isLoading}
+      count={events?.count || 0}
+      currentPage={currentPage}
+      onPageChange={handlePageChange}
+    />
   );
 }

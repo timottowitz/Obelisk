@@ -140,11 +140,12 @@ export function useDeleteCase() {
   });
 }
 
-export function useGetCases(type: string,page: number, search?: string, statusFilter?: string, sort?: string) {
+export function useGetCases(type: string,page: number, search?: string, statusFilter?: string, sortBy?: string, order?: string) {
+  console.log(sortBy, order);
   return useQuery({
-    queryKey: [...QUERY_KEYS.cases, type, page, search, statusFilter, sort],
+    queryKey: [...QUERY_KEYS.cases, type, page, search, statusFilter, sortBy, order],
     queryFn: async () => {
-      const response = await CasesAPI.getCases(type, page, search, statusFilter, sort);
+      const response = await CasesAPI.getCases(type, page, search, statusFilter, sortBy, order);
       return response;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -164,11 +165,11 @@ export function useGetCase(caseId: string) {
   });
 }
 
-export function useGetCaseTasks(caseId: string) {
+export function useGetCaseTasks(caseId: string, page: number) {
   return useQuery({
-    queryKey: [...QUERY_KEYS.tasks, caseId],
+    queryKey: [...QUERY_KEYS.tasks, caseId, page],
     queryFn: async () => {
-      const response = await CasesAPI.getCaseTasks(caseId);
+      const response = await CasesAPI.getCaseTasks(caseId, page);
       return response;
     },
     enabled: !!caseId,
@@ -324,11 +325,11 @@ export function useDeleteFolderTemplate() {
   });
 }
 
-export function useGetCaseEvents(caseId: string) {
+export function useGetCaseEvents(caseId: string, page: number = 1) {
   return useQuery({
-    queryKey: [...QUERY_KEYS.events, caseId],
+    queryKey: [...QUERY_KEYS.events, caseId, page],
     queryFn: async () => {
-      const response = await CasesAPI.getCaseEvents(caseId);
+      const response = await CasesAPI.getCaseEvents(caseId, page);
       return response;
     },
     enabled: !!caseId,

@@ -27,17 +27,17 @@ import {
 } from '@/components/ui/sidebar';
 import { UserAvatarProfile } from '@/components/user-avatar-profile';
 import { navItems, footerItems } from '@/constants/data';
-import { useMediaQuery } from '@/hooks/use-media-query';
 import { Button } from '@/components/ui/button';
 import { useUser, useOrganizationList, useAuth } from '@clerk/nextjs';
 import {
   IconBell,
-  IconChevronsDown,
-  IconChevronsRight,
   IconCreditCard,
   IconLogout,
-  IconUserCircle
+  IconUserCircle,
+  IconFolderOpen,
+  IconFolder,
 } from '@tabler/icons-react';
+import { ChevronRight, ChevronDown } from 'lucide-react';
 import { SignOutButton } from '@clerk/nextjs';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -121,7 +121,10 @@ export default function AppSidebar() {
           <SidebarMenu>
             {navItems.map((item) => {
               const Icon = item.icon ? Icons[item.icon] : Icons.logo;
-              const isActive = item.url === "/dashboard" ? pathname === "/dashboard/overview" : pathname.includes(item.url);
+              const isActive =
+                item.url === '/dashboard'
+                  ? pathname === '/dashboard/overview'
+                  : pathname.includes(item.url);
               return (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
@@ -135,19 +138,30 @@ export default function AppSidebar() {
                     )}
                   >
                     {item.items && item.items.length > 0 ? (
-                      <div className='flex items-center gap-2 cursor-pointer' onClick={() => setIsOpen(!isOpen)} >
-                        <Icon size={24} />
+                      <div
+                        className='flex cursor-pointer items-center gap-2'
+                        onClick={() => setIsOpen(!isOpen)}
+                      >
+                        {isOpen ? (
+                          <IconFolderOpen
+                            style={{ width: '24px', height: '24px' }}
+                          />
+                        ) : (
+                          <IconFolder
+                            style={{ width: '24px', height: '24px' }}
+                          />
+                        )}
                         <span>{item.title}</span>
                         {isOpen ? (
-                          <IconChevronsDown className='ml-auto size-4' />
+                          <ChevronDown className='ml-auto size-4' />
                         ) : (
-                          <IconChevronsRight className='ml-auto size-4' />
+                          <ChevronRight className='ml-auto size-4' />
                         )}
                       </div>
                     ) : (
                       <Link href={item.url}>
-                        <Icon size={24} />
-                        <span>{item.title}</span>
+                        <Icon style={{ width: '24px', height: '24px' }} />
+                        <span className='text-sm'>{item.title}</span>
                       </Link>
                     )}
                   </SidebarMenuButton>
@@ -157,18 +171,28 @@ export default function AppSidebar() {
                         const SubIcon = subItem.icon
                           ? Icons[subItem.icon]
                           : Icons.logo;
-                        const isSubActive = searchParams.get('type') === subItem.url.split('?')[1].split('=')[1];
+
+                        const isSubActive =
+                          pathname === '/dashboard/cases'
+                            ? searchParams.get('type') ===
+                              subItem.title.split(' ')[0].toLowerCase()
+                            : pathname.includes(subItem.url);
                         return (
                           <SidebarMenuSubItem key={subItem.title}>
-                            <SidebarMenuSubButton asChild className={cn(
-                              'text-md flex w-full items-center rounded-lg px-4 py-5 text-left transition-colors',
-                              isSubActive
-                                ? 'border border-blue-200 bg-blue-50 text-blue-700'
-                                : 'text-gray-700 hover:bg-gray-50'
-                            )}>
+                            <SidebarMenuSubButton
+                              asChild
+                              className={cn(
+                                'text-md flex w-full items-center rounded-lg px-4 py-5 text-left transition-colors',
+                                isSubActive
+                                  ? 'border border-blue-200 bg-blue-50 text-blue-700'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                              )}
+                            >
                               <Link href={subItem.url}>
-                                <SubIcon size={24} />
-                                <span>{subItem.title}</span>
+                                <SubIcon
+                                  style={{ width: '24px', height: '24px' }}
+                                />
+                                <span className='text-sm'>{subItem.title}</span>
                               </Link>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
@@ -201,8 +225,8 @@ export default function AppSidebar() {
                     )}
                   >
                     <Link href={item.url}>
-                      <Icon size={24} />
-                      <span>{item.title}</span>
+                      <Icon style={{ width: '24px', height: '24px' }} />
+                      <span className='text-sm'>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -244,7 +268,7 @@ export default function AppSidebar() {
                       user={user}
                     />
                   )}
-                  <IconChevronsDown className='ml-auto size-4' />
+                  <ChevronDown className='ml-auto size-4' />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent

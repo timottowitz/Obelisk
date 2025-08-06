@@ -110,7 +110,7 @@ export function ManageFolderTemplates({ caseTypeId }: { caseTypeId: string }) {
         <p className='text-center'>Loading case type...</p>
       ) : (
         <p className='text-center'>
-          Add and manage folder templates for "{caseTypeData?.display_name}"
+          Add and manage folder templates for {caseTypeData?.display_name}
           case type
         </p>
       )}

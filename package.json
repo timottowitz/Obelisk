@@ -9,6 +9,7 @@
     "meeting-intelligence:test": "tsx scripts/testMeetingIntelligenceIntegration.ts",
     "meeting-intelligence:validate-integration": "tsx scripts/validateMeetingIntelligenceIntegration.ts",
     "seed:case-types": "tsx scripts/seed-case-types.ts",
+    "seed:task-categories": "tsx scripts/seed-task-categories.ts",
     "start": "cd frontend && npm start",
     "build": "cd frontend && npm run build",
     "dev": "cd frontend && npm run dev"

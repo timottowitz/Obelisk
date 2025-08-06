@@ -24,7 +24,6 @@ export default function TasksPage() {
 
   return (
     <div className='container mx-auto flex w-[80%] flex-col gap-4 px-10 py-10'>
-      <h1 className='text-2xl font-bold'>Case Tasks</h1>
       <TasksTable
         tasks={tasksData || []}
         isLoading={isLoading}

@@ -18,9 +18,27 @@ import {
   PaginationNext,
   PaginationPrevious
 } from '@/components/ui/pagination';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Calendar,
+  Clock,
+  FileText,
+  Hash,
+  User,
+  Filter,
+  Plus
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Calendar, FileText, Hash } from 'lucide-react';
-import dayjs from 'dayjs';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem
+} from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 
 interface TasksTableProps {
   tasks: Task[];
@@ -37,9 +55,9 @@ const MobileLoadingState = memo(() => (
         key={i}
         className='border-muted bg-card animate-pulse rounded-lg border p-4 shadow-sm'
       >
-        <div className='mb-3 h-4 w-3/4 rounded bg-muted'></div>
-        <div className='mb-2 h-3 w-1/2 rounded bg-muted'></div>
-        <div className='h-3 w-2/3 rounded bg-muted'></div>
+        <div className='bg-muted mb-3 h-4 w-3/4 rounded'></div>
+        <div className='bg-muted mb-2 h-3 w-1/2 rounded'></div>
+        <div className='bg-muted h-3 w-2/3 rounded'></div>
       </div>
     ))}
   </div>
@@ -48,8 +66,8 @@ MobileLoadingState.displayName = 'MobileLoadingState';
 
 const DesktopLoadingState = memo(() => (
   <TableRow>
-    <TableCell colSpan={5} className='py-16 text-center'>
-      <div className='flex flex-col items-center gap-3'>
+    <TableCell colSpan={6} className='py-16 text-center'>
+      <div className='flex flex-col items-center justify-center gap-3'>
         <div className='border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent'></div>
         <span className='text-muted-foreground'>Loading tasks...</span>
       </div>
@@ -60,8 +78,8 @@ DesktopLoadingState.displayName = 'DesktopLoadingState';
 
 const MobileEmptyState = memo(() => (
   <div className='p-8 text-center'>
-    <div className='mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-muted'>
-      <FileText className='h-8 w-8 text-muted-foreground' />
+    <div className='bg-muted mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full'>
+      <FileText className='text-muted-foreground h-8 w-8' />
     </div>
     <p className='text-muted-foreground'>No tasks found</p>
   </div>
@@ -70,10 +88,13 @@ MobileEmptyState.displayName = 'MobileEmptyState';
 
 const DesktopEmptyState = memo(() => (
   <TableRow>
-    <TableCell colSpan={5} className='py-16 text-center'>
+    <TableCell
+      colSpan={6}
+      className='flex items-center justify-center py-16 text-center'
+    >
       <div className='flex flex-col items-center gap-3'>
-        <div className='inline-flex h-16 w-16 items-center justify-center rounded-full bg-muted'>
-          <FileText className='h-8 w-8 text-muted-foreground' />
+        <div className='bg-muted inline-flex h-16 w-16 items-center justify-center rounded-full'>
+          <FileText className='text-muted-foreground h-8 w-8' />
         </div>
         <p className='text-muted-foreground'>No tasks found</p>
       </div>
@@ -86,32 +107,69 @@ const MobileTaskRow = memo(({ task }: { task: Task }) => (
   <div className='border-muted bg-card space-y-3 rounded-lg border p-4 shadow-sm transition-shadow duration-200 hover:shadow-md'>
     <div className='flex items-start justify-between'>
       <div className='flex items-center gap-2'>
-        <Hash className='h-4 w-4 text-muted-foreground' />
-        <span className='font-semibold text-foreground'>{task.case_number}</span>
+        <Hash className='text-muted-foreground h-4 w-4' />
+        <span className='text-foreground font-semibold'>{task.name}</span>
       </div>
-      <div className='flex gap-2 flex-wrap'>
+      <div className='flex flex-wrap gap-2'>
         <span className='inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200'>
-          {task.claimant}
+          {task.assignee}
         </span>
         <span className='inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800 dark:bg-purple-900 dark:text-purple-200'>
-          {task.respondent}
+          {task.priority}
         </span>
       </div>
     </div>
 
-    {task.name && (
-      <p className='line-clamp-2 text-sm text-muted-foreground'>{task.name}</p>
+    {task.description && (
+      <p className='text-muted-foreground line-clamp-2 text-sm'>
+        {task.description}
+      </p>
     )}
 
-    <div className='flex items-center gap-4 text-xs text-muted-foreground'>
+    <div className='text-muted-foreground flex items-center gap-4 text-xs'>
       <div className='flex items-center gap-1'>
         <Calendar className='h-3 w-3' />
-        <span>{dayjs(task.due_date).format('DD/MM/YYYY')}</span>
+        <span>{formatDate(task.due_date)}</span>
       </div>
     </div>
   </div>
 ));
 MobileTaskRow.displayName = 'MobileTaskRow';
+
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case 'completed':
+      return <CheckCircle2 className='h-4 w-4 text-green-600' />;
+    case 'overdue':
+      return <AlertCircle className='h-4 w-4 text-red-600' />;
+    case 'in-progress':
+      return <Clock className='h-4 w-4 text-blue-600' />;
+    default:
+      return <Clock className='h-4 w-4 text-gray-400' />;
+  }
+};
+
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+};
+
+const getPriorityColor = (priority: string) => {
+  switch (priority) {
+    case 'High':
+      return 'text-red-600 bg-red-50 border-red-200';
+    case 'Medium':
+      return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+    case 'Low':
+      return 'text-green-600 bg-green-50 border-green-200';
+    default:
+      return 'text-gray-600 bg-gray-50 border-gray-200';
+  }
+};
 
 function TasksTable({
   tasks,
@@ -163,83 +221,129 @@ function TasksTable({
   );
 
   return (
-    <div className='space-y-4'>
-      {/* Mobile View */}
-      <div className='space-y-3 sm:hidden'>
-        {isLoading && <MobileLoadingState />}
-        {tasks &&
-          !isLoading &&
-          tasks.map((task) => <MobileTaskRow key={task.id} task={task} />)}
-        {tasks && !isLoading && tasks.length === 0 && <MobileEmptyState />}
-      </div>
+    <>
+      <Card className='pb-0'>
+        <CardHeader className='pb-0'>
+          <CardTitle className='flex items-center justify-between'>
+            <h2 className='text-lg font-semibold text-gray-900'>Case Tasks</h2>
+            <div className='flex items-center gap-2'>
+              <Select>
+                <SelectTrigger className='flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50'>
+                  <Filter className='h-4 w-4' />
+                  <SelectValue placeholder='Filter' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='all'>All</SelectItem>
+                  <SelectItem value='completed'>Completed</SelectItem>
+                  <SelectItem value='in-progress'>In Progress</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button className='flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50'>
+                <Plus className='h-4 w-4' />
+                Create A Task
+              </Button>
+            </div>
+          </CardTitle>
+        </CardHeader>
+        {/* Mobile View */}
+        <div className='space-y-3 sm:hidden'>
+          {isLoading && <MobileLoadingState />}
+          {tasks &&
+            !isLoading &&
+            tasks.map((task) => <MobileTaskRow key={task.id} task={task} />)}
+          {tasks && !isLoading && tasks.length === 0 && <MobileEmptyState />}
+        </div>
 
-      {/* Desktop View */}
-      <div className='border-muted bg-card hidden overflow-hidden rounded-lg border shadow-sm sm:block'>
-        <Table>
+        {/* Desktop View */}
+        <Table className='border-b border-gray-200 bg-gray-50'>
           <TableHeader>
             <TableRow className='bg-muted/50 hover:bg-muted/50'>
-              <TableHead className='text-center font-semibold'>
-                Case Number
+              <TableHead className='px-6 py-4 text-left text-xs font-medium tracking-wider text-gray-500 uppercase'>
+                TASK
               </TableHead>
-              <TableHead className='text-center font-semibold'>
-                Task
+              <TableHead className='px-6 py-4 text-left text-xs font-medium tracking-wider text-gray-500 uppercase'>
+                DUE DATE
               </TableHead>
-              <TableHead className='hidden text-center font-semibold lg:table-cell'>
-                Due Date
+              <TableHead className='px-6 py-4 text-left text-xs font-medium tracking-wider text-gray-500 uppercase'>
+                ASSIGNEE
               </TableHead>
-              <TableHead className='text-center font-semibold'>
-                Claimant
+              <TableHead className='px-6 py-4 text-left text-xs font-medium tracking-wider text-gray-500 uppercase'>
+                PRIORITY
               </TableHead>
-              <TableHead className='hidden text-center font-semibold md:table-cell'>
-                Respondent
+              <TableHead className='px-6 py-4 text-left text-xs font-medium tracking-wider text-gray-500 uppercase'>
+                STATUS
+              </TableHead>
+              <TableHead className='px-6 py-4 text-left text-xs font-medium tracking-wider text-gray-500 uppercase'>
+                CATEGORY
               </TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className='divide-y divide-gray-200 bg-white'>
             {isLoading && <DesktopLoadingState />}
             {tasks &&
               !isLoading &&
               tasks.map((task) => (
                 <TableRow
                   key={task.id}
-                  className='text-center transition-colors duration-150 hover:bg-muted/50'
+                  className='cursor-pointer transition-colors hover:bg-gray-50'
                 >
-                  <TableCell className='font-medium'>
-                    {task.case_number}
+                  <TableCell className='px-6 py-4'>
+                    {task.name}
+                    {task.description && (
+                      <p className='text-muted-foreground text-sm'>
+                        {task.description}
+                      </p>
+                    )}
                   </TableCell>
-                  <TableCell>
-                    <span className='inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200'>
-                      {task.name}
+                  <TableCell className='px-6 py-4 text-sm text-gray-900'>
+                    <div className='flex items-center gap-2'>
+                      <Calendar className='mr-1 h-4 w-4 text-gray-400' />
+                      {formatDate(task.due_date)}
+                    </div>
+                  </TableCell>
+                  <TableCell className='px-6 py-4 text-sm text-gray-900'>
+                    <div className='flex items-center gap-2'>
+                      <div className='flex h-6 w-6 items-center justify-center rounded-full bg-gray-200'>
+                        <User className='h-3 w-3 text-gray-600' />
+                      </div>
+                      <span>{task.assignee}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className='px-6 py-4'>
+                    <span
+                      className={cn(
+                        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
+                        getPriorityColor(task.priority)
+                      )}
+                    >
+                      {task.priority.charAt(0).toUpperCase() +
+                        task.priority.slice(1)}
                     </span>
                   </TableCell>
-                  <TableCell className='hidden text-muted-foreground lg:table-cell'>
-                    {dayjs(task.due_date).format('DD/MM/YYYY')}
+                  <TableCell className='px-6 py-4'>
+                    <div className='flex items-center gap-2'>
+                      {getStatusIcon(task.status)}
+                      <span className='text-sm capitalize'>
+                        {task.status.replace('-', ' ')}
+                      </span>
+                    </div>
                   </TableCell>
-                  <TableCell>
-                    <span className='inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200'>
-                      {task.claimant}
-                    </span>
-                  </TableCell>
-                  <TableCell className='hidden md:table-cell'>
-                    <span className='inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800 dark:bg-purple-900 dark:text-purple-200'>
-                      {task.respondent}
-                    </span>
-                  </TableCell>
+                  <TableCell className='px-6 py-4'>{task.category}</TableCell>
                 </TableRow>
               ))}
             {tasks && !isLoading && tasks.length === 0 && <DesktopEmptyState />}
           </TableBody>
         </Table>
-      </div>
+      </Card>
       <div className='mt-4 flex items-center justify-between'>
         {isLoading ? (
-          <span className='text-sm text-muted-foreground'>Loading...</span>
-        ) : (
-          <span className='text-sm text-muted-foreground'>
-            Showing {`${(currentPage - 1) * 5 + 1}`} -{' '}
-            {`${Math.min(currentPage * 5, count)}`} of {count} tasks
+          <p>Loading...</p>
+        ) : count && count > 0 ? (
+          <span className='text-muted-foreground flex w-full items-center gap-2 text-sm font-medium'>
+            Showing{' '}
+            {`${(currentPage - 1) * 5 + 1}-${Math.min(currentPage * 5, count)} of ${count} tasks`}
           </span>
-        )}
+        ) : null}
         {/* Pagination */}
         {totalPages > 1 && (
           <Pagination className='flex justify-end'>
@@ -250,7 +354,7 @@ function TasksTable({
                   className={cn(
                     'h-9 cursor-pointer rounded-lg border px-3 transition-all duration-200',
                     currentPage === 1
-                      ? 'pointer-events-none bg-muted opacity-50'
+                      ? 'bg-muted pointer-events-none opacity-50'
                       : 'hover:bg-accent hover:text-accent-foreground'
                   )}
                 />
@@ -260,7 +364,7 @@ function TasksTable({
                 {pageNumbers.map((page, index) => (
                   <PaginationItem key={`${page}-${index}`}>
                     {page === '...' ? (
-                      <span className='px-3 text-muted-foreground'>...</span>
+                      <span className='text-muted-foreground px-3'>...</span>
                     ) : (
                       <PaginationLink
                         onClick={() => handlePageChange(Number(page))}
@@ -280,7 +384,7 @@ function TasksTable({
 
               {/* Mobile Page Indicator */}
               <div className='flex items-center gap-2 px-3 sm:hidden'>
-                <span className='text-sm text-muted-foreground'>
+                <span className='text-muted-foreground text-sm'>
                   Page {currentPage} of {totalPages}
                 </span>
               </div>
@@ -291,7 +395,7 @@ function TasksTable({
                   className={cn(
                     'h-9 cursor-pointer rounded-lg border px-3 transition-all duration-200',
                     currentPage === totalPages
-                      ? 'pointer-events-none bg-muted opacity-50'
+                      ? 'bg-muted pointer-events-none opacity-50'
                       : 'hover:bg-accent hover:text-accent-foreground'
                   )}
                 />
@@ -300,7 +404,7 @@ function TasksTable({
           </Pagination>
         )}
       </div>
-    </div>
+    </>
   );
 }
 
