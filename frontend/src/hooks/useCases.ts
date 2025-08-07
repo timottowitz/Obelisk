@@ -196,9 +196,6 @@ export function useCreateCaseTask() {
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.tasks, caseId]
       });
-      queryClient.invalidateQueries({
-        queryKey: [...QUERY_KEYS.events, caseId]
-      });
     },
     onError: (error) => {
       console.error('Case task creation failed:', error);
@@ -208,6 +205,7 @@ export function useCreateCaseTask() {
 
 export function useUpdateCaseTask() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async ({
       caseId,
@@ -225,9 +223,6 @@ export function useUpdateCaseTask() {
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.tasks, caseId]
       });
-      queryClient.invalidateQueries({
-        queryKey: [...QUERY_KEYS.events]
-      });
     },
     onError: (error) => {
       console.error('Case task update failed:', error);
@@ -237,6 +232,7 @@ export function useUpdateCaseTask() {
 
 export function useDeleteCaseTask() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async ({
       caseId,
@@ -251,9 +247,6 @@ export function useDeleteCaseTask() {
     onSuccess: (_, { caseId }) => {
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.tasks, caseId]
-      });
-      queryClient.invalidateQueries({
-        queryKey: [...QUERY_KEYS.events]
       });
     },
     onError: (error) => {
@@ -355,5 +348,15 @@ export function useCasesOperations() {
     updateCaseType: useUpdateCaseType(),
     updateFolderTemplates: useUpdateFolderTemplates(),
     deleteFolderTemplate: useDeleteFolderTemplate()
+  };
+}
+
+// Helper function to get case operations with a specific caseId
+export function useCaseOperations(caseId: string) {
+  return {
+    //Queries
+    getCase: useGetCase(caseId),
+    getCaseTasks: useGetCaseTasks(caseId, 1),
+    getCaseEvents: useGetCaseEvents(caseId)
   };
 }

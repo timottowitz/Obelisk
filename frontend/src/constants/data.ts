@@ -87,11 +87,19 @@ export const navItems: NavItem[] = [
     items: []
   },
   {
+    title: 'Projects',
+    url: '/dashboard/projects',
+    icon: 'folderOpen',
+    isActive: false,
+    shortcut: ['p', 'r'],
+    items: []
+  },
+  {
     title: 'Expenses',
     url: '/dashboard/expenses',
     icon: 'dollar',
     isActive: false,
-    shortcut: ['p', 'p'],
+    shortcut: ['e', 'x'],
     items: []
   }
 ];

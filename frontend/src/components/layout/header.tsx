@@ -7,6 +7,7 @@ import { Badge } from '../ui/badge';
 import { UserNav } from './user-nav';
 import { ThemeSelector } from '../theme-selector';
 import { ModeToggle } from './ThemeToggle/theme-toggle';
+import { AINotificationCenter } from '../ai/ai-notification-center';
 
 export default function Header() {
   const notifications = 3;
@@ -19,6 +20,8 @@ export default function Header() {
       </div>
 
       <div className='flex items-center gap-2 px-4'>
+        <AINotificationCenter />
+        
         <Button variant='ghost' className='relative h-8 w-8'>
           <Bell />
           {notifications > 0 && (
