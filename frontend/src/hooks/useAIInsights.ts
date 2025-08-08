@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { aiInsightsService } from '@/services/ai-insights';
+import { AiInsightsService } from '@/services/ai-insights';
 import type {
   AITaskInsightWithDetails,
   ReviewAITaskRequest,
@@ -14,7 +14,7 @@ import { trackAIEvent } from './useAIAnalytics';
 export function useAIInsightsForCase(caseId?: string) {
   return useQuery({
     queryKey: ['ai-insights', 'case', caseId],
-    queryFn: () => aiInsightsService.getCaseInsights(caseId!),
+    queryFn: () => AiInsightsService.getCaseInsights(caseId!),
     enabled: !!caseId,
   });
 }
@@ -25,7 +25,7 @@ export function useAIInsightsForCase(caseId?: string) {
 export function useAIInsightsForProject(projectId?: string) {
   return useQuery({
     queryKey: ['ai-insights', 'project', projectId],
-    queryFn: () => aiInsightsService.getProjectInsights(projectId!),
+    queryFn: () => AiInsightsService.getProjectInsights(projectId!),
     enabled: !!projectId,
   });
 }
@@ -36,7 +36,7 @@ export function useAIInsightsForProject(projectId?: string) {
 export function usePendingAIInsights() {
   return useQuery({
     queryKey: ['ai-insights', 'pending'],
-    queryFn: () => aiInsightsService.getPendingInsights(),
+    queryFn: () => AiInsightsService.getPendingInsights(),
     refetchInterval: 30000, // Refetch every 30 seconds
   });
 }
@@ -47,7 +47,7 @@ export function usePendingAIInsights() {
 export function useAIInsightDetails(insightId?: string) {
   return useQuery({
     queryKey: ['ai-insights', 'detail', insightId],
-    queryFn: () => aiInsightsService.getInsightById(insightId!),
+    queryFn: () => AiInsightsService.getInsightById(insightId!),
     enabled: !!insightId,
   });
 }
@@ -58,7 +58,7 @@ export function useAIInsightDetails(insightId?: string) {
 export function useTaskInsights(taskId?: string) {
   return useQuery({
     queryKey: ['ai-insights', 'task', taskId],
-    queryFn: () => aiInsightsService.getTaskInsights(taskId!),
+    queryFn: () => AiInsightsService.getTaskInsights(taskId!),
     enabled: !!taskId,
   });
 }
@@ -69,7 +69,7 @@ export function useTaskInsights(taskId?: string) {
 export function useAIInsightStats() {
   return useQuery({
     queryKey: ['ai-insights', 'stats'],
-    queryFn: () => aiInsightsService.getInsightStats(),
+    queryFn: () => AiInsightsService.getInsightStats(),
     refetchInterval: 60000, // Refetch every minute
   });
 }
@@ -82,7 +82,7 @@ export function useReviewAITask() {
 
   return useMutation({
     mutationFn: (request: ReviewAITaskRequest) =>
-      aiInsightsService.reviewInsight(request),
+      AiInsightsService.reviewInsight(request),
     onSuccess: (data, variables) => {
       // Track analytics
       trackAIEvent(variables.decision === 'accept' ? 'accept' : 'reject', {
@@ -118,7 +118,7 @@ export function useBulkReviewAITasks() {
 
   return useMutation({
     mutationFn: (request: BulkReviewRequest) =>
-      aiInsightsService.bulkReview(request),
+      AiInsightsService.bulkReview(request),
     onSuccess: (data, variables) => {
       // Track analytics
       trackAIEvent(

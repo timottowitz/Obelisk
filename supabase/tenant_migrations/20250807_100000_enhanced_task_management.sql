@@ -72,18 +72,6 @@ CREATE TABLE IF NOT EXISTS {{schema_name}}.project_tasks (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create AI insights table for Foundation AI processed data
-CREATE TABLE IF NOT EXISTS {{schema_name}}.ai_task_insights (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    task_type VARCHAR(20) NOT NULL, -- 'case_task' or 'project_task'
-    task_id UUID NOT NULL,
-    insight_type VARCHAR(50) NOT NULL, -- 'deadline_risk', 'workload_alert', 'priority_suggestion', etc.
-    confidence_score DECIMAL(3,2),
-    insight_data JSONB,
-    foundation_ai_processed_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_case_tasks_case_project_id ON {{schema_name}}.case_tasks(case_project_id);
 CREATE INDEX IF NOT EXISTS idx_case_tasks_assigner_id ON {{schema_name}}.case_tasks(assigner_id);
@@ -93,4 +81,3 @@ CREATE INDEX IF NOT EXISTS idx_case_projects_case_id ON {{schema_name}}.case_pro
 CREATE INDEX IF NOT EXISTS idx_project_tasks_project_id ON {{schema_name}}.project_tasks(project_id);
 CREATE INDEX IF NOT EXISTS idx_project_tasks_assignee_id ON {{schema_name}}.project_tasks(assignee_id);
 CREATE INDEX IF NOT EXISTS idx_project_tasks_assigner_id ON {{schema_name}}.project_tasks(assigner_id);
-CREATE INDEX IF NOT EXISTS idx_ai_task_insights_task ON {{schema_name}}.ai_task_insights(task_type, task_id);

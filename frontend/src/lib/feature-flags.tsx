@@ -3,6 +3,8 @@
  * These can be controlled via environment variables or remote config
  */
 
+import React, { createContext, useContext, ReactNode } from 'react';
+
 interface FeatureFlags {
   aiSuggestions: boolean;
   aiSuggestionsAutoApply: boolean;
@@ -147,8 +149,6 @@ export function clearFeatureFlagOverrides() {
 /**
  * Feature flag context provider
  */
-import { createContext, useContext, ReactNode } from 'react';
-
 const FeatureFlagContext = createContext<FeatureFlags>(getFeatureFlags());
 
 export function FeatureFlagProvider({ children }: { children: ReactNode }) {

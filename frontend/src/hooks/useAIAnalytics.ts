@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { aiInsightsService } from '@/services/ai-insights';
+import { AiInsightsService } from '@/services/ai-insights';
 
 interface AIAnalyticsData {
   acceptanceRate: number;
@@ -76,7 +76,7 @@ export function useAIAnalytics(timeRange: '7d' | '30d' | '90d' = '30d') {
     queryKey: ['ai-analytics', timeRange],
     queryFn: async () => {
       // Get stats from API
-      const stats = await aiInsightsService.getInsightStats();
+      const stats = await AiInsightsService.getInsightStats();
       
       // Calculate analytics
       const total = stats.total || 1; // Avoid division by zero

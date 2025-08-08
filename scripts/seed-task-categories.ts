@@ -25,7 +25,7 @@ import * as path from "path";
 config();
 
 // Type definitions
-interface TaskCategory {
+interface TaskProject {
   name: string;
   description: string;
 }
@@ -60,7 +60,7 @@ const CONFIG: Config = {
 };
 
 // Default task categories configuration
-export const DEFAULT_TASK_CATEGORIES: TaskCategory[] = [
+export const DEFAULT_TASK_CATEGORIES: TaskProject[] = [
     {
       name: "Discovery",
       description: "Discovery tasks",
@@ -79,7 +79,7 @@ export const DEFAULT_TASK_CATEGORIES: TaskCategory[] = [
     },
   ];
 
-class TaskCategorySeeder {
+class TaskProjectSeeder {
   private client: Client;
   private args: SeederArgs;
   private stats: SeederStats;
@@ -174,12 +174,12 @@ CONFIGURATION FILE FORMAT:
     console.log("=� Task Categories Seeder initialized");
   }
 
-  private async loadConfiguration(): Promise<TaskCategory[]> {
+  private async loadConfiguration(): Promise<TaskProject[]> {
     if (this.args.config) {
       try {
         const configPath = path.resolve(this.args.config);
         const configData = fs.readFileSync(configPath, "utf8");
-        const customConfig: TaskCategory[] = JSON.parse(configData);
+        const customConfig: TaskProject[] = JSON.parse(configData);
         console.log(`=� Using custom configuration: ${configPath}`);
         return customConfig;
       } catch (error) {
@@ -225,7 +225,7 @@ CONFIGURATION FILE FORMAT:
 
   private async seedCategoriesForOrg(
     organization: Organization,
-    categoriesConfig: TaskCategory[]
+    categoriesConfig: TaskProject[]
   ): Promise<void> {
     const schema = organization.schema_name.toLowerCase();
     console.log(
@@ -301,7 +301,7 @@ CONFIGURATION FILE FORMAT:
 
   private async preview(
     organizations: Organization[],
-    categoriesConfig: TaskCategory[]
+    categoriesConfig: TaskProject[]
   ): Promise<void> {
     console.log("\n=� PREVIEW MODE - No changes will be made\n");
 
@@ -381,11 +381,11 @@ CONFIGURATION FILE FORMAT:
 
 // Run the seeder
 if (require.main === module) {
-  const seeder = new TaskCategorySeeder();
+  const seeder = new TaskProjectSeeder();
   seeder.run().catch((error) => {
     console.error("Unhandled error:", error);
     process.exit(1);
   });
 }
 
-export default TaskCategorySeeder;
+export default TaskProjectSeeder;

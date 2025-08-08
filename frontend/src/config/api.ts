@@ -21,6 +21,10 @@ export const API_CONFIG = {
     ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/tasks`
     : 'https://rnmjwdxqtsvsbelcftzg.supabase.co/functions/v1/tasks',
 
+  AI_INSIGHTS_BASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL
+    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/ai-insights`
+    : 'https://rnmjwdxqtsvsbelcftzg.supabase.co/functions/v1/ai-insights',
+
   // Default pagination settings
   DEFAULT_LIMIT: 50,
   DEFAULT_ORDER_BY: 'start_time',
@@ -70,7 +74,7 @@ export async function getAuthHeaders(): Promise<HeadersInit> {
 
   return {
     Authorization: `Bearer ${token}`,
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/json'
   };
 }
 

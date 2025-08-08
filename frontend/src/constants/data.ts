@@ -52,14 +52,6 @@ export const navItems: NavItem[] = [
         shortcut: ['c', 'c'],
         items: []
       },
-      {
-        title: 'My Tasks',
-        url: '/dashboard/tasks',
-        icon: 'squareCheck',
-        isActive: false,
-        shortcut: ['t', 't'],
-        items: []
-      }
     ]
   },
   {

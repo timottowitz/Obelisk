@@ -11,34 +11,60 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import dayjs from 'dayjs';
+import {
+  useCreateCaseProject,
+  useCaseProjects,
+  useGetTeamMembers,
+  useCreateCaseTask
+} from '@/hooks/useTasks';
+import { toast } from 'sonner';
+import { UploadTaskData } from '@/types/cases';
 
+const regExp = /^[A-Z][a-z0-9]*(\s[A-Z][a-z0-9]*)*$/;
 interface TaskDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (taskData: TaskData) => void;
-  initialData?: TaskData;
+  initialData: UploadTaskData | null;
   loading: boolean;
-}
-
-interface TaskData {
-  name: string;
-  due_date: string;
-  description: string;
+  caseId: string;
+  onSave: (taskData: UploadTaskData) => void;
 }
 
 export default function TaskModel({
   isOpen,
   onClose,
+  loading,
+  caseId,
   onSave,
-  initialData,
-  loading
+  initialData
 }: TaskDetailModalProps) {
-  const [formData, setFormData] = useState<TaskData>({
+  const [formData, setFormData] = useState<UploadTaskData>({
     name: '',
     due_date: '',
+    description: '',
+    assignee_id: '',
+    priority: 'medium',
+    case_project_id: ''
+  });
+
+  const [showNewProject, setShowNewProject] = useState(false);
+  const [newProjectData, setNewProjectData] = useState({
+    name: '',
     description: ''
   });
+
+  
+  const createCaseProject = useCreateCaseProject();
+  const { data: caseProjects } = useCaseProjects(caseId);
+  const { data: teamMembers } = useGetTeamMembers();
 
   // Update form data when initialData changes
   useEffect(() => {
@@ -46,21 +72,27 @@ export default function TaskModel({
       setFormData({
         name: initialData.name || '',
         due_date: dayjs(initialData.due_date).format('YYYY-MM-DD') || '',
-        description: initialData.description || ''
+        description: initialData.description || '',
+        assignee_id: initialData.assignee_id || '',
+        priority: initialData.priority || 'medium',
+        case_project_id: initialData.case_project_id || ''
       });
     } else {
       // Reset form when no initial data
       setFormData({
         name: '',
         due_date: '',
-        description: ''
+        description: '',
+        assignee_id: teamMembers?.[0]?.id || '',
+        priority: 'medium',
+        case_project_id: caseProjects?.[0]?.id || ''
       });
     }
-  }, [initialData]);
+  }, [initialData, teamMembers, caseProjects]);
 
-
+  const createTask = useCreateCaseTask();
   const handleInputChange = useCallback(
-    (field: keyof TaskData, value: string) => {
+    (field: keyof UploadTaskData, value: string) => {
       setFormData((prev) => ({
         ...prev,
         [field]: value
@@ -70,12 +102,30 @@ export default function TaskModel({
   );
 
   const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
+    async (e: React.FormEvent) => {
       e.preventDefault();
       onSave(formData);
     },
-    [formData, onSave, onClose]
+    [formData, createTask, caseId]
   );
+
+  const handleCreateProject = useCallback(async () => {
+    if (newProjectData.name) {
+      // Call the parent's onCreateProject with the new project data
+      try {
+        await createCaseProject.mutateAsync({
+          caseId,
+          projectData: newProjectData
+        });
+        setShowNewProject(false);
+        setNewProjectData({ name: '', description: '' });
+        toast.success('Project created successfully');
+      } catch (error) {
+        console.error('Error creating project', error);
+        toast.error('Error creating project');
+      }
+    }
+  }, [newProjectData, createCaseProject, caseId]);
 
   if (!isOpen) return null;
 
@@ -89,7 +139,6 @@ export default function TaskModel({
         </DialogHeader>
         <form onSubmit={handleSubmit} className='p-6'>
           <div className='space-y-4'>
-            {/* Subject and Due Date Row */}
             <div className='grid grid-cols-2 gap-4'>
               {/* Subject Field */}
               <div className='space-y-2'>
@@ -97,12 +146,12 @@ export default function TaskModel({
                   htmlFor='name'
                   className='text-sm font-medium text-gray-700'
                 >
-                  Subject <span className='text-red-500'>*</span>
+                  Name <span className='text-red-500'>*</span>
                 </Label>
                 <Input
                   id='name'
                   type='text'
-                  placeholder='Subject'
+                  placeholder='Enter task name'
                   value={formData.name}
                   onChange={(e) => handleInputChange('name', e.target.value)}
                   required
@@ -110,6 +159,141 @@ export default function TaskModel({
                 />
               </div>
 
+              {/* Priority Field */}
+              <div className='space-y-2'>
+                <Label
+                  htmlFor='priority'
+                  className='text-sm font-medium text-gray-700'
+                >
+                  Priority <span className='text-red-500'>*</span>
+                </Label>
+                <Select
+                  value={formData.priority}
+                  onValueChange={(value) =>
+                    handleInputChange(
+                      'priority',
+                      value as 'high' | 'medium' | 'low'
+                    )
+                  }
+                >
+                  <SelectTrigger className='w-full'>
+                    <SelectValue placeholder='Select priority' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='high'>
+                      <span className='flex items-center gap-2'>
+                        <span className='h-2 w-2 rounded-full bg-red-500'></span>
+                        High
+                      </span>
+                    </SelectItem>
+                    <SelectItem value='medium'>
+                      <span className='flex items-center gap-2'>
+                        <span className='h-2 w-2 rounded-full bg-yellow-500'></span>
+                        Medium
+                      </span>
+                    </SelectItem>
+                    <SelectItem value='low'>
+                      <span className='flex items-center gap-2'>
+                        <span className='h-2 w-2 rounded-full bg-green-500'></span>
+                        Low
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Project Field with inline creation */}
+            <div className='space-y-2'>
+              <Label
+                htmlFor='project'
+                className='text-sm font-medium text-gray-700'
+              >
+                Project <span className='text-red-500'>*</span>
+              </Label>
+              {!showNewProject ? (
+                <div className='flex gap-2'>
+                  <Select
+                    value={formData.case_project_id}
+                    onValueChange={(value) =>
+                      handleInputChange('case_project_id', value)
+                    }
+                  >
+                    <SelectTrigger className='flex-1'>
+                      <SelectValue placeholder='Select a project' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {caseProjects?.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type='button'
+                    variant='outline'
+                    onClick={() => setShowNewProject(true)}
+                    className='px-3'
+                  >
+                    + New
+                  </Button>
+                </div>
+              ) : (
+                <div className='space-y-2 rounded-md border bg-gray-50 p-3'>
+                  <Input
+                    type='text'
+                    placeholder='example: Discovery'
+                    value={newProjectData.name}
+                    onChange={(e) => {
+                      setNewProjectData((prev) => ({
+                        ...prev,
+                        name: e.target.value
+                      }));
+                    }}
+                    className='w-full'
+                  />
+                  <Textarea
+                    placeholder='Project description (optional)'
+                    value={newProjectData.description}
+                    onChange={(e) =>
+                      setNewProjectData((prev) => ({
+                        ...prev,
+                        description: e.target.value
+                      }))
+                    }
+                    className='w-full resize-none'
+                    rows={2}
+                  />
+                  <div className='flex justify-end gap-2'>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      onClick={() => {
+                        setShowNewProject(false);
+                        setNewProjectData({ name: '', description: '' });
+                      }}
+                      className='cursor-pointer'
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type='button'
+                      size='sm'
+                      onClick={handleCreateProject}
+                      className='cursor-pointer'
+                      disabled={!regExp.test(newProjectData.name)}
+                    >
+                      Create
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Due Date and Assignee Row */}
+            <div className='grid grid-cols-2 gap-4'>
               {/* Due Date Field */}
               <div className='space-y-2'>
                 <Label
@@ -132,15 +316,47 @@ export default function TaskModel({
                   />
                 </div>
               </div>
+
+              {/* Assignee Field */}
+              <div className='space-y-2'>
+                <Label
+                  htmlFor='assignee'
+                  className='text-sm font-medium text-gray-700'
+                >
+                  Assignee <span className='text-red-500'>*</span>
+                </Label>
+                <Select
+                  value={formData.assignee_id}
+                  onValueChange={(value) =>
+                    handleInputChange('assignee_id', value)
+                  }
+                >
+                  <SelectTrigger className='w-full'>
+                    <SelectValue placeholder='Select team member' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teamMembers?.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        <div className='flex items-center gap-2'>
+                          <span>{member.email}</span>
+                          <span className='text-xs text-gray-500'>
+                            ({member.role})
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {/* Comments Field */}
+            {/* Description Field */}
             <div className='space-y-2'>
               <Label
                 htmlFor='description'
                 className='text-sm font-medium text-gray-700'
               >
-                Comments (Optional)
+                Description (Optional)
               </Label>
               <div className='relative'>
                 <Textarea

@@ -20,11 +20,11 @@ import {
   PaginationNext,
   PaginationPrevious
 } from '@/components/ui/pagination';
-import { 
-  Edit, 
-  Trash2, 
-  Brain, 
-  MessageCircle, 
+import {
+  Edit,
+  Trash2,
+  Brain,
+  MessageCircle,
   Calendar,
   Clock,
   User,
@@ -34,9 +34,16 @@ import {
 } from 'lucide-react';
 import { Task, TaskFilterOptions } from '@/types/cases';
 import { cn } from '@/lib/utils';
-import { AISuggestionBadge, AIInsightIndicator } from '@/components/ai/ai-suggestion-badge';
+import {
+  AISuggestionBadge,
+  AIInsightIndicator
+} from '@/components/ai/ai-suggestion-badge';
 import { AISuggestionPanel } from '@/components/ai/ai-suggestion-panel';
-import { BulkReviewBar, BulkSelectCheckbox, BulkSelectHeader } from '@/components/ai/bulk-review-bar';
+import {
+  BulkReviewBar,
+  BulkSelectCheckbox,
+  BulkSelectHeader
+} from '@/components/ai/bulk-review-bar';
 import { useAIInsightsForCase, useTaskInsights } from '@/hooks/useAIInsights';
 import type { AITaskInsightWithDetails } from '@/types/ai-insights';
 
@@ -45,25 +52,23 @@ interface EnhancedCaseTasksTableProps {
   isLoading: boolean;
   count: number;
   currentPage: number;
-  searchQuery: string;
-  filters: TaskFilterOptions;
   caseId: string;
   onPageChange: (page: number) => void;
   onEditTask: (task: Task) => void;
   onDeleteTask: (task: Task) => void;
 }
 
-function TaskRow({ 
-  task, 
-  onEditTask, 
+function TaskRow({
+  task,
+  onEditTask,
   onDeleteTask,
   aiInsights,
   isSelected,
   onSelectionChange,
   onOpenAIPanel
-}: { 
-  task: Task; 
-  onEditTask: (task: Task) => void; 
+}: {
+  task: Task;
+  onEditTask: (task: Task) => void;
   onDeleteTask: (task: Task) => void;
   aiInsights?: AITaskInsightWithDetails[];
   isSelected?: boolean;
@@ -72,37 +77,55 @@ function TaskRow({
 }) {
   const getDueDateStatus = (dueDate: string) => {
     if (!dueDate) return null;
-    
+
     const due = new Date(dueDate);
     const now = new Date();
     const diffTime = due.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays < 0) return { status: 'overdue', text: 'Overdue', class: 'text-red-600' };
-    if (diffDays === 0) return { status: 'today', text: 'Due today', class: 'text-orange-600' };
-    if (diffDays <= 3) return { status: 'soon', text: `Due in ${diffDays}d`, class: 'text-yellow-600' };
-    return { status: 'future', text: `Due ${due.toLocaleDateString()}`, class: 'text-gray-600' };
+
+    if (diffDays < 0)
+      return { status: 'overdue', text: 'Overdue', class: 'text-red-600' };
+    if (diffDays === 0)
+      return { status: 'today', text: 'Due today', class: 'text-orange-600' };
+    if (diffDays <= 3)
+      return {
+        status: 'soon',
+        text: `Due in ${diffDays}d`,
+        class: 'text-yellow-600'
+      };
+    return {
+      status: 'future',
+      text: `Due ${due.toLocaleDateString()}`,
+      class: 'text-gray-600'
+    };
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'low': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'high':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'low':
+        return 'bg-green-100 text-green-800 border-green-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
   const dueDateStatus = getDueDateStatus(task.due_date);
-  const taskAIInsights = aiInsights?.filter(insight => insight.task_id === task.id) || [];
-  const pendingInsights = taskAIInsights.filter(insight => insight.status === 'pending');
+  const taskAIInsights =
+    aiInsights?.filter((insight) => insight.task_id === task.id) || [];
+  const pendingInsights = taskAIInsights.filter(
+    (insight) => insight.status === 'pending'
+  );
   const hasAIInsights = taskAIInsights.length > 0;
 
   return (
-    <TableRow className="hover:bg-gray-50 transition-colors">
+    <TableRow className='transition-colors hover:bg-gray-50'>
       {/* Selection Checkbox */}
       {pendingInsights.length > 0 && onSelectionChange && (
-        <TableCell className="w-8">
+        <TableCell className='w-8'>
           <BulkSelectCheckbox
             checked={isSelected || false}
             onCheckedChange={onSelectionChange}
@@ -110,50 +133,48 @@ function TaskRow({
         </TableCell>
       )}
       {/* Task Name & Status */}
-      <TableCell className="max-w-xs">
-        <div className="flex items-start space-x-3">
-          <div className="flex-shrink-0 mt-1">
+      <TableCell className='max-w-xs'>
+        <div className='flex items-start space-x-3'>
+          <div className='mt-1 flex-shrink-0'>
             {task.is_completed ? (
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <CheckCircle2 className='h-4 w-4 text-green-600' />
             ) : (
-              <Circle className="h-4 w-4 text-gray-400" />
+              <Circle className='h-4 w-4 text-gray-400' />
             )}
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center space-x-2">
-              <p className="font-medium text-gray-900 truncate">
-                {task.name}
-              </p>
+          <div className='min-w-0 flex-1'>
+            <div className='flex items-center space-x-2'>
+              <p className='truncate font-medium text-gray-900'>{task.name}</p>
               {/* AI Indicators */}
               {taskAIInsights.length > 0 && (
-                <div className="flex items-center gap-1">
+                <div className='flex items-center gap-1'>
                   {taskAIInsights.map((insight) => (
                     <AISuggestionBadge
                       key={insight.id}
                       status={insight.status}
                       confidence={insight.confidence_score}
-                      size="sm"
+                      size='sm'
                       onClick={() => onOpenAIPanel?.(insight)}
                     />
                   ))}
                 </div>
               )}
               {task.ai_generated && taskAIInsights.length === 0 && (
-                <Badge variant="secondary" className="text-xs">
-                  <Brain className="mr-1 h-3 w-3" />
+                <Badge variant='secondary' className='text-xs'>
+                  <Brain className='mr-1 h-3 w-3' />
                   AI
                 </Badge>
               )}
               {/* Chat Indicator */}
               {task.created_from_chat && (
-                <Badge variant="outline" className="text-xs">
-                  <MessageCircle className="mr-1 h-3 w-3" />
+                <Badge variant='outline' className='text-xs'>
+                  <MessageCircle className='mr-1 h-3 w-3' />
                   Chat
                 </Badge>
               )}
             </div>
             {task.description && (
-              <p className="text-sm text-gray-500 truncate mt-1">
+              <p className='mt-1 truncate text-sm text-gray-500'>
                 {task.description}
               </p>
             )}
@@ -163,9 +184,9 @@ function TaskRow({
 
       {/* Priority */}
       <TableCell>
-        <Badge 
-          variant="outline" 
-          className={cn("text-xs font-medium", getPriorityColor(task.priority))}
+        <Badge
+          variant='outline'
+          className={cn('text-xs font-medium', getPriorityColor(task.priority))}
         >
           {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
         </Badge>
@@ -173,11 +194,11 @@ function TaskRow({
 
       {/* Assignee */}
       <TableCell>
-        <div className="flex items-center space-x-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200">
-            <User className="h-4 w-4 text-gray-600" />
+        <div className='flex items-center space-x-2'>
+          <div className='flex h-8 w-8 items-center justify-center rounded-full bg-gray-200'>
+            <User className='h-4 w-4 text-gray-600' />
           </div>
-          <span className="text-sm text-gray-900">
+          <span className='text-sm text-gray-900'>
             {task.assignee || 'Unassigned'}
           </span>
         </div>
@@ -186,25 +207,25 @@ function TaskRow({
       {/* Due Date */}
       <TableCell>
         {task.due_date ? (
-          <div className="flex items-center space-x-2">
-            <Calendar className="h-4 w-4 text-gray-400" />
-            <span className={cn("text-sm", dueDateStatus?.class)}>
+          <div className='flex items-center space-x-2'>
+            <Calendar className='h-4 w-4 text-gray-400' />
+            <span className={cn('text-sm', dueDateStatus?.class)}>
               {dueDateStatus?.text}
             </span>
             {dueDateStatus?.status === 'overdue' && (
-              <AlertTriangle className="h-4 w-4 text-red-500" />
+              <AlertTriangle className='h-4 w-4 text-red-500' />
             )}
           </div>
         ) : (
-          <span className="text-sm text-gray-400">No due date</span>
+          <span className='text-sm text-gray-400'>No due date</span>
         )}
       </TableCell>
 
       {/* Status */}
       <TableCell>
-        <Badge 
-          variant={task.is_completed ? "default" : "secondary"}
-          className="text-xs"
+        <Badge
+          variant={task.is_completed ? 'default' : 'secondary'}
+          className='text-xs'
         >
           {task.is_completed ? 'Completed' : task.status}
         </Badge>
@@ -212,29 +233,31 @@ function TaskRow({
 
       {/* Actions */}
       <TableCell>
-        <div className="flex items-center space-x-2">
+        <div className='flex items-center space-x-2'>
           {hasAIInsights && (
             <AIInsightIndicator
               hasInsights={hasAIInsights}
               insightCount={pendingInsights.length}
-              onClick={() => pendingInsights[0] && onOpenAIPanel?.(pendingInsights[0])}
+              onClick={() =>
+                pendingInsights[0] && onOpenAIPanel?.(pendingInsights[0])
+              }
             />
           )}
           <Button
-            variant="ghost"
-            size="sm"
+            variant='ghost'
+            size='sm'
             onClick={() => onEditTask(task)}
-            className="h-8 w-8 p-0"
+            className='h-8 w-8 p-0'
           >
-            <Edit className="h-4 w-4" />
+            <Edit className='h-4 w-4' />
           </Button>
           <Button
-            variant="ghost"
-            size="sm"
+            variant='ghost'
+            size='sm'
             onClick={() => onDeleteTask(task)}
-            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+            className='h-8 w-8 p-0 text-red-600 hover:text-red-700'
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className='h-4 w-4' />
           </Button>
         </div>
       </TableCell>
@@ -246,10 +269,10 @@ function LoadingRow({ showSelection }: { showSelection?: boolean }) {
   return (
     <TableRow>
       <TableCell colSpan={showSelection ? 7 : 6}>
-        <div className="flex items-center justify-center py-8">
-          <div className="flex items-center space-x-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-            <span className="text-sm text-gray-500">Loading tasks...</span>
+        <div className='flex items-center justify-center py-8'>
+          <div className='flex items-center space-x-2'>
+            <div className='h-4 w-4 animate-spin rounded-full border-b-2 border-blue-600'></div>
+            <span className='text-sm text-gray-500'>Loading tasks...</span>
           </div>
         </div>
       </TableCell>
@@ -257,24 +280,19 @@ function LoadingRow({ showSelection }: { showSelection?: boolean }) {
   );
 }
 
-function EmptyState({ searchQuery, filters, showSelection }: { searchQuery: string; filters: TaskFilterOptions; showSelection?: boolean }) {
-  const hasFilters = searchQuery || filters.priority || filters.completed !== undefined;
-  
+function EmptyState({ showSelection }: { showSelection?: boolean }) {
   return (
     <TableRow>
       <TableCell colSpan={showSelection ? 7 : 6}>
-        <div className="flex flex-col items-center justify-center py-12">
-          <div className="rounded-full bg-gray-100 p-3">
-            <CheckCircle2 className="h-6 w-6 text-gray-400" />
+        <div className='flex flex-col items-center justify-center py-12'>
+          <div className='rounded-full bg-gray-100 p-3'>
+            <CheckCircle2 className='h-6 w-6 text-gray-400' />
           </div>
-          <h3 className="mt-4 text-sm font-medium text-gray-900">
-            {hasFilters ? 'No tasks match your filters' : 'No tasks yet'}
+          <h3 className='mt-4 text-sm font-medium text-gray-900'>
+            No tasks yet
           </h3>
-          <p className="mt-2 text-sm text-gray-500">
-            {hasFilters 
-              ? 'Try adjusting your search or filters to find tasks.'
-              : 'Get started by creating your first task for this case.'
-            }
+          <p className='mt-2 text-sm text-gray-500'>
+            Get started by creating your first task for this case.
           </p>
         </div>
       </TableCell>
@@ -287,71 +305,37 @@ export default function EnhancedCaseTasksTable({
   isLoading,
   count,
   currentPage,
-  searchQuery,
-  filters,
   caseId,
   onPageChange,
   onEditTask,
   onDeleteTask
 }: EnhancedCaseTasksTableProps) {
   const [selectedInsightIds, setSelectedInsightIds] = useState<string[]>([]);
-  const [selectedAIInsight, setSelectedAIInsight] = useState<AITaskInsightWithDetails | null>(null);
+  const [selectedAIInsight, setSelectedAIInsight] =
+    useState<AITaskInsightWithDetails | null>(null);
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
-  
+
   // Get AI insights for this case
   const { data: aiInsights = [] } = useAIInsightsForCase(caseId);
-  const totalPages = Math.ceil(count / 10);
-  
-  const filteredTasks = useMemo(() => {
-    let filtered = [...tasks];
-
-    // Apply search filter
-    if (searchQuery) {
-      filtered = filtered.filter(task =>
-        task.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.assignee?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    // Apply filters
-    if (filters.priority) {
-      filtered = filtered.filter(task => task.priority === filters.priority);
-    }
-
-    if (filters.completed !== undefined) {
-      filtered = filtered.filter(task => task.is_completed === filters.completed);
-    }
-
-    // Apply view filter (this would need user context)
-    if (filters.view === 'my_tasks') {
-      // Filter by current user's assigned tasks
-      // filtered = filtered.filter(task => task.assignee_id === currentUserId);
-    } else if (filters.view === 'assigned_by_me') {
-      // Filter by tasks assigned by current user
-      // filtered = filtered.filter(task => task.assigner_id === currentUserId);
-    }
-
-    return filtered;
-  }, [tasks, searchQuery, filters]);
+  const totalPages = Math.ceil(count / 5);
 
   // Filter AI insights to only pending ones for bulk selection
-  const pendingInsights = aiInsights.filter(insight => insight.status === 'pending');
-  const tasksWithPendingInsights = tasks.filter(task => 
-    pendingInsights.some(insight => insight.task_id === task.id)
+  const pendingInsights = aiInsights.filter(
+    (insight) => insight.status === 'pending'
+  );
+  const tasksWithPendingInsights = tasks.filter((task) =>
+    pendingInsights.some((insight) => insight.task_id === task.id)
   );
 
   const handleSelectInsight = (insightId: string, selected: boolean) => {
-    setSelectedInsightIds(prev => 
-      selected 
-        ? [...prev, insightId]
-        : prev.filter(id => id !== insightId)
+    setSelectedInsightIds((prev) =>
+      selected ? [...prev, insightId] : prev.filter((id) => id !== insightId)
     );
   };
 
   const handleSelectAllInsights = (selected: boolean) => {
     if (selected) {
-      setSelectedInsightIds(pendingInsights.map(insight => insight.id));
+      setSelectedInsightIds(pendingInsights.map((insight) => insight.id));
     } else {
       setSelectedInsightIds([]);
     }
@@ -401,136 +385,157 @@ export default function EnhancedCaseTasksTable({
 
   return (
     <>
-    <div className="space-y-4">
-      {/* AI Insights Header */}
-      {showSelectionColumn && (
-        <div className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <BulkSelectHeader
-            selectedCount={selectedInsightIds.length}
-            totalCount={pendingInsights.length}
-            onSelectAll={handleSelectAllInsights}
-          />
-          <div className="text-sm text-blue-700">
-            {pendingInsights.length} AI suggestion{pendingInsights.length !== 1 ? 's' : ''} pending review
+      <div className='space-y-4'>
+        {/* AI Insights Header */}
+        {showSelectionColumn && (
+          <div className='flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 p-4'>
+            <BulkSelectHeader
+              selectedCount={selectedInsightIds.length}
+              totalCount={pendingInsights.length}
+              onSelectAll={handleSelectAllInsights}
+            />
+            <div className='text-sm text-blue-700'>
+              {pendingInsights.length} AI suggestion
+              {pendingInsights.length !== 1 ? 's' : ''} pending review
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Table */}
-      <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-gray-50/50">
-              {showSelectionColumn && (
-                <TableHead className="w-8"></TableHead>
+        {/* Table */}
+        <div className='rounded-lg border border-gray-200 bg-white shadow-sm'>
+          <Table>
+            <TableHeader>
+              <TableRow className='bg-gray-50/50'>
+                {showSelectionColumn && <TableHead className='w-8'></TableHead>}
+                <TableHead className='font-semibold text-gray-900'>
+                  Task
+                </TableHead>
+                <TableHead className='font-semibold text-gray-900'>
+                  Priority
+                </TableHead>
+                <TableHead className='font-semibold text-gray-900'>
+                  Assignee
+                </TableHead>
+                <TableHead className='font-semibold text-gray-900'>
+                  Due Date
+                </TableHead>
+                <TableHead className='font-semibold text-gray-900'>
+                  Status
+                </TableHead>
+                <TableHead className='w-20 font-semibold text-gray-900'>
+                  Actions
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <LoadingRow showSelection={showSelectionColumn} />
+              ) : tasks.length > 0 ? (
+                tasks.map((task) => {
+                  const taskPendingInsights = pendingInsights.filter(
+                    (insight) => insight.task_id === task.id
+                  );
+                  const isTaskSelected = taskPendingInsights.some((insight) =>
+                    selectedInsightIds.includes(insight.id)
+                  );
+
+                  return (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      onEditTask={onEditTask}
+                      onDeleteTask={onDeleteTask}
+                      aiInsights={aiInsights}
+                      isSelected={isTaskSelected}
+                      onSelectionChange={(selected) => {
+                        taskPendingInsights.forEach((insight) => {
+                          handleSelectInsight(insight.id, selected);
+                        });
+                      }}
+                      onOpenAIPanel={handleOpenAIPanel}
+                    />
+                  );
+                })
+              ) : (
+                <EmptyState showSelection={showSelectionColumn} />
               )}
-              <TableHead className="font-semibold text-gray-900">Task</TableHead>
-              <TableHead className="font-semibold text-gray-900">Priority</TableHead>
-              <TableHead className="font-semibold text-gray-900">Assignee</TableHead>
-              <TableHead className="font-semibold text-gray-900">Due Date</TableHead>
-              <TableHead className="font-semibold text-gray-900">Status</TableHead>
-              <TableHead className="font-semibold text-gray-900 w-20">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <LoadingRow showSelection={showSelectionColumn} />
-            ) : filteredTasks.length > 0 ? (
-              filteredTasks.map((task) => {
-                const taskPendingInsights = pendingInsights.filter(insight => insight.task_id === task.id);
-                const isTaskSelected = taskPendingInsights.some(insight => 
-                  selectedInsightIds.includes(insight.id)
-                );
-                
-                return (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    onEditTask={onEditTask}
-                    onDeleteTask={onDeleteTask}
-                    aiInsights={aiInsights}
-                    isSelected={isTaskSelected}
-                    onSelectionChange={(selected) => {
-                      taskPendingInsights.forEach(insight => {
-                        handleSelectInsight(insight.id, selected);
-                      });
-                    }}
-                    onOpenAIPanel={handleOpenAIPanel}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className='flex items-center justify-between'>
+            <p className='text-sm text-gray-700'>
+              Showing {(currentPage - 1) * 5 + 1}-
+              {Math.min(currentPage * 5, count)} of {count} tasks
+            </p>
+
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+                    className={cn(
+                      'cursor-pointer rounded-lg px-3 transition-all duration-200',
+                      currentPage === 1 && 'pointer-events-none opacity-50'
+                    )}
                   />
-                );
-              })
-            ) : (
-              <EmptyState searchQuery={searchQuery} filters={filters} showSelection={showSelectionColumn} />
-            )}
-          </TableBody>
-        </Table>
+                </PaginationItem>
+
+                {pageNumbers.map((page, index) => (
+                  <PaginationItem key={index}>
+                    {page === '...' ? (
+                      <span className='cursor-pointer px-3 py-2 text-sm text-gray-500'>
+                        ...
+                      </span>
+                    ) : (
+                      <PaginationLink
+                        onClick={() => onPageChange(Number(page))}
+                        isActive={currentPage === Number(page)}
+                        className='cursor-pointer rounded-lg px-3 transition-all duration-200'
+                      >
+                        {page}
+                      </PaginationLink>
+                    )}
+                  </PaginationItem>
+                ))}
+
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() =>
+                      onPageChange(Math.min(totalPages, currentPage + 1))
+                    }
+                    className={cn(
+                      'cursor-pointer rounded-lg px-3 transition-all duration-200',
+                      currentPage === totalPages &&
+                        'pointer-events-none opacity-50'
+                    )}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-700">
-            Showing {Math.min((currentPage - 1) * 10 + 1, count)} to{' '}
-            {Math.min(currentPage * 10, count)} of {count} tasks
-          </p>
-          
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-                  className={cn(
-                    currentPage === 1 && "pointer-events-none opacity-50"
-                  )}
-                />
-              </PaginationItem>
-              
-              {pageNumbers.map((page, index) => (
-                <PaginationItem key={index}>
-                  {page === '...' ? (
-                    <span className="px-3 py-2 text-sm text-gray-500">...</span>
-                  ) : (
-                    <PaginationLink
-                      onClick={() => onPageChange(Number(page))}
-                      isActive={currentPage === Number(page)}
-                    >
-                      {page}
-                    </PaginationLink>
-                  )}
-                </PaginationItem>
-              ))}
-              
-              <PaginationItem>
-                <PaginationNext
-                  onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-                  className={cn(
-                    currentPage === totalPages && "pointer-events-none opacity-50"
-                  )}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
+      {/* AI Suggestion Panel */}
+      {selectedAIInsight && (
+        <AISuggestionPanel
+          insight={selectedAIInsight}
+          open={isAIPanelOpen}
+          onOpenChange={handleCloseAIPanel}
+        />
       )}
-    </div>
 
-    {/* AI Suggestion Panel */}
-    {selectedAIInsight && (
-      <AISuggestionPanel
-        insight={selectedAIInsight}
-        open={isAIPanelOpen}
-        onOpenChange={handleCloseAIPanel}
+      {/* Bulk Review Bar */}
+      <BulkReviewBar
+        selectedInsightIds={selectedInsightIds}
+        onClearSelection={handleClearSelection}
+        onBulkAction={(action, count) => {
+          // Optional callback for additional handling
+        }}
       />
-    )}
-
-    {/* Bulk Review Bar */}
-    <BulkReviewBar
-      selectedInsightIds={selectedInsightIds}
-      onClearSelection={handleClearSelection}
-      onBulkAction={(action, count) => {
-        // Optional callback for additional handling
-      }}
-    />
     </>
   );
 }

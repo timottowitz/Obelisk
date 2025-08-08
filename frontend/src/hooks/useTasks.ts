@@ -1,6 +1,10 @@
 import TasksAPI from '@/services/tasks';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { TaskFilterOptions, TaskCreateData, ProjectTask, FoundationAITaskData } from '@/types/cases';
+import {
+  TaskFilterOptions,
+  TaskCreateData,
+  FoundationAITaskData
+} from '@/types/cases';
 
 const QUERY_KEYS = {
   tasks: ['tasks'] as const,
@@ -10,10 +14,10 @@ const QUERY_KEYS = {
 };
 
 // General project tasks (non-case specific)
-export const useTasks = (page: number, filters?: TaskFilterOptions) => {
+export const useCaseTasks = (caseId: string, page: number, filters?: TaskFilterOptions) => {
   return useQuery({
-    queryKey: [...QUERY_KEYS.tasks, page, filters],
-    queryFn: () => TasksAPI.getTasks(page, filters),
+    queryKey: [...QUERY_KEYS.tasks, caseId, page, filters],
+    queryFn: () => TasksAPI.getCaseTasks(caseId, page, filters),
     staleTime: 1000 * 60 * 5,
     retry: 2
   });
@@ -31,9 +35,9 @@ export const useProjects = () => {
 
 export const useCreateProject = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: (projectData: { name: string; description?: string }) => 
+    mutationFn: (projectData: { name: string; description?: string }) =>
       TasksAPI.createProject(projectData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.projects] });
@@ -41,8 +45,27 @@ export const useCreateProject = () => {
   });
 };
 
+export const useCreateCaseTask = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      caseId,
+      taskData
+    }: {
+      caseId: string;
+      taskData: TaskCreateData;
+    }) => TasksAPI.createCaseTask(caseId, taskData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.tasks] });
+    }
+  });
+};
 // Project tasks
-export const useProjectTasks = (projectId: string, filters?: TaskFilterOptions) => {
+export const useProjectTasks = (
+  projectId: string,
+  filters?: TaskFilterOptions
+) => {
   return useQuery({
     queryKey: [...QUERY_KEYS.tasks, 'project', projectId, filters],
     queryFn: () => TasksAPI.getProjectTasks(projectId, filters),
@@ -54,12 +77,19 @@ export const useProjectTasks = (projectId: string, filters?: TaskFilterOptions) 
 
 export const useCreateProjectTask = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ projectId, taskData }: { projectId: string; taskData: TaskCreateData }) => 
-      TasksAPI.createProjectTask(projectId, taskData),
+    mutationFn: ({
+      projectId,
+      taskData
+    }: {
+      projectId: string;
+      taskData: TaskCreateData;
+    }) => TasksAPI.createProjectTask(projectId, taskData),
     onSuccess: (_, { projectId }) => {
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.tasks, 'project', projectId] });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.tasks, 'project', projectId]
+      });
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.tasks] });
     }
   });
@@ -78,12 +108,19 @@ export const useCaseProjects = (caseId: string) => {
 
 export const useCreateCaseProject = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ caseId, projectData }: { caseId: string; projectData: { name: string; description?: string }}) => 
-      TasksAPI.createCaseProject(caseId, projectData),
+    mutationFn: ({
+      caseId,
+      projectData
+    }: {
+      caseId: string;
+      projectData: { name: string; description?: string };
+    }) => TasksAPI.createCaseProject(caseId, projectData),
     onSuccess: (_, { caseId }) => {
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.caseProjects, caseId] });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.caseProjects, caseId]
+      });
     }
   });
 };
@@ -91,9 +128,9 @@ export const useCreateCaseProject = () => {
 // AI Integration hooks
 export const useFoundationAITasks = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: (aiTaskData: FoundationAITaskData) => 
+    mutationFn: (aiTaskData: FoundationAITaskData) =>
       TasksAPI.processFoundationAITasks(aiTaskData),
     onSuccess: () => {
       // Invalidate relevant queries when AI tasks are processed
@@ -103,7 +140,10 @@ export const useFoundationAITasks = () => {
   });
 };
 
-export const useAITaskInsights = (taskType: 'case_task' | 'project_task', taskId: string) => {
+export const useAITaskInsights = (
+  taskType: 'case_task' | 'project_task',
+  taskId: string
+) => {
   return useQuery({
     queryKey: [...QUERY_KEYS.aiInsights, taskType, taskId],
     queryFn: () => TasksAPI.getAITaskInsights(taskType, taskId),
@@ -116,16 +156,16 @@ export const useAITaskInsights = (taskType: 'case_task' | 'project_task', taskId
 // Chat integration hooks
 export const useCreateTaskFromChat = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ 
-      taskData, 
-      caseId, 
+    mutationFn: ({
+      taskData,
+      caseId,
       projectId,
-      chatMessageId 
-    }: { 
-      taskData: TaskCreateData; 
-      caseId?: string; 
+      chatMessageId
+    }: {
+      taskData: TaskCreateData;
+      caseId?: string;
       projectId?: string;
       chatMessageId: string;
     }) => {
@@ -134,7 +174,7 @@ export const useCreateTaskFromChat = () => {
         chat_message_id: chatMessageId,
         created_from_chat: true
       };
-      
+
       if (caseId) {
         return TasksAPI.createCaseTaskFromChat(caseId, dataWithChat);
       } else if (projectId) {
@@ -147,7 +187,9 @@ export const useCreateTaskFromChat = () => {
         queryClient.invalidateQueries({ queryKey: ['cases', 'tasks', caseId] });
       }
       if (projectId) {
-        queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.tasks, 'project', projectId] });
+        queryClient.invalidateQueries({
+          queryKey: [...QUERY_KEYS.tasks, 'project', projectId]
+        });
       }
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.tasks] });
     }
@@ -157,14 +199,14 @@ export const useCreateTaskFromChat = () => {
 // Task operations
 export const useUpdateTask = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ 
-      taskId, 
-      taskData, 
-      taskType 
-    }: { 
-      taskId: string; 
+    mutationFn: ({
+      taskId,
+      taskData,
+      taskType
+    }: {
+      taskId: string;
       taskData: Partial<TaskCreateData>;
       taskType: 'case_task' | 'project_task';
     }) => {
@@ -178,14 +220,14 @@ export const useUpdateTask = () => {
 
 export const useCompleteTask = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ 
-      taskId, 
-      taskType, 
-      completed 
-    }: { 
-      taskId: string; 
+    mutationFn: ({
+      taskId,
+      taskType,
+      completed
+    }: {
+      taskId: string;
       taskType: 'case_task' | 'project_task';
       completed: boolean;
     }) => {
@@ -199,13 +241,13 @@ export const useCompleteTask = () => {
 
 export const useDeleteTask = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ 
-      taskId, 
-      taskType 
-    }: { 
-      taskId: string; 
+    mutationFn: ({
+      taskId,
+      taskType
+    }: {
+      taskId: string;
       taskType: 'case_task' | 'project_task';
     }) => {
       return TasksAPI.deleteTask(taskId, taskType);
@@ -213,5 +255,14 @@ export const useDeleteTask = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.tasks] });
     }
+  });
+};
+
+export const useGetTeamMembers = () => {
+  return useQuery({
+    queryKey: [...QUERY_KEYS.tasks, 'team-members'],
+    queryFn: () => TasksAPI.getTeamMembers(),
+    staleTime: 1000 * 60 * 5,
+    retry: 2
   });
 };

@@ -35,7 +35,7 @@ import {
   IconLogout,
   IconUserCircle,
   IconFolderOpen,
-  IconFolder,
+  IconFolder
 } from '@tabler/icons-react';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { SignOutButton } from '@clerk/nextjs';
@@ -173,10 +173,9 @@ export default function AppSidebar() {
                           : Icons.logo;
 
                         const isSubActive =
-                          pathname === '/dashboard/cases'
-                            ? searchParams.get('type') ===
-                              subItem.title.split(' ')[0].toLowerCase()
-                            : pathname.includes(subItem.url);
+                          searchParams.get('type') ===
+                          subItem.title.split(' ')[0].toLowerCase();
+
                         return (
                           <SidebarMenuSubItem key={subItem.title}>
                             <SidebarMenuSubButton

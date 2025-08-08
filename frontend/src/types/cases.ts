@@ -52,12 +52,13 @@ export interface Task {
   status: string;
   due_date: string;
   priority: 'high' | 'medium' | 'low';
-  assignee: string;
-  assignee_id?: string;
-  assigner_id?: string;
-  category: string;
-  category_id?: string;
-  is_completed: boolean;
+  assignee?: string;
+  assigner?: string;
+  assignee_id: string;
+  assigner_id: string;
+  case_project_id: string;
+  case_project?: string;
+  is_completed?: boolean;
   completed_at?: string;
   completed_by_id?: string;
   // AI Integration Fields
@@ -73,6 +74,14 @@ export interface Task {
   created_from_chat: boolean;
   created_at: string;
   updated_at: string;
+}
+export interface UploadTaskData {
+  name: string;
+  due_date: string;
+  description: string;
+  assignee_id: string;
+  priority: 'high' | 'medium' | 'low';
+  case_project_id: string;
 }
 
 export interface CaseProject {

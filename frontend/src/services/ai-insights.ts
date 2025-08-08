@@ -1,84 +1,126 @@
-import { apiClient } from '@/config/api';
+import { API_CONFIG, getAuthHeaders, handleApiResponse } from '@/config/api';
 import type {
   AITaskInsight,
   AITaskInsightWithDetails,
   ReviewAITaskRequest,
   BulkReviewRequest,
-  AIInsightStats,
+  AIInsightStats
 } from '@/types/ai-insights';
+
+const API_BASE_URL = API_CONFIG.AI_INSIGHTS_BASE_URL;
 
 class AIInsightsService {
   /**
    * Get AI insights for a case
    */
   async getCaseInsights(caseId: string): Promise<AITaskInsightWithDetails[]> {
-    const response = await apiClient.get(`/ai-insights/cases/${caseId}`);
-    return response.data;
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/cases/${caseId}`, {
+      method: 'GET',
+      headers
+    });
+    return handleApiResponse<AITaskInsightWithDetails[]>(response);
   }
 
   /**
    * Get AI insights for a project
    */
-  async getProjectInsights(projectId: string): Promise<AITaskInsightWithDetails[]> {
-    const response = await apiClient.get(`/ai-insights/projects/${projectId}`);
-    return response.data;
+  async getProjectInsights(
+    projectId: string
+  ): Promise<AITaskInsightWithDetails[]> {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/projects/${projectId}`, {
+      method: 'GET',
+      headers
+    });
+    return handleApiResponse<AITaskInsightWithDetails[]>(response);
   }
 
   /**
    * Get all pending AI insights for the organization
    */
   async getPendingInsights(): Promise<AITaskInsightWithDetails[]> {
-    const response = await apiClient.get('/ai-insights/pending');
-    return response.data;
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/pending`, {
+      method: 'GET',
+      headers
+    });
+    return handleApiResponse<AITaskInsightWithDetails[]>(response);
   }
 
   /**
    * Get AI insight details by ID
    */
   async getInsightById(insightId: string): Promise<AITaskInsightWithDetails> {
-    const response = await apiClient.get(`/ai-insights/${insightId}`);
-    return response.data;
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/${insightId}`, {
+      method: 'GET',
+      headers
+    });
+    return handleApiResponse<AITaskInsightWithDetails>(response);
   }
 
   /**
    * Get AI insights for a specific task
    */
   async getTaskInsights(taskId: string): Promise<AITaskInsight[]> {
-    const response = await apiClient.get(`/ai-insights/tasks/${taskId}`);
-    return response.data;
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
+      method: 'GET',
+      headers
+    });
+    return handleApiResponse<AITaskInsight[]>(response);
   }
 
   /**
    * Review an AI task suggestion
    */
-  async reviewInsight(request: ReviewAITaskRequest): Promise<{ task_id?: string }> {
-    const response = await apiClient.post('/ai-insights/review', request);
-    return response.data;
+  async reviewInsight(
+    request: ReviewAITaskRequest
+  ): Promise<{ task_id?: string }> {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/review`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(request)
+    });
+    return handleApiResponse<{ task_id?: string }>(response);
   }
 
   /**
    * Bulk review AI suggestions
    */
-  async bulkReview(request: BulkReviewRequest): Promise<{ task_ids: string[] }> {
-    const response = await apiClient.post('/ai-insights/bulk-review', request);
-    return response.data;
+  async bulkReview(
+    request: BulkReviewRequest
+  ): Promise<{ task_ids: string[] }> {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/bulk-review`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(request)
+    });
+    return handleApiResponse<{ task_ids: string[] }>(response);
   }
 
   /**
    * Get AI insights statistics
    */
   async getInsightStats(): Promise<AIInsightStats> {
-    const response = await apiClient.get('/ai-insights/stats');
-    return response.data;
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/stats`, {
+      method: 'GET',
+      headers
+    });
+    return handleApiResponse<AIInsightStats>(response);
   }
 
   /**
    * Accept an AI suggestion
    */
-  async acceptSuggestion(insightId: string): Promise<{ task_id: string }> {
+  async acceptSuggestion(insightId: string): Promise<{ task_id?: string }> {
     return this.reviewInsight({
       insight_id: insightId,
-      decision: 'accept',
+      decision: 'accept'
     });
   }
 
@@ -89,9 +131,9 @@ class AIInsightsService {
     await this.reviewInsight({
       insight_id: insightId,
       decision: 'reject',
-      reason,
+      reason
     });
   }
 }
 
-export const aiInsightsService = new AIInsightsService();
+export const AiInsightsService = new AIInsightsService();

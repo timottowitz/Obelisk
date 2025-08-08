@@ -19,7 +19,7 @@ export function useAIInsightsRealtime() {
   const { getToken } = useAuth();
   const { organization } = useOrganization();
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
 
   useEffect(() => {

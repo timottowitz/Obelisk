@@ -43,16 +43,16 @@ export function AINotificationCenter({ className }: AINotificationCenterProps) {
   const reviewMutation = useReviewAITask();
   
   // Enable real-time updates if feature flag is on
-  if (realtimeEnabled) {
-    useAIInsightsRealtime();
-  }
+  // if (realtimeEnabled) {
+  //   useAIInsightsRealtime();
+  // }
   
-  // Listen for external open events
-  useAIInsightOpenListener((insight) => {
-    setSelectedInsight(insight);
-    setIsAIPanelOpen(true);
-    setIsOpen(false);
-  });
+  // // Listen for external open events
+  // useAIInsightOpenListener((insight) => {
+  //   setSelectedInsight(insight);
+  //   setIsAIPanelOpen(true);
+  //   setIsOpen(false);
+  // });
   
   // Don't render if feature is disabled
   if (!aiSuggestionsEnabled) {
