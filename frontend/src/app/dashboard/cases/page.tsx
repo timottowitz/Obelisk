@@ -29,7 +29,7 @@ export default function CasesPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [queryParams, setQueryParams] = useState({
-    type: searchParams.get('type') || 'all',
+    type: searchParams.get('type') || 'solar',
     page: parseInt(searchParams.get('page') || '1'),
     search: searchParams.get('search') || '',
     status: searchParams.get('status') || 'all',
@@ -67,7 +67,7 @@ export default function CasesPage() {
   useEffect(() => {
     setQueryParams({
       ...queryParams,
-      type: searchParams.get('type') || 'all'
+      type: searchParams.get('type') || 'solar'
     });
   }, [searchParams.get('type')]);
 
