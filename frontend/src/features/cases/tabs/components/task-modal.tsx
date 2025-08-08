@@ -102,6 +102,10 @@ export default function TaskModal({
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
+      if (!formData.case_project_id) {
+        toast.error('Please select a project');
+        return;
+      }
       e.preventDefault();
       onSave(formData);
     },
