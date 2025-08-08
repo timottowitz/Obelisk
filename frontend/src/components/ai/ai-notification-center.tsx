@@ -266,7 +266,7 @@ export function AINotificationCenter({ className }: AINotificationCenterProps) {
                   No AI suggestions
                 </h3>
                 <p className="text-sm text-gray-500 max-w-xs">
-                  AI task suggestions will appear here when they're generated from your documents, transcripts, and other sources.
+                  AI task suggestions will appear here when they&apos;are generated from your documents, transcripts, and other sources.
                 </p>
               </div>
             )}
