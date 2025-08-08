@@ -14,10 +14,18 @@ const QUERY_KEYS = {
 };
 
 // General project tasks (non-case specific)
-export const useCaseTasks = (caseId: string, page: number, filters?: TaskFilterOptions) => {
+export const useCaseTasks = (
+  caseId: string,
+  page: number,
+  search: string,
+  status: string,
+  priority: string,
+  view: string
+) => {
   return useQuery({
-    queryKey: [...QUERY_KEYS.tasks, caseId, page, filters],
-    queryFn: () => TasksAPI.getCaseTasks(caseId, page, filters),
+    queryKey: [...QUERY_KEYS.tasks, caseId, page, search, status, priority, view],
+    queryFn: () =>
+      TasksAPI.getCaseTasks(caseId, page, search, status, priority, view),
     staleTime: 1000 * 60 * 5,
     retry: 2
   });

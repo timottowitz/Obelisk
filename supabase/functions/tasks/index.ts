@@ -90,21 +90,30 @@ app.get("/tasks/cases/:caseId", async (c) => {
   const url = new URL(c.req.url);
   const page = parseInt(url.searchParams.get("page") ?? "1");
   const limit = parseInt(url.searchParams.get("limit") ?? "5");
-
-  const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
+  const search = url.searchParams.get("search") ?? "";
+  const status = url.searchParams.get("status") ?? "all";
+  const priority = url.searchParams.get("priority") ?? "all";
+  const view = url.searchParams.get("view") ?? "all";
 
   try {
-    const {
-      data: tasks,
-      error,
-      count,
-    } = await supabase
+    const { supabase, schema, user } = await getSupabaseAndOrgInfo(orgId, userId);
+
+    let query = supabase
       .schema(schema)
       .from("case_tasks")
       .select("*", { count: "exact" })
-      .order("due_date", { ascending: true })
-      .eq("case_id", caseId)
-      .range(limit * (page - 1), limit * page - 1);
+      .eq("case_id", caseId);
+
+    if (search) query = query.ilike("name", `%${search}%`);
+    if (status !== "all") query = query.eq("status", status);
+    if (priority !== "all") query = query.eq("priority", priority);
+    if (view === "my_tasks") query = query.eq("assignee_id", user.id);
+    if (view === "assigned_by_me")
+      query = query.eq("assigner_id", user.id).neq("assignee_id", user.id);
+    if (page && limit)
+      query = query.range(limit * (page - 1), limit * page - 1);
+
+    const { data: tasks, error, count } = await query;
 
     if (error) {
       return c.json({ "Failed to fetch tasks": error.message }, 500);

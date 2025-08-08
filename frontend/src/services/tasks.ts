@@ -12,9 +12,17 @@ const API_BASE_URL = API_CONFIG.TASKS_BASE_URL;
 
 export default class TasksAPI {
   // General tasks
-  static async getCaseTasks(caseId: string, page: number, filters?: TaskFilterOptions) {
+  static async getCaseTasks(caseId: string, page: number, search: string, status: string, priority: string, view: string) {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/cases/${caseId}?page=${page}`, {
+    const params = new URLSearchParams();
+    params.append('page', page.toString());
+    
+    if (status) params.append('status', status);
+    if (priority) params.append('priority', priority);
+    if (search) params.append('search', search);
+    if (view) params.append('view', view);
+    
+    const response = await fetch(`${API_BASE_URL}/cases/${caseId}?${params.toString()}`, {
       method: 'GET',
       headers
     });

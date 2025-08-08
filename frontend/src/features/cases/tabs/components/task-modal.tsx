@@ -16,7 +16,7 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
+  SelectValue
 } from '@/components/ui/select';
 import dayjs from 'dayjs';
 import {
@@ -38,7 +38,7 @@ interface TaskDetailModalProps {
   onSave: (taskData: UploadTaskData) => void;
 }
 
-export default function TaskModel({
+export default function TaskModal({
   isOpen,
   onClose,
   loading,
@@ -61,7 +61,6 @@ export default function TaskModel({
     description: ''
   });
 
-  
   const createCaseProject = useCreateCaseProject();
   const { data: caseProjects } = useCaseProjects(caseId);
   const { data: teamMembers } = useGetTeamMembers();
@@ -234,7 +233,7 @@ export default function TaskModel({
                     type='button'
                     variant='outline'
                     onClick={() => setShowNewProject(true)}
-                    className='px-3'
+                    className='cursor-pointer px-3'
                   >
                     + New
                   </Button>
@@ -383,13 +382,13 @@ export default function TaskModel({
               type='button'
               variant='outline'
               onClick={onClose}
-              className='border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50'
+              className='cursor-pointer border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50'
             >
               Cancel
             </Button>
             <Button
               type='submit'
-              className='bg-red-600 px-4 py-2 text-white hover:bg-red-700'
+              className='cursor-pointer bg-red-600 px-4 py-2 text-white hover:bg-red-700'
             >
               {loading ? 'Saving...' : 'Save'}
             </Button>
