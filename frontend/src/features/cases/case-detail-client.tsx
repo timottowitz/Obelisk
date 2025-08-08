@@ -90,16 +90,37 @@ export default function CaseDetailClient({
 
           <div className='flex-1'>
             <h2 className='mb-2 text-2xl font-bold text-gray-900'>
-              Tammy Lee as Legal Representative of... et al
+              {caseData?.full_name}
             </h2>
 
-            <div className='flex flex-row space-y-1 text-sm text-gray-600'>
-              <span>Case Number: {caseData?.case_number}</span>
-              <span>, Manager: {caseData?.case_manager}</span>
-              <span>, Phone: {caseData?.phone}</span>
-              <span>
-                , Email:{' '}
-                <a href="#" className='text-blue-600 hover:text-blue-800'>
+            <div className='flex flex-wrap items-center gap-x-3 text-sm text-gray-600'>
+              <span className='flex items-center gap-1'>
+                <span className='font-medium'>Case Number:</span>
+                <span>{caseData?.case_number}</span>
+              </span>
+              
+              <span className='text-gray-400'>•</span>
+              
+              <span className='flex items-center gap-1'>
+                <span className='font-medium'>Manager:</span>
+                <span>{caseData?.case_manager}</span>
+              </span>
+              
+              <span className='text-gray-400'>•</span>
+              
+              <span className='flex items-center gap-1'>
+                <span className='font-medium'>Phone:</span>
+                <span>{caseData?.phone}</span>
+              </span>
+              
+              <span className='text-gray-400'>•</span>
+              
+              <span className='flex items-center gap-1'>
+                <span className='font-medium'>Email:</span>
+                <a 
+                  href={`mailto:${caseData?.email}`} 
+                  className='text-blue-600 hover:text-blue-800 hover:underline'
+                >
                   {caseData?.email}
                 </a>
               </span>
