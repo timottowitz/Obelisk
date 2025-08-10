@@ -108,6 +108,14 @@ export default function TaskModal({
       }
       e.preventDefault();
       onSave(formData);
+      setFormData({
+        name: '',
+        due_date: '',
+        description: '',
+        assignee_id: teamMembers?.[0]?.id || '',
+        priority: 'medium',
+        case_project_id: caseProjects?.[0]?.id || ''
+      });
     },
     [formData, createTask, caseId]
   );
@@ -298,27 +306,29 @@ export default function TaskModal({
             {/* Due Date and Assignee Row */}
             <div className='grid grid-cols-2 gap-4'>
               {/* Due Date Field */}
-              <div className='space-y-2'>
-                <Label
-                  htmlFor='due_date'
-                  className='text-sm font-medium text-gray-700'
-                >
-                  Due Date <span className='text-red-500'>*</span>
-                </Label>
-                <div className='relative'>
-                  <Input
-                    id='due_date'
-                    type='date'
-                    placeholder='mm/dd/yy'
-                    value={formData.due_date}
-                    onChange={(e) =>
-                      handleInputChange('due_date', e.target.value)
-                    }
-                    required
-                    className='w-full pr-10'
-                  />
+              {initialData && (
+                <div className='space-y-2'>
+                  <Label
+                    htmlFor='due_date'
+                    className='text-sm font-medium text-gray-700'
+                  >
+                    Due Date <span className='text-red-500'>*</span>
+                  </Label>
+                  <div className='relative'>
+                    <Input
+                      id='due_date'
+                      type='date'
+                      placeholder='mm/dd/yy'
+                      value={formData.due_date}
+                      onChange={(e) =>
+                        handleInputChange('due_date', e.target.value)
+                      }
+                      required
+                      className='w-full pr-10'
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Assignee Field */}
               <div className='space-y-2'>

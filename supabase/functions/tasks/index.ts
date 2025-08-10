@@ -358,7 +358,6 @@ app.post("/tasks/cases/:caseId/projects", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const caseId = c.req.param("caseId");
-  console.log("caseId", caseId);
 
   try {
     const { supabase, schema, user } = await getSupabaseAndOrgInfo(

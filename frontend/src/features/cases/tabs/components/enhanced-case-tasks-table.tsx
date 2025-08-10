@@ -173,11 +173,6 @@ function TaskRow({
                 </Badge>
               )}
             </div>
-            {task.description && (
-              <p className='mt-1 truncate text-sm text-gray-500'>
-                {task.description}
-              </p>
-            )}
           </div>
         </div>
       </TableCell>
