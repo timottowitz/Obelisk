@@ -17,10 +17,10 @@ import {
 } from '@/components/ui/pagination';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import ContactAvatar from './ContactAvatar';
-import PhoneDisplay from './PhoneDisplay';
-import EmailDisplay from './EmailDisplay';
-import AddressDisplay from './AddressDisplay';
+import ContactAvatar from './contact-avatar';
+import PhoneDisplay from './phone-display';
+import EmailDisplay from './email-display';
+import AddressDisplay from './address-display';
 import { Contact, PhoneEntry, PhoneType } from '@/types/contacts';
 
 interface ContactsTableProps {

@@ -31,22 +31,39 @@ export default class ContactsAPI {
     return handleApiResponse<ContactType[]>(response);
   }
 
-  static async createContact(contact: Contact) {
+  static async createContact(contact: FormData) {
     const headers = await getAuthHeaders();
+
+    const uploadHeaders: Record<string, string> = {};
+    if (typeof headers === 'object' && headers !== null) {
+      Object.entries(headers).forEach(([key, value]) => {
+        if (key.toLowerCase() !== 'content-type') {
+          uploadHeaders[key] = value as string;
+        }
+      });
+    }
     const response = await fetch(`${API_BASE_URL}`, {
       method: 'POST',
-      headers,
-      body: JSON.stringify(contact)
+      headers: uploadHeaders,
+      body: contact
     });
     return handleApiResponse<Contact>(response);
   }
 
-  static async updateContact(contactId: string, contact: Contact) {
+  static async updateContact(contactId: string, contact: FormData) {
     const headers = await getAuthHeaders();
+    const uploadHeaders: Record<string, string> = {};
+    if (typeof headers === 'object' && headers !== null) {
+      Object.entries(headers).forEach(([key, value]) => {
+        if (key.toLowerCase() !== 'content-type') {
+          uploadHeaders[key] = value as string;
+        }
+      });
+    }
     const response = await fetch(`${API_BASE_URL}/${contactId}`, {
       method: 'PUT',
-      headers,
-      body: JSON.stringify(contact)
+      headers: uploadHeaders,
+      body: contact
     });
     return handleApiResponse<Contact>(response);
   }

@@ -21,10 +21,10 @@ export function useContactTypes() {
   });
 }
 
-export function useCreateContract() {
+export function useCreateContact() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (contact: Contact) => ContactsAPI.createContact(contact),
+    mutationFn: (contact: FormData) => ContactsAPI.createContact(contact),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.contacts });
     },
@@ -34,7 +34,7 @@ export function useCreateContract() {
   });
 }
 
-export function useUpdateContract() {
+export function useUpdateContact() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -42,7 +42,7 @@ export function useUpdateContract() {
       contact
     }: {
       contactId: string;
-      contact: Contact;
+      contact: FormData;
     }) => ContactsAPI.updateContact(contactId, contact),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.contacts });
@@ -53,7 +53,7 @@ export function useUpdateContract() {
   });
 }
 
-export function useDeleteContract() {
+export function useDeleteContact() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => ContactsAPI.deleteContact(id),

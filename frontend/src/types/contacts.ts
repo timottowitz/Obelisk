@@ -4,6 +4,12 @@ export type Contact = {
   avatar_storage_url: string;
   contact_type_id: string;
   contact_type: string;
+  prefix?: string;
+  suffix?: string;
+  nickname?: string;
+  company?: string;
+  department?: string;
+  job_title?: string;
   address: {
     street: string;
     street2: string;

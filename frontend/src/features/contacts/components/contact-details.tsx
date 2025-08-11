@@ -2,8 +2,8 @@ import React from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Icons } from '@/components/icons';
-import ContactAvatar from './ContactAvatar';
-import { phoneTypeIcon, phoneTypeToLabel } from './PhoneDisplay';
+import ContactAvatar from './contact-avatar';
+import { phoneTypeIcon, phoneTypeToLabel } from './phone-display';
 import { Contact, PhoneEntry, PhoneType } from '@/types/contacts';
 
 const getPhones = (c: Contact): PhoneEntry[] => {

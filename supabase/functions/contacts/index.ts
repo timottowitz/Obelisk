@@ -328,17 +328,15 @@ async function createContact(
     tags,
   } = Object.fromEntries(body);
 
-  if (contact_type_id) {
-    const { error: contactTypeError } = await supabaseClient
-      .schema("public")
-      .from("contact_types")
-      .select("*")
-      .eq("id", contact_type_id)
-      .single();
+  const { error: contactTypeError } = await supabaseClient
+    .schema("public")
+    .from("contact_types")
+    .select("*")
+    .eq("id", contact_type_id)
+    .single();
 
-    if (contactTypeError) {
-      throw new Error("Contact type not found");
-    }
+  if (contactTypeError) {
+    throw new Error("Contact type not found");
   }
 
   let avatar_storage_url = null;
@@ -409,7 +407,7 @@ async function updateContact(
   } = Object.fromEntries(body);
 
   if (contact_type_id) {
-    const { data: contactType, error: contactTypeError } = await supabaseClient
+    const { error: contactTypeError } = await supabaseClient
       .schema("public")
       .from("contact_types")
       .select("*")
@@ -444,6 +442,11 @@ async function updateContact(
       tenantId: org.data?.id,
     });
   }
+
+  const phoneArray = phone ? JSON.parse(phone) : [];
+  const emailArray = email ? JSON.parse(email) : [];
+  const addressArray = address ? JSON.parse(address) : [];
+
   const { data: updatedContact, error: updatedContactError } =
     await supabaseClient
       .schema(org.data?.schema_name.toLowerCase())
@@ -456,9 +459,9 @@ async function updateContact(
         company,
         department,
         job_title,
-        phone,
-        email,
-        address,
+        phone: phoneArray,
+        email: emailArray,
+        address: addressArray,
         contact_type_id,
         tags,
         avatar_storage_url,

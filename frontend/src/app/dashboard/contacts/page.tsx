@@ -5,18 +5,29 @@ import PageContainer from '@/components/layout/page-container';
 import { Heading } from '@/components/ui/heading';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import ContactFilters from '../../../features/contacts/components/ContactFilters';
-import ContactActions from '../../../features/contacts/components/ContactActions';
-import ContactsTable from '../../../features/contacts/components/ContactsTable';
-import ContactDetails from '../../../features/contacts/components/ContactDetails';
+import ContactFilters from '../../../features/contacts/components/contact-filters';
+import ContactActions from '../../../features/contacts/components/contact-actions';
+import ContactsTable from '../../../features/contacts/components/contacts-table';
+import ContactDetails from '../../../features/contacts/components/contact-details';
 import { Contact } from '@/types/contacts';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDebounce } from '@/hooks/use-debounce';
-import { useContactTypes, useContacts } from '@/hooks/useContacts';
+import {
+  useContactTypes,
+  useContacts,
+  useCreateContact,
+  useDeleteContact,
+  useUpdateContact
+} from '@/hooks/useContacts';
+import ContactModal from '@/features/contacts/components/contact-modal';
+import { toast } from 'sonner';
 
 export default function ContactsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const createContact = useCreateContact();
+  const updateContact = useUpdateContact();
+  const deleteContact = useDeleteContact();
   const [queryParams, setQueryParams] = useState({
     search: searchParams.get('search') ?? '',
     page: Number(searchParams.get('page')) ?? 1,
@@ -65,6 +76,7 @@ export default function ContactsPage() {
   ]);
 
   const [selected, setSelected] = useState<Contact | null>(null);
+  const [open, setOpen] = useState(false);
   const pageSize = 5;
 
   const totalPages = Math.ceil((contacts?.count ?? 0) / pageSize) || 1;
@@ -83,6 +95,56 @@ export default function ContactsPage() {
 
   const { data: contactTypes, isLoading: contactTypesLoading } =
     useContactTypes();
+
+  const handleAddNew = useCallback(() => {
+    setOpen(true);
+  }, []);
+
+  const handleEdit = useCallback((contact: Contact) => {
+    setSelected(contact);
+    setOpen(true);
+  }, []);
+
+  const handleCreateContact = useCallback(
+    async (formData: any) => {
+      try {
+        await createContact.mutateAsync(formData);
+        toast.success('Contact created successfully');
+      } catch (error) {
+        console.error('Error creating contact:', error);
+        toast.error('Error creating contact');
+      }
+    },
+    [createContact]
+  );
+
+  const handleUpdateContact = useCallback(
+    async (contactId: string, formData: any) => {
+      try {
+        await updateContact.mutateAsync({ contactId, contact: formData });
+        toast.success('Contact updated successfully');
+      } catch (error) {
+        console.error('Error updating contact:', error);
+        toast.error('Error updating contact');
+      }
+    },
+    [updateContact]
+  );
+
+  const handleDeleteContact = useCallback(
+    async (contactId: string) => {
+      try {
+        await deleteContact.mutateAsync(contactId);
+        toast.success('Contact deleted successfully');
+        setSelected(null);
+      } catch (error) {
+        console.error('Error deleting contact:', error);
+        toast.error('Error deleting contact');
+      }
+      toast.success('Contact deleted successfully');
+    },
+    [deleteContact]
+  );
 
   return (
     <PageContainer scrollable={true}>
@@ -106,10 +168,10 @@ export default function ContactsPage() {
 
           <ContactActions
             selectedContact={selected}
-            onEdit={() => console.log('Edit', selected)}
+            onEdit={handleEdit}
             onArchive={() => console.log('Archive', selected)}
-            onDelete={() => console.log('Delete', selected)}
-            onAddNew={() => console.log('Add new contact')}
+            onDelete={handleDeleteContact}
+            onAddNew={handleAddNew}
             onInfo={() => console.log('Show info')}
           />
         </div>
@@ -137,6 +199,14 @@ export default function ContactsPage() {
 
           {selected && <ContactDetails contact={selected} />}
         </div>
+        <ContactModal
+          open={open}
+          onOpenChange={setOpen}
+          onCreate={handleCreateContact}
+          onUpdate={handleUpdateContact}
+          availableTypes={contactTypes ?? []}
+          selectedContact={selected}
+        />
       </div>
     </PageContainer>
   );
