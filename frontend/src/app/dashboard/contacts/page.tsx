@@ -31,6 +31,8 @@ export default function ContactsPage() {
   const updateContact = useUpdateContact();
   const deleteContact = useDeleteContact();
   const archiveContact = useArchiveContact();
+  const { data: contactTypes, isLoading: contactTypesLoading } =
+    useContactTypes();
   const [queryParams, setQueryParams] = useState({
     search: searchParams.get('search') ?? '',
     page: Number(searchParams.get('page')) ?? 1,
@@ -79,6 +81,7 @@ export default function ContactsPage() {
   ]);
 
   const [selected, setSelected] = useState<Contact | null>(null);
+  const [showInfo, setShowInfo] = useState(false);
   const [open, setOpen] = useState(false);
   const [openDelete, setOpenDelete] = useState(false);
   const pageSize = 5;
@@ -97,11 +100,12 @@ export default function ContactsPage() {
     setSelected(contact);
   }, []);
 
-  const { data: contactTypes, isLoading: contactTypesLoading } =
-    useContactTypes();
+  const handleInfoClick = useCallback(() => {
+    setShowInfo((prev) => !prev);
+  }, []);
 
   const handleAddNew = useCallback(() => {
-    setSelected(null)
+    setSelected(null);
     setOpen(true);
   }, []);
 
@@ -143,6 +147,7 @@ export default function ContactsPage() {
         await deleteContact.mutateAsync(contactId);
         toast.success('Contact deleted successfully');
         setSelected(null);
+        setOpenDelete(false);
       } catch (error) {
         console.error('Error deleting contact:', error);
         toast.error('Error deleting contact');
@@ -190,7 +195,7 @@ export default function ContactsPage() {
             onArchive={() => handleArchiveContact(selected?.id ?? '')}
             onDelete={() => setOpenDelete(true)}
             onAddNew={handleAddNew}
-            onInfo={() => console.log('Show info')}
+            onInfo={handleInfoClick}
           />
         </div>
 
@@ -199,8 +204,8 @@ export default function ContactsPage() {
         <div className='my-4 grid grid-cols-1 gap-3 md:grid-cols-12'>
           <div
             className={cn(
-              'bg-card overflow-hidden rounded-lg border-2',
-              selected ? 'md:col-span-9' : 'md:col-span-12'
+              'bg-card overflow-hidden rounded-lg border-2 transition-all duration-1000 ease-out',
+              !showInfo ? 'md:col-span-12' : 'md:col-span-9'
             )}
           >
             <ContactsTable
@@ -215,7 +220,16 @@ export default function ContactsPage() {
             />
           </div>
 
-          {selected && <ContactDetails contact={selected} />}
+          <div
+            className={cn(
+              'transition-all duration-1000 ease-out md:col-span-3',
+              showInfo
+                ? 'pointer-events-auto translate-x-0 opacity-100'
+                : 'pointer-events-none -translate-x-2 opacity-0'
+            )}
+          >
+            {showInfo && <ContactDetails contact={selected} />}
+          </div>
         </div>
         <ContactModal
           open={open}
