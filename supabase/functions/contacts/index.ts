@@ -635,19 +635,27 @@ async function uploadAvatar(
       });
     }
 
-    const { data: uploadData, error: uploadError } =
-      await supabaseClient.storage
-        .from("avatars")
-        .upload(`${tenantId}/${userId}/${fileName}`, file, {
-          cacheControl: "3600",
-          upsert: true,
-        });
+    const { error: uploadError } = await supabaseClient.storage
+      .from("avatars")
+      .upload(`${tenantId}/${userId}/${fileName}`, file, {
+        cacheControl: "3600",
+        upsert: true,
+      });
 
     if (uploadError) {
       throw new Error(uploadError.message);
     }
 
-    return uploadData.fullPath;
+    const { data: publicUrl, error: publicUrlError } =
+      await supabaseClient.storage
+        .from("avatars")
+        .getPublicUrl(`${tenantId}/${userId}/${fileName}`);
+
+    if (publicUrlError) {
+      throw new Error(publicUrlError.message);
+    }
+
+    return publicUrl.publicUrl;
   } catch (error: any) {
     console.error("uploading avatar error", error);
     throw new Error(error.message);

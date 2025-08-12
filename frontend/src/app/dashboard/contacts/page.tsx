@@ -101,6 +101,7 @@ export default function ContactsPage() {
     useContactTypes();
 
   const handleAddNew = useCallback(() => {
+    setSelected(null)
     setOpen(true);
   }, []);
 
@@ -127,6 +128,7 @@ export default function ContactsPage() {
       try {
         await updateContact.mutateAsync({ contactId, contact: formData });
         toast.success('Contact updated successfully');
+        setSelected(null);
       } catch (error) {
         console.error('Error updating contact:', error);
         toast.error('Error updating contact');

@@ -30,6 +30,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Contact, ContactType } from '@/types/contacts';
+import { Avatar, AvatarImage } from '@/components/ui/avatar';
+import { toast } from 'sonner';
 
 interface ContactModalProps {
   open: boolean;
@@ -64,6 +66,8 @@ type ContactFormState = {
   company: string;
   department: string;
   jobTitle: string;
+  avatar_storage_url: string | null;
+  avatar: File | null;
   phones: PhoneRow[];
   emails: EmailRow[];
   addresses: AddressRow[];
@@ -91,6 +95,8 @@ export default function ContactModal({
     department: '',
     jobTitle: '',
     contactTypeId: '',
+    avatar_storage_url: '',
+    avatar: null,
     phones: [{ id: uid(), type: 'phone', number: '' }],
     emails: [{ id: uid(), type: 'email', email: '' }],
     addresses: [
@@ -119,6 +125,8 @@ export default function ContactModal({
         department: selectedContact.department ?? '',
         jobTitle: selectedContact.job_title ?? '',
         contactTypeId: selectedContact.contact_type_id ?? '',
+        avatar_storage_url: selectedContact.avatar_storage_url ?? '',
+        avatar: null,
         phones: selectedContact.phone.map((p) => ({
           id: uid(),
           type: p.type,
@@ -141,6 +149,9 @@ export default function ContactModal({
     }
     if (availableTypes.length > 0 && !selectedContact) {
       setForm((f) => ({ ...f, contactTypeId: availableTypes[0].id }));
+    }
+    if (!selectedContact) {
+      handleResetForm();
     }
   }, [availableTypes, selectedContact]);
 
@@ -166,6 +177,29 @@ export default function ContactModal({
   );
 
   const canCreate = fullName.trim().length > 0;
+
+  const handleResetForm = () => {
+    setForm({
+      firstName: '',
+      middleName: '',
+      lastName: '',
+      prefix: '',
+      suffix: '',
+      nickname: '',
+      company: '',
+      department: '',
+      jobTitle: '',
+      contactTypeId: availableTypes?.length > 0 ? availableTypes[0].id : '',
+      avatar_storage_url: '',
+      avatar: null,
+      phones: [{ id: uid(), type: 'phone', number: '' }],
+      emails: [{ id: uid(), type: 'email', email: '' }],
+      addresses: [
+        { id: uid(), street: '', street2: '', city: '', st: '', zip: '' }
+      ],
+      tags: []
+    });
+  };
 
   // List mutators
   const addPhone = () =>
@@ -208,6 +242,9 @@ export default function ContactModal({
     formData.append('department', department);
     formData.append('job_title', jobTitle);
     formData.append('contact_type_id', form.contactTypeId);
+    if (form.avatar) {
+      formData.append('avatar', form.avatar);
+    }
     formData.append(
       'phone',
       JSON.stringify(
@@ -251,25 +288,41 @@ export default function ContactModal({
     } else {
       onCreate(formData);
     }
-    setForm({
-      firstName: '',
-      middleName: '',
-      lastName: '',
-      prefix: '',
-      suffix: '',
-      nickname: '',
-      company: '',
-      department: '',
-      jobTitle: '',
-      contactTypeId: availableTypes[0].id ?? '',
-      phones: [{ id: uid(), type: 'phone', number: '' }],
-      emails: [{ id: uid(), type: 'email', email: '' }],
-      addresses: [
-        { id: uid(), street: '', street2: '', city: '', st: '', zip: '' }
-      ],
-      tags: []
-    });
+    handleResetForm();
     onOpenChange(false);
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setForm((f) => ({
+      ...f,
+      avatar_storage_url: null
+    }));
+    if (file) {
+      if (file.size > 1024 * 1024 * 5) {
+        toast.error('File size must be less than 5MB');
+        return;
+      }
+      if (!file.type.includes('image/')) {
+        toast.error('File must be an image (png, jpg, jpeg)');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        if (e.target) {
+          const avatarImage = document.getElementById('avatarPreview');
+          if (avatarImage) {
+            avatarImage.setAttribute('src', e.target.result as string);
+            setForm((f) => ({
+              ...f,
+              avatar: file
+            }));
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -343,10 +396,35 @@ export default function ContactModal({
           {/* Top row: avatar/icons + identity fields to mirror a dashboard layout */}
           <div className='grid grid-cols-1 gap-6 lg:grid-cols-12'>
             <div className='lg:col-span-2'>
-              <div className='flex items-center justify-center gap-3'>
-                <div className='bg-card flex h-24 w-24 items-center justify-center rounded-full border'>
-                  <User2 className='text-muted-foreground h-8 w-8' />
-                </div>
+              <div className='flex flex-col items-center justify-center gap-3'>
+                {form.avatar_storage_url && (
+                  <Avatar className='h-24 w-24'>
+                    <AvatarImage src={form.avatar_storage_url} />
+                  </Avatar>
+                )}
+                {!form.avatar_storage_url && (
+                  <div className='bg-card flex h-24 w-24 items-center justify-center rounded-full border'>
+                    <img
+                      id='avatarPreview'
+                      className='h-24 w-24 rounded-full'
+                    />
+                  </div>
+                )}
+                <Button
+                  variant='outline'
+                  size='sm'
+                  className='cursor-pointer'
+                  onClick={() => document.getElementById('avatar')?.click()}
+                >
+                  Upload Avatar
+                </Button>
+                <input
+                  type='file'
+                  accept='image/*'
+                  id='avatar'
+                  className='hidden'
+                  onChange={handleAvatarChange}
+                />
               </div>
             </div>
 
@@ -369,8 +447,9 @@ export default function ContactModal({
                   />
                 </div>
                 <div className='flex-1'>
-                  <Label className='text-muted-foreground'>
-                    {activeTab === 'person' ? 'First Name' : 'Company Name'}
+                  <Label className='text-muted-foreground flex items-center gap-1'>
+                    {activeTab === 'person' ? 'First Name' : 'Company'}
+                    <span className='text-red-500'>*</span>
                   </Label>
                   <Input
                     className='bg-card'
