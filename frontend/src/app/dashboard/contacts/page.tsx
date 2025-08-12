@@ -97,6 +97,7 @@ export default function ContactsPage() {
   );
 
   const handleRowClick = useCallback((contact: Contact) => {
+    setShowInfo(true);
     setSelected(contact);
   }, []);
 
@@ -119,6 +120,7 @@ export default function ContactsPage() {
       try {
         await createContact.mutateAsync(formData);
         toast.success('Contact created successfully');
+        setShowInfo(false);
       } catch (error) {
         console.error('Error creating contact:', error);
         toast.error('Error creating contact');
@@ -133,6 +135,7 @@ export default function ContactsPage() {
         await updateContact.mutateAsync({ contactId, contact: formData });
         toast.success('Contact updated successfully');
         setSelected(null);
+        setShowInfo(false);
       } catch (error) {
         console.error('Error updating contact:', error);
         toast.error('Error updating contact');

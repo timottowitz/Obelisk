@@ -33,6 +33,23 @@ import { Contact, ContactType } from '@/types/contacts';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 
+function parseName(raw: string | undefined): {
+  first: string;
+  middle: string;
+  last: string;
+} {
+  const name = (raw ?? '').trim();
+  if (!name) return { first: '', middle: '', last: '' };
+  const parts = name.split(/\s+/);
+  if (parts.length === 1) return { first: parts[0], middle: '', last: '' };
+  if (parts.length === 2) return { first: parts[0], middle: '', last: parts[1] };
+  return {
+    first: parts[0],
+    middle: parts.slice(1, -1).join(' '),
+    last: parts[parts.length - 1]
+  };
+}
+
 interface ContactModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -58,8 +75,8 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 
 type ContactFormState = {
   firstName: string;
-  middleName: string;
-  lastName: string;
+  middleName: string | undefined;
+  lastName: string | undefined;
   prefix: string;
   suffix: string;
   nickname: string;
@@ -107,17 +124,12 @@ export default function ContactModal({
 
   useEffect(() => {
     if (selectedContact) {
+      const { first, middle, last } = parseName(selectedContact.name);
       setForm((f) => ({
         ...f,
-        firstName: selectedContact.name.split(' ')[0],
-        middleName:
-          selectedContact.name.split(' ').length > 2
-            ? selectedContact.name.split(' ')[1]
-            : '',
-        lastName:
-          selectedContact.name.split(' ').length > 2
-            ? selectedContact.name.split(' ')[2]
-            : selectedContact.name.split(' ')[1],
+        firstName: first,
+        middleName: middle,
+        lastName: last,
         prefix: selectedContact.prefix ?? '',
         suffix: selectedContact.suffix ?? '',
         nickname: selectedContact.nickname ?? '',
@@ -127,24 +139,26 @@ export default function ContactModal({
         contactTypeId: selectedContact.contact_type_id ?? '',
         avatar_storage_url: selectedContact.avatar_storage_url ?? '',
         avatar: null,
-        phones: selectedContact.phone.map((p) => ({
+        phones: selectedContact.phone.map((p: { type: string; number: string }) => ({
           id: uid(),
           type: p.type,
           number: p.number
         })),
-        emails: selectedContact.email.map((e) => ({
+        emails: selectedContact.email.map((e: { type: string; email: string }) => ({
           id: uid(),
           type: e.type,
           email: e.email
         })),
-        addresses: selectedContact.address.map((a) => ({
-          id: uid(),
-          street: a.street,
-          street2: a.street2,
-          city: a.city,
-          st: a.st,
-          zip: a.zip
-        }))
+        addresses: selectedContact.address.map(
+          (a: { street: string; street2: string; city: string; st: string; zip: string }) => ({
+            id: uid(),
+            street: a.street,
+            street2: a.street2,
+            city: a.city,
+            st: a.st,
+            zip: a.zip
+          })
+        )
       }));
     }
     if (availableTypes.length > 0 && !selectedContact) {
@@ -176,7 +190,9 @@ export default function ContactModal({
     [firstName, middleName, lastName]
   );
 
-  const canCreate = fullName.trim().length > 0;
+  const canCreate =
+    fullName.trim().length > 0 ||
+    (activeTab === 'company' && company.trim().length > 0);
 
   const handleResetForm = () => {
     setForm({
@@ -234,7 +250,8 @@ export default function ContactModal({
 
   const submit = () => {
     const formData = new FormData();
-    formData.append('name', fullName);
+    const nameToSave = activeTab === 'person' ? fullName : company;
+    formData.append('name', nameToSave);
     formData.append('prefix', prefix);
     formData.append('suffix', suffix);
     formData.append('nickname', nickname);
@@ -439,14 +456,51 @@ export default function ContactModal({
                       'h-8 w-8',
                       activeTab === 'person' && 'border-2 border-blue-500'
                     )}
-                    onClick={() => setActiveTab('person')}
+                    onClick={() => {
+                      setActiveTab('person');
+                      setForm((f) => ({
+                        ...f,
+                        company: selectedContact?.company || company,
+                        firstName:
+                          selectedContact?.name?.split(' ')[0] || firstName,
+                        middleName:
+                          selectedContact?.name?.split(' ').length &&
+                          selectedContact?.name?.split(' ').length > 2
+                            ? selectedContact?.name?.split(' ')[1]
+                            : middleName,
+                        lastName:
+                          selectedContact?.name?.split(' ').length &&
+                          selectedContact?.name?.split(' ').length > 2
+                            ? selectedContact?.name?.split(' ')[2]
+                            : selectedContact?.name?.split(' ')[1] || lastName,
+                        prefix: selectedContact?.prefix || prefix,
+                        suffix: selectedContact?.suffix || suffix,
+                        nickname: selectedContact?.nickname || nickname,
+                        department: selectedContact?.department || department,
+                        jobTitle: selectedContact?.job_title || jobTitle
+                      }));
+                    }}
                   />
                   <Building2
                     className={cn(
                       'h-8 w-8',
                       activeTab === 'company' && 'border-2 border-blue-500'
                     )}
-                    onClick={() => setActiveTab('company')}
+                    onClick={() => {
+                      setActiveTab('company');
+                      setForm((f) => ({
+                        ...f,
+                        firstName: '',
+                        middleName: '',
+                        lastName: '',
+                        prefix: '',
+                        suffix: '',
+                        nickname: '',
+                        company: selectedContact?.company || company,
+                        department: '',
+                        jobTitle: ''
+                      }));
+                    }}
                   />
                 </div>
                 <div className='flex-1'>
@@ -456,9 +510,13 @@ export default function ContactModal({
                   </Label>
                   <Input
                     className='bg-card'
-                    value={activeTab === 'person' ? firstName : fullName}
+                    value={activeTab === 'person' ? firstName : company}
                     onChange={(e) =>
-                      setForm((f) => ({ ...f, firstName: e.target.value }))
+                      setForm((f) =>
+                        activeTab === 'person'
+                          ? { ...f, firstName: e.target.value }
+                          : { ...f, company: e.target.value }
+                      )
                     }
                     required
                   />
