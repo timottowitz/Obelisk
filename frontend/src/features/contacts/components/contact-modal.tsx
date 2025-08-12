@@ -327,7 +327,10 @@ export default function ContactModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='bg-card h-[80vh] w-full !max-w-7xl overflow-y-auto border-2 p-4'>
+      <DialogContent
+        className='bg-card h-[80vh] w-full !max-w-7xl overflow-y-auto border-2 p-4'
+        aria-describedby={undefined}
+      >
         <div className='bg-muted/20 flex items-center justify-between px-6 py-4'>
           <DialogHeader>
             <DialogTitle className='text-foreground text-xl font-semibold'>
