@@ -159,11 +159,11 @@ export default function ContactsTable({
               >
                 <TableCell className='border-x'>
                   <div className='flex items-center gap-3'>
-                    <ContactAvatar name={c.name} size='sm' />
+                    <ContactAvatar name={c.name || c.company || ''} size='sm' />
                     <div className='min-w-0'>
                       <div className='flex min-w-0 items-center gap-2'>
                         <div className='text-foreground font-medium break-words whitespace-normal'>
-                          {c.name}
+                          {c.name || c.company}
                         </div>
                         <Badge
                           variant='outline'

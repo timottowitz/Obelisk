@@ -43,10 +43,13 @@ export default function ContactDetails({
           {contact && (
             <div className='space-y-6 p-6'>
               <div className='flex flex-col items-center gap-4'>
-                <ContactAvatar name={contact.name} size='lg' />
+                <ContactAvatar
+                  name={contact.name || contact.company || ''}
+                  size='lg'
+                />
                 <div>
                   <div className='text-foreground text-xl font-semibold'>
-                    {contact.name}
+                    {contact.name || contact.company}
                   </div>
                   <div className='mt-2 flex flex-wrap justify-center gap-2'>
                     <Badge
