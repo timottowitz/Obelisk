@@ -2,24 +2,21 @@ import React from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Icons } from '@/components/icons';
-import ContactAvatar from './ContactAvatar';
-import { phoneTypeIcon, phoneTypeToLabel } from './PhoneDisplay';
-import { Contact, PhoneEntry } from '@/types/contacts';
-
-interface ContactDetailsProps {
-  contact: Contact;
-}
+import ContactAvatar from './contact-avatar';
+import { phoneTypeIcon, phoneTypeToLabel } from './phone-display';
+import { Contact, PhoneEntry, PhoneType } from '@/types/contacts';
 
 const getPhones = (c: Contact): PhoneEntry[] => {
-  if (c.phoneNumbers && c.phoneNumbers.length) {
-    return c.phoneNumbers.map((p) =>
-      typeof p === 'string' ? { type: 'other' as const, value: p } : p
-    );
+  if (c.phone && c.phone.length) {
+    return c.phone.map((p) => ({
+      type: p.type as PhoneType,
+      value: p.number
+    }));
   }
   return [];
 };
 
-export default function ContactDetails({ contact }: ContactDetailsProps) {
+export default function ContactDetails({ contact }: { contact: Contact }) {
   return (
     <div className='md:col-span-3'>
       <div className='bg-card rounded-lg border-2'>
@@ -39,7 +36,7 @@ export default function ContactDetails({ contact }: ContactDetailsProps) {
                     variant='outline'
                     className='border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-300'
                   >
-                    {contact.type}
+                    {contact.contact_type}
                   </Badge>
                 </div>
                 {contact.tags?.length ? (
@@ -92,16 +89,28 @@ export default function ContactDetails({ contact }: ContactDetailsProps) {
                 <Icons.mail className='text-muted-foreground mt-0.5 h-4 w-4' />
                 <div className='text-sm'>
                   <div className='text-muted-foreground'>Email</div>
-                  <div className='text-sky-700 dark:text-sky-400'>
-                    {contact.email ?? '—'}
-                  </div>
+                  {contact.email.map((e) => (
+                    <div key={e.email} className='truncate whitespace-nowrap'>
+                      {e.email}
+                    </div>
+                  ))}
                 </div>
               </div>
               <div className='flex items-start gap-3'>
                 <Icons.location className='text-muted-foreground mt-0.5 h-4 w-4' />
                 <div className='text-sm'>
                   <div className='text-muted-foreground'>Address</div>
-                  <div className='text-foreground'>{contact.address}</div>
+                  <div className='text-foreground'>
+                    {contact.address.map((a) => (
+                      <div key={a.street}>
+                        {a.street}
+                        {a.street2 && ` ${a.street2}`}
+                        {a.city && ` ${a.city}`}
+                        {a.st && ` ${a.st}`}
+                        {a.zip && ` ${a.zip}`}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
