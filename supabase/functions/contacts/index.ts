@@ -175,6 +175,49 @@ app.post("/contacts", async (c) => {
   }
 });
 
+//Create a new contact type
+app.post("/contacts/types", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const body = await c.req.formData();
+
+  try {
+    const supabaseClient = await getSupabaseClinet();
+    const user = await supabaseClient
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+
+    const org = await supabaseClient
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+
+    if (!user || !org) {
+      return c.json({ error: "User or organization not found" }, 404);
+    }
+
+    const { data: contactType, error: contactTypeError } = await supabaseClient
+      .schema("public")
+      .from("contact_types")
+      .insert({ name: body.get("name") })
+      .select();
+
+    if (contactTypeError) {
+      throw new Error(contactTypeError.message);
+    }
+
+    return c.json(contactType, 201);
+  } catch (error: any) {
+    console.error("creating contact type error", error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
 //Update a contact
 app.put("/contacts/:contactId", async (c) => {
   const orgId = c.get("orgId");
@@ -212,6 +255,61 @@ app.put("/contacts/:contactId", async (c) => {
     return c.json(contact, 200);
   } catch (error: any) {
     console.error("updating contact error", error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+//Archive a contact
+
+app.put("/contacts/:contactId/archive", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const { contactId } = c.req.param();
+
+  try {
+    const supabaseClient = await getSupabaseClinet();
+    const user = await supabaseClient
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+
+    const org = await supabaseClient
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+
+    if (!user || !org) {
+      return c.json({ error: "User or organization not found" }, 404);
+    }
+
+    const { data: contact, error: contactError } = await supabaseClient
+      .schema(org.data?.schema_name.toLowerCase())
+      .from("contacts")
+      .select("*")
+      .eq("id", contactId)
+      .single();
+
+    if (contactError) {
+      throw new Error(contactError.message);
+    }
+
+    const { error: updateError } = await supabaseClient
+      .schema(org.data?.schema_name.toLowerCase())
+      .from("contacts")
+      .update({ archived: !contact.archived })
+      .eq("id", contactId);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+
+    return c.json({ message: "Contact archived successfully" }, 200);
+  } catch (error: any) {
+    console.error("archiving contact error", error);
     return c.json({ error: error.message }, 500);
   }
 });

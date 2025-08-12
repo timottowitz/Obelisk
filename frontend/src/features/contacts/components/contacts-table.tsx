@@ -153,7 +153,7 @@ export default function ContactsTable({
                 className={cn(
                   'cursor-pointer',
                   selectedContact?.id === c.id &&
-                    'border-2 border-x-0 border-t-0 border-blue-300 last:!border-b-2 last:!border-blue-300'
+                    'border-2 border-x-0 border-t-0 border-blue-300'
                 )}
                 onClick={() => onContactSelect(c)}
               >
@@ -169,7 +169,8 @@ export default function ContactsTable({
                           variant='outline'
                           className='shrink-0 border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-300'
                         >
-                          {c.contact_type.charAt(0).toUpperCase() + c.contact_type.slice(1)}
+                          {c.contact_type.charAt(0).toUpperCase() +
+                            c.contact_type.slice(1)}
                         </Badge>
                       </div>
                     </div>

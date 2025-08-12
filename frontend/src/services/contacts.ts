@@ -76,4 +76,21 @@ export default class ContactsAPI {
     });
     return handleApiResponse(response);
   }
+
+  static async archiveContact(contactId: string) {
+    const headers = await getAuthHeaders();
+    const uploadHeaders: Record<string, string> = {};
+    if (typeof headers === 'object' && headers !== null) {
+      Object.entries(headers).forEach(([key, value]) => {
+        if (key.toLowerCase() !== 'content-type') {
+          uploadHeaders[key] = value as string;
+        }
+      });
+    }
+    const response = await fetch(`${API_BASE_URL}/${contactId}/archive`, {
+      method: 'PUT',
+      headers: uploadHeaders
+    });
+    return handleApiResponse(response);
+  }
 }

@@ -17,10 +17,12 @@ import {
   useContacts,
   useCreateContact,
   useDeleteContact,
-  useUpdateContact
+  useUpdateContact,
+  useArchiveContact
 } from '@/hooks/useContacts';
 import ContactModal from '@/features/contacts/components/contact-modal';
 import { toast } from 'sonner';
+import { AlertModal } from '@/components/modal/alert-modal';
 
 export default function ContactsPage() {
   const router = useRouter();
@@ -28,6 +30,7 @@ export default function ContactsPage() {
   const createContact = useCreateContact();
   const updateContact = useUpdateContact();
   const deleteContact = useDeleteContact();
+  const archiveContact = useArchiveContact();
   const [queryParams, setQueryParams] = useState({
     search: searchParams.get('search') ?? '',
     page: Number(searchParams.get('page')) ?? 1,
@@ -77,6 +80,7 @@ export default function ContactsPage() {
 
   const [selected, setSelected] = useState<Contact | null>(null);
   const [open, setOpen] = useState(false);
+  const [openDelete, setOpenDelete] = useState(false);
   const pageSize = 5;
 
   const totalPages = Math.ceil((contacts?.count ?? 0) / pageSize) || 1;
@@ -141,9 +145,21 @@ export default function ContactsPage() {
         console.error('Error deleting contact:', error);
         toast.error('Error deleting contact');
       }
-      toast.success('Contact deleted successfully');
     },
     [deleteContact]
+  );
+
+  const handleArchiveContact = useCallback(
+    async (contactId: string) => {
+      try {
+        await archiveContact.mutateAsync(contactId);
+        toast.success('Contact archived successfully');
+      } catch (error) {
+        console.error('Error archiving contact:', error);
+        toast.error('Error archiving contact');
+      }
+    },
+    [archiveContact]
   );
 
   return (
@@ -169,8 +185,8 @@ export default function ContactsPage() {
           <ContactActions
             selectedContact={selected}
             onEdit={handleEdit}
-            onArchive={() => console.log('Archive', selected)}
-            onDelete={handleDeleteContact}
+            onArchive={() => handleArchiveContact(selected?.id ?? '')}
+            onDelete={() => setOpenDelete(true)}
             onAddNew={handleAddNew}
             onInfo={() => console.log('Show info')}
           />
@@ -207,6 +223,15 @@ export default function ContactsPage() {
           availableTypes={contactTypes ?? []}
           selectedContact={selected}
         />
+        {selected && (
+          <AlertModal
+            isOpen={openDelete}
+            onClose={() => setOpenDelete(false)}
+            onConfirm={() => handleDeleteContact(selected?.id ?? '')}
+            loading={deleteContact.isPending}
+            deleteTargetType='contact'
+          />
+        )}
       </div>
     </PageContainer>
   );

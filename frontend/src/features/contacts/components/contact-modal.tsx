@@ -58,7 +58,6 @@ type ContactFormState = {
   firstName: string;
   middleName: string;
   lastName: string;
-  company_name: string;
   prefix: string;
   suffix: string;
   nickname: string;
@@ -85,7 +84,6 @@ export default function ContactModal({
     firstName: '',
     middleName: '',
     lastName: '',
-    company_name: '',
     prefix: '',
     suffix: '',
     nickname: '',
@@ -150,7 +148,6 @@ export default function ContactModal({
     firstName,
     middleName,
     lastName,
-    company_name,
     prefix,
     suffix,
     nickname,
@@ -168,7 +165,7 @@ export default function ContactModal({
     [firstName, middleName, lastName]
   );
 
-  const canCreate = (fullName || company).trim().length > 0;
+  const canCreate = fullName.trim().length > 0;
 
   // List mutators
   const addPhone = () =>
@@ -203,7 +200,7 @@ export default function ContactModal({
 
   const submit = () => {
     const formData = new FormData();
-    formData.append('name', fullName || company_name);
+    formData.append('name', fullName);
     formData.append('prefix', prefix);
     formData.append('suffix', suffix);
     formData.append('nickname', nickname);
@@ -254,6 +251,24 @@ export default function ContactModal({
     } else {
       onCreate(formData);
     }
+    setForm({
+      firstName: '',
+      middleName: '',
+      lastName: '',
+      prefix: '',
+      suffix: '',
+      nickname: '',
+      company: '',
+      department: '',
+      jobTitle: '',
+      contactTypeId: availableTypes[0].id ?? '',
+      phones: [{ id: uid(), type: 'phone', number: '' }],
+      emails: [{ id: uid(), type: 'email', email: '' }],
+      addresses: [
+        { id: uid(), street: '', street2: '', city: '', st: '', zip: '' }
+      ],
+      tags: []
+    });
     onOpenChange(false);
   };
 
@@ -263,7 +278,7 @@ export default function ContactModal({
         <div className='bg-muted/20 flex items-center justify-between px-6 py-4'>
           <DialogHeader>
             <DialogTitle className='text-foreground text-xl font-semibold'>
-              New Contact
+              {selectedContact ? 'Edit Contact' : 'New Contact'}
             </DialogTitle>
             <div className='flex items-center gap-2'>
               <Label className='text-muted-foreground w-48'>
@@ -359,13 +374,9 @@ export default function ContactModal({
                   </Label>
                   <Input
                     className='bg-card'
-                    value={activeTab === 'person' ? firstName : company_name}
+                    value={activeTab === 'person' ? firstName : fullName}
                     onChange={(e) =>
-                      setForm((f) =>
-                        activeTab === 'person'
-                          ? { ...f, firstName: e.target.value }
-                          : { ...f, company_name: e.target.value }
-                      )
+                      setForm((f) => ({ ...f, firstName: e.target.value }))
                     }
                     required
                   />

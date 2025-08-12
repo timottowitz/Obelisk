@@ -65,3 +65,18 @@ export function useDeleteContact() {
     }
   });
 }
+
+export function useArchiveContact() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => {
+      return ContactsAPI.archiveContact(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.contacts });
+    },
+    onError: (error) => {
+      console.error('Error archiving contact:', error);
+    }
+  });
+}

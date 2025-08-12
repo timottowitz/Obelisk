@@ -2,6 +2,11 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Pencil, Archive, Trash2, UserPlus, Info } from 'lucide-react';
 import { Contact } from '@/types/contacts';
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger
+} from '@/components/ui/hover-card';
 
 interface ContactActionsProps {
   selectedContact: any | null;
@@ -32,14 +37,24 @@ export default function ContactActions({
           >
             <Pencil className='text-muted-foreground h-12 w-12' />
           </Button>
-          <Button
-            size='icon'
-            variant='ghost'
-            className='cursor-pointer'
-            onClick={onArchive}
-          >
-            <Archive className='text-muted-foreground h-12 w-12' />
-          </Button>
+          <HoverCard>
+            <HoverCardTrigger>
+              <Button
+                size='icon'
+                variant='ghost'
+                className='cursor-pointer'
+                onClick={onArchive}
+              >
+                <Archive className='text-muted-foreground h-12 w-12' />
+              </Button>
+            </HoverCardTrigger>
+            <HoverCardContent>
+              {selectedContact.archived
+                ? 'Unarchive Contact'
+                : 'Archive Contact'}
+            </HoverCardContent>
+          </HoverCard>
+
           <Button
             size='icon'
             variant='ghost'
