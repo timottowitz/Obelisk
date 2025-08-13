@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { CallRecordingsAPI } from '@/services/call-recordings-api';
 import { RecordingClip } from '@/types/callcaps';
-import { Player } from '@cyntler/react-doc-viewer';
 
 const ClipViewerPage = () => {
   const params = useParams();
