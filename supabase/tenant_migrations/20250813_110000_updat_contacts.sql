@@ -1,5 +1,7 @@
+DROP TABLE IF EXISTS {{schema_name}}.contacts;
+
 --CREATE CONTACTS TABLE
-CREATE TABLE IF NOT EXISTS public.contacts (
+CREATE TABLE IF NOT EXISTS {{schema_name}}.contacts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     first_name TEXT NOT NULL,
     middle_name TEXT,
