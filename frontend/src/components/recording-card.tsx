@@ -17,7 +17,7 @@ import {
 import { CallRecording, OrganizationMember } from '@/types/callcaps';
 import { useQuery } from '@tanstack/react-query';
 import { getAuthHeaders } from '@/config/api';
-import { useOrganizationMembers } from '@/hooks/use-organization-members';
+import { useMembers } from '@/hooks/useMembers';
 import { ShareRecordingDialog } from './share-recording-dialog';
 import {
   DropdownMenu,
@@ -55,7 +55,7 @@ const RecordingCard = ({
     data: members = [],
     isLoading: membersLoading,
     error: membersError
-  } = useOrganizationMembers();
+  } = useMembers();
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
@@ -69,12 +69,6 @@ const RecordingCard = ({
     e.preventDefault();
     e.stopPropagation();
     setIsShareDialogOpen(true);
-  };
-
-  const handleShareSuccess = () => {
-    if (onRecordingUpdated) {
-      onRecordingUpdated();
-    }
   };
 
   const handlePlayClick = async (e: React.MouseEvent) => {
@@ -540,7 +534,6 @@ const RecordingCard = ({
         recording={recording}
         isOpen={isShareDialogOpen}
         onClose={() => setIsShareDialogOpen(false)}
-        onSuccess={handleShareSuccess}
       />
     </div>
   );

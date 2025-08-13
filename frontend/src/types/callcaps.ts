@@ -64,7 +64,7 @@ export interface MeetingActionItem {
   assignee?: string;
   assigneeSpeakerLabel?: string;
   dueDate?: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
+  priority: 'low' | 'medium' | 'high' ;
   context?: string;
 }
 

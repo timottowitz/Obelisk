@@ -6,7 +6,8 @@ import {
   ShareRecordingRequest,
   RecordingShareInfo,
   AccessibleRecordingsResponse,
-  AccessibleRecordingsFilters
+  AccessibleRecordingsFilters,
+  RecordingClip
 } from '@/types/callcaps';
 import { API_CONFIG, getAuthHeaders, handleApiResponse } from '@/config/api';
 
@@ -354,7 +355,7 @@ export class CallRecordingsAPI {
       s3_key: apiRecording.gcs_video_blob_name || '',
       transcript_s3_key: apiRecording.gcs_transcript_blob_name || null,
       gcs_video_url: apiRecording.gcs_video_url,
-      start_time: apiRecording.start_time,
+      start_time: apiRecording.start_time
       // Add other fields as needed
     };
   }
@@ -367,27 +368,33 @@ export class CallRecordingsAPI {
     title?: string
   ): Promise<RecordingClip> {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${API_CONFIG.API_URL}/recording-clips`, {
+    const response = await fetch(API_CONFIG.RECORDING_CLIPS_BASE_URL, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         recording_id: recordingId,
         start_time: startTime,
         end_time: endTime,
-        title: title,
-      }),
+        title: title
+      })
     });
     return handleApiResponse<RecordingClip>(response);
   }
 
-  static async getClip(shareToken: string, schemaName: string): Promise<RecordingClip> {
+  static async getClip(
+    shareToken: string,
+    schemaName: string
+  ): Promise<RecordingClip> {
     const headers = {
       'Content-Type': 'application/json',
-      'X-Schema-Name': schemaName,
+      'X-Schema-Name': schemaName
     };
-    const response = await fetch(`${API_CONFIG.API_URL}/recording-clips/${shareToken}`, {
-      headers,
-    });
+    const response = await fetch(
+      `${API_CONFIG.RECORDING_CLIPS_BASE_URL}/${shareToken}`,
+      {
+        headers
+      }
+    );
     return handleApiResponse<RecordingClip>(response);
   }
 }
