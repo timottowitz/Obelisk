@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Calendar,
   Clock,
@@ -20,26 +20,37 @@ import {
 import { CallRecording } from '@/types/callcaps';
 import { getAuthHeaders } from '@/config/api';
 import { ShareRecordingDialog } from './share-recording-dialog';
-import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
 
-const RecordingDetailModal = ({
+const FeaturedRecording = ({
   recording,
-  onClose,
   onRecordingUpdated
 }: {
   recording: CallRecording;
-  onClose: () => void;
   onRecordingUpdated?: () => void;
 }) => {
-  console.log(recording);
   const [activeTab, setActiveTab] = useState('summary');
   const [isPlaying, setIsPlaying] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Reset video when recording changes
+  useEffect(() => {
+    if (videoUrl) {
+      URL.revokeObjectURL(videoUrl);
+      setVideoUrl(null);
+    }
+    setIsPlaying(false);
+    setVideoLoading(false);
+    if (videoRef.current) {
+      videoRef.current.src = '';
+      videoRef.current.load();
+    }
+  }, [recording]);
+
 
   // Format date, time, and duration from start_date and duration (ms)
   const formattedDate = recording.start_time ? format(new Date(recording.start_time), 'PPP') : '';
@@ -132,14 +143,6 @@ const RecordingDetailModal = ({
     setIsPlaying(false);
   };
 
-  // Cleanup video URL when modal closes
-  const handleClose = () => {
-    if (videoUrl && videoUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(videoUrl);
-    }
-    onClose();
-  };
-
   const handleShareClick = () => {
     setIsShareDialogOpen(true);
   };
@@ -151,8 +154,7 @@ const RecordingDetailModal = ({
   };
 
   return (
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent showCloseButton={false} className='bg-card h-[80vh] w-full !max-w-7xl overflow-hidden rounded-[var(--radius)] p-0'>
+    <div className='bg-card w-full rounded-[var(--radius)] p-0 mb-6 border'>
         {/* Header */}
         <div className='border-border flex items-center justify-between border-b p-6'>
           <div className='flex-1'>
@@ -187,11 +189,6 @@ const RecordingDetailModal = ({
             <button className='text-muted-foreground hover:text-foreground hover:bg-muted rounded-[calc(var(--radius)-2px)] p-2'>
               <Trash2 className='h-5 w-5' />
             </button>
-            <DialogClose asChild>
-              <button className='text-muted-foreground hover:text-foreground hover:bg-muted rounded-[calc(var(--radius)-2px)] p-2'>
-                <X className='h-5 w-5' />
-              </button>
-            </DialogClose>
             {/* Add process/analysis button if not processed */}
             {recording.status !== 'processed' && (
               <button
@@ -220,9 +217,9 @@ const RecordingDetailModal = ({
         </div>
 
         {/* Main Content Area */}
-        <div className='flex flex-1 overflow-hidden'>
+        <div className='flex flex-1 overflow-hidden p-6'>
           {/* Video Player Sidebar */}
-          <ScrollArea className='w-80 h-[calc(80vh-120px)] border-r bg-muted p-6'>
+          <div className='w-1/3 pr-6 border-r'>
             {/* Video Player and sidebar content here */}
             <div
               className='relative mb-4 min-h-[150px] overflow-hidden rounded-[var(--radius)] bg-black'
@@ -362,13 +359,13 @@ const RecordingDetailModal = ({
                 </div>
               )}
             </div>
-          </ScrollArea>
+          </div>
           {/* Main Tabs Content */}
-          <ScrollArea className='flex-1 h-[calc(80vh-120px)]'>
+          <div className='w-2/3 pl-6'>
             <div className='flex flex-col h-full'>
               {/* Tabs */}
               <div className='border-border border-b'>
-                <nav className='flex space-x-8 px-6'>
+                <nav className='flex space-x-8'>
                   {tabs.map((tab) => {
                     const IconComponent = tab.icon;
                     return (
@@ -675,7 +672,7 @@ const RecordingDetailModal = ({
                 </div>
               </div>
             </div>
-          </ScrollArea>
+          </div>
         </div>
         {/* Share Dialog */}
         <ShareRecordingDialog
@@ -684,9 +681,8 @@ const RecordingDetailModal = ({
           onClose={() => setIsShareDialogOpen(false)}
           onSuccess={handleShareSuccess}
         />
-      </DialogContent>
-    </Dialog>
+    </div>
   );
 };
 
-export default RecordingDetailModal;
+export default FeaturedRecording;

@@ -15,7 +15,7 @@ import { CallRecording } from '@/types/callcaps';
 import { webScreenRecorder } from '@/services/web-recording';
 import { CallRecordingsAPI } from '@/services/call-recordings-api';
 import { useAccessibleRecordings } from '@/hooks/useAccessibleRecordings';
-import RecordingDetailModal from './recording-detail-modal';
+import FeaturedRecording from './featured-recording';
 import RecordingCard from './recording-card';
 
 const CallCaps = () => {
@@ -45,6 +45,12 @@ const CallCaps = () => {
     search: searchQuery || undefined,
     accessType: accessFilter
   });
+
+  useEffect(() => {
+    if (!selectedRecording && recordings.length > 0) {
+      setSelectedRecording(recordings[0]);
+    }
+  }, [recordings, selectedRecording]);
 
   // Get total from summary
   const total = summary?.total || 0;
@@ -532,6 +538,14 @@ const CallCaps = () => {
       </div>
       {/* Main Content */}
       <div className='mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex flex-col h-[calc(100vh-200px)]'>
+        {/* Featured Recording */}
+        {selectedRecording && (
+          <FeaturedRecording
+            recording={selectedRecording}
+            onRecordingUpdated={refresh}
+          />
+        )}
+
         {/* Recordings List - Scrollable */}
         <div className='flex-1 overflow-y-auto pr-2'>
           {Object.entries(groupedRecordings).map(([date, dateRecordings]) => (
@@ -651,14 +665,6 @@ const CallCaps = () => {
           </div>
         )}
       </div>
-      {/* Recording Detail Modal */}
-      {selectedRecording && (
-        <RecordingDetailModal
-          recording={selectedRecording}
-          onClose={() => setSelectedRecording(null)}
-          onRecordingUpdated={refresh}
-        />
-      )}
     </div>
   );
 };
