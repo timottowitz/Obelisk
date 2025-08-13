@@ -30,7 +30,7 @@ export default function EmailDisplay({
             <MailIcon className='text-muted-foreground h-4 w-4' />
           </span>
         )}
-        <span className='truncate whitespace-nowrap'>{current.email}</span>
+        <span className='truncate whitespace-nowrap'>{current.address}</span>
       </div>
       {emails.length > 1 && (
         <div className='flex flex-col items-center'>

@@ -17,7 +17,7 @@ interface ContactFiltersProps {
   queryParams: {
     search: string;
     page: number;
-    sortBy: 'asc' | 'desc';
+    sortBy: 'sort_by_first' | 'sort_by_last';
     typeFilter: string;
     archived: string;
   };
@@ -41,17 +41,15 @@ export default function ContactFilters({
         onClick={() =>
           onQueryChange(
             'sortBy',
-            queryParams.sortBy === 'asc' ? 'desc' : 'asc'
+            queryParams.sortBy === 'sort_by_first'
+              ? 'sort_by_last'
+              : 'sort_by_first'
           )
         }
         disabled={isLoading}
       >
-        Sort by Name
-        {queryParams.sortBy === 'asc' ? (
-          <ChevronUp className='h-4 w-4' />
-        ) : (
-          <ChevronDown className='h-4 w-4' />
-        )}
+        Sort by{' '}
+        {queryParams.sortBy === 'sort_by_first' ? 'First Name' : 'Last Name'}
       </Button>
 
       <Select
@@ -85,9 +83,11 @@ export default function ContactFilters({
         <Input
           type='checkbox'
           id='archived'
-          className='accent-cyan-500 h-4 w-4'
+          className='h-4 w-4 accent-cyan-500'
           checked={queryParams.archived === 'true'}
-          onChange={(e) => onQueryChange('archived', e.target.checked ? 'true' : 'false')}
+          onChange={(e) =>
+            onQueryChange('archived', e.target.checked ? 'true' : 'false')
+          }
         />
         <label htmlFor='archived'>Show Archived</label>
       </div>

@@ -1,32 +1,37 @@
 export type Contact = {
   id: string;
-  name: string;
-  avatar_storage_url: string;
-  contact_type_id: string;
-  contact_type: string;
+  first_name: string;
+  middle_name: string;
+  last_name: string;
+  full_name: string;
   prefix?: string;
   suffix?: string;
-  nickname?: string;
-  company?: string;
-  department?: string;
-  job_title?: string;
-  address: {
+  is_archived: boolean;
+  addresses: {
     street: string;
     street2: string;
     city: string;
     st: string;
     zip: string;
   }[];
-  email: {
-    type: string;
-    email: string;
+  emails: {
+    notes: string;
+    emailLabel: string;
+    address: string;
+    emailDomain: string;
   }[];
-  phone: {
-    type: string;
+  phones: {
+    notes: string;
+    phoneLabel: string;
     number: string;
   }[];
-  tags: string[];
-  archived: boolean;
+  contact_type: string[];
+  contact_type_ids: string[];
+  flattened_hash_tags: string;
+  company: string;
+  department: string;
+  job_title: string;
+  picture_url: string;
 };
 
 export type ContactType = {
@@ -53,6 +58,8 @@ export interface AddressEntry {
   street2?: string;
 }
 export interface EmailEntry {
-  type: string;
-  email: string;
+  notes: string;
+  emailLabel: string;
+  address: string;
+  emailDomain: string;
 }

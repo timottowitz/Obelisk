@@ -49,7 +49,7 @@ export default function ContactActions({
               </Button>
             </HoverCardTrigger>
             <HoverCardContent>
-              {selectedContact.archived
+              {selectedContact.is_archived
                 ? 'Unarchive Contact'
                 : 'Archive Contact'}
             </HoverCardContent>
