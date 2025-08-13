@@ -29,6 +29,14 @@ export const API_CONFIG = {
     ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/contacts`
     : 'https://rnmjwdxqtsvsbelcftzg.supabase.co/functions/v1/contacts',
 
+  MEMBERS_BASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL
+    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/members`
+    : 'https://rnmjwdxqtsvsbelcftzg.supabase.co/functions/v1/members',
+
+  RECORDING_CLIPS_BASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL
+    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/recording-clips`
+    : 'https://rnmjwdxqtsvsbelcftzg.supabase.co/functions/v1/recording-clips',
+
   // Default pagination settings
   DEFAULT_LIMIT: 50,
   DEFAULT_ORDER_BY: 'start_time',

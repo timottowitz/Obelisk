@@ -924,7 +924,13 @@ app.post("/call-recordings/:id/process", async (c) => {
     }
 
     if (!recordingData.meeting_type_id) {
-      return c.json({ error: "Recording does not have a meeting type assigned. Please update the recording with a meeting type before processing." }, 400);
+      return c.json(
+        {
+          error:
+            "Recording does not have a meeting type assigned. Please update the recording with a meeting type before processing.",
+        },
+        400
+      );
     }
 
     // Get meeting type details
@@ -935,11 +941,11 @@ app.post("/call-recordings/:id/process", async (c) => {
       .eq("id", recordingData.meeting_type_id)
       .eq("is_active", true)
       .single();
-    
+
     if (meetingTypeError || !meetingTypeData) {
       return c.json({ error: "Meeting type not found or inactive" }, 400);
     }
-    
+
     const systemPrompt = meetingTypeData.system_prompt;
     const outputFormat = meetingTypeData.output_format;
     const meetingTypeName = meetingTypeData.display_name;
@@ -1369,8 +1375,15 @@ app.post("/call-recordings/upload", async (c) => {
       );
     }
 
-    const { mimeType, duration, startTime, endTime, title, participants, meetingTypeId } =
-      metadata;
+    const {
+      mimeType,
+      duration,
+      startTime,
+      endTime,
+      title,
+      participants,
+      meetingTypeId,
+    } = metadata;
 
     if (!mimeType || !duration || !startTime || !title) {
       return c.json(

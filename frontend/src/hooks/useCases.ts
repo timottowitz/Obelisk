@@ -140,12 +140,33 @@ export function useDeleteCase() {
   });
 }
 
-export function useGetCases(type: string,page: number, search?: string, statusFilter?: string, sortBy?: string, order?: string) {
-  console.log(sortBy, order);
+export function useGetCases(
+  type: string,
+  page: number,
+  search?: string,
+  statusFilter?: string,
+  sortBy?: string,
+  order?: string
+) {
   return useQuery({
-    queryKey: [...QUERY_KEYS.cases, type, page, search, statusFilter, sortBy, order],
+    queryKey: [
+      ...QUERY_KEYS.cases,
+      type,
+      page,
+      search,
+      statusFilter,
+      sortBy,
+      order
+    ],
     queryFn: async () => {
-      const response = await CasesAPI.getCases(type, page, search, statusFilter, sortBy, order);
+      const response = await CasesAPI.getCases(
+        type,
+        page,
+        search,
+        statusFilter,
+        sortBy,
+        order
+      );
       return response;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes

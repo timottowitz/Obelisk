@@ -22,11 +22,11 @@ import dayjs from 'dayjs';
 import {
   useCreateCaseProject,
   useCaseProjects,
-  useGetTeamMembers,
   useCreateCaseTask
 } from '@/hooks/useTasks';
 import { toast } from 'sonner';
 import { UploadTaskData } from '@/types/cases';
+import { useMembers } from '@/hooks/useMembers';
 
 const regExp = /^[A-Z][a-z0-9]*(\s[A-Z][a-z0-9]*)*$/;
 interface TaskDetailModalProps {
@@ -63,7 +63,7 @@ export default function TaskModal({
 
   const createCaseProject = useCreateCaseProject();
   const { data: caseProjects } = useCaseProjects(caseId);
-  const { data: teamMembers } = useGetTeamMembers();
+  const { data: teamMembers } = useMembers();
 
   // Update form data when initialData changes
   useEffect(() => {
