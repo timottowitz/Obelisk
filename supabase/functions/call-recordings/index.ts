@@ -9,7 +9,10 @@ import { Hono } from "jsr:@hono/hono";
 import { cors } from "jsr:@hono/hono/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
 import { extractUserAndOrgId } from "../_shared/index.ts";
-import { GeminiMeetingIntelligence } from "./gemini-meeting-intelligence.ts";
+import {
+  GeminiMeetingIntelligence,
+  MeetingActionItem,
+} from "./gemini-meeting-intelligence.ts";
 import {
   GoogleGenAI,
   createUserContent,
@@ -36,6 +39,93 @@ function formatDuration(milliseconds: number): string {
   } else {
     return `${seconds}s`;
   }
+}
+
+// Helper to find user by name with "Firstname L." logic
+async function findUserByName(
+  supabase: any,
+  schema: string,
+  orgId: string,
+  name: string
+): Promise<string | null> {
+  if (!name) return null;
+
+  const nameParts = name.split(" ");
+  const firstName = nameParts[0];
+  const lastNameInitial = nameParts.length > 1 ? nameParts[1].charAt(0) : null;
+
+  // Query for members of the organization first
+  const { data: members, error: memberError } = await supabase
+    .schema("private")
+    .from("organization_members")
+    .select("user_id")
+    .eq("organization_id", orgId);
+
+  if (memberError || !members) {
+    console.error("Could not fetch organization members:", memberError);
+    return null;
+  }
+
+  const memberUserIds = members.map((m: any) => m.user_id);
+
+  let query = supabase
+    .schema("private")
+    .from("users")
+    .select("id, full_name")
+    .in("id", memberUserIds)
+    .like("full_name", `${firstName}%`);
+
+  const { data: users, error } = await query;
+
+  if (error || !users || users.length === 0) {
+    console.warn(`Could not find user matching name: ${name}`, error);
+    return null;
+  }
+
+  if (users.length === 1) {
+    return users[0].id;
+  }
+
+  // If multiple users have the same first name, try to match by last initial
+  if (lastNameInitial) {
+    const filteredUsers = users.filter((u: any) => {
+      const userParts = u.full_name.split(" ");
+      return (
+        userParts.length > 1 &&
+        userParts[1].charAt(0).toUpperCase() === lastNameInitial.toUpperCase()
+      );
+    });
+
+    if (filteredUsers.length === 1) {
+      return filteredUsers[0].id;
+    }
+  }
+
+  console.warn(`Found multiple users or no specific match for name: ${name}`);
+  return null;
+}
+
+// Helper to find case by identifier
+async function findCaseByIdentifier(
+  supabase: any,
+  schema: string,
+  identifier: string
+): Promise<string | null> {
+  if (!identifier) return null;
+
+  const { data: caseData, error } = await supabase
+    .schema(schema)
+    .from("cases")
+    .select("id")
+    .or(`case_number.eq.${identifier},details->>title.ilike.%${identifier}%`)
+    .maybeSingle();
+
+  if (error) {
+    console.error(`Error finding case by identifier "${identifier}":`, error);
+    return null;
+  }
+
+  return caseData ? caseData.id : null;
 }
 
 // Helper to generate markdown report
@@ -979,30 +1069,39 @@ Do not include any commentary, explanation, or markdown formatting. The output m
       if (transcriptText && !analysis) {
         console.log("Starting AI analysis...");
 
-        // Get meeting type system prompt and output format if meetingTypeId is available
-        let systemPrompt;
-        let outputFormat = "json";
-        
-        if (meetingTypeId) {
-          const { data: meetingTypeData, error: meetingTypeError } = await supabase
-            .schema(schema)
-            .rpc('get_meeting_type_prompt', { meeting_type_id_param: meetingTypeId });
-          
-          if (!meetingTypeError && meetingTypeData && meetingTypeData.length > 0) {
-            systemPrompt = meetingTypeData[0].system_prompt;
-            outputFormat = meetingTypeData[0].output_format || "json";
-            console.log("Using custom meeting type prompt for:", meetingTypeData[0].display_name);
-          } else {
-            return c.json({ error: "Meeting type not found or inactive" }, 400);
-          }
-        } else {
-          // If no meeting type provided, return error
-          return c.json({ error: "Meeting type is required. Please create and select a meeting type to process this recording." }, 400);
+        // Get full meeting type details
+        if (!meetingTypeId) {
+          return c.json(
+            {
+              error:
+                "Meeting type is required. Please create and select a meeting type to process this recording.",
+            },
+            400
+          );
         }
+
+        const { data: meetingType, error: meetingTypeError } = await supabase
+          .schema(schema)
+          .from("meeting_types")
+          .select("*")
+          .eq("id", meetingTypeId)
+          .single();
+
+        if (meetingTypeError || !meetingType) {
+          console.error("Meeting type error:", meetingTypeError);
+          return c.json({ error: "Meeting type not found or inactive" }, 400);
+        }
+
+        const systemPrompt = meetingType.system_prompt;
+        const outputFormat = meetingType.output_format || "json";
+        console.log(
+          "Using custom meeting type prompt for:",
+          meetingType.display_name
+        );
 
         // Use Gemini Meeting Intelligence for analysis with custom prompt
         const geminiIntelligence = new GeminiMeetingIntelligence(googleApiKey);
-        
+
         try {
           analysis = await geminiIntelligence.analyzeWithCustomPrompt(
             transcriptText,
@@ -1010,21 +1109,88 @@ Do not include any commentary, explanation, or markdown formatting. The output m
             systemPrompt,
             outputFormat
           );
-          
+
           console.log("Gemini analysis completed:", analysis);
         } catch (analysisError) {
           console.error("Gemini analysis failed:", analysisError);
-          throw new Error(`AI analysis failed: ${analysisError instanceof Error ? analysisError.message : 'Unknown error'}`);
+          throw new Error(
+            `AI analysis failed: ${
+              analysisError instanceof Error ? analysisError.message : "Unknown error"
+            }`
+          );
         }
 
-        // Update recording with analysis
+        // Step 2a: Create AI Task Insights from Action Items
+        if (analysis?.actionItems?.length > 0) {
+          console.log(
+            `Found ${analysis.actionItems.length} action items to process.`
+          );
+
+          let projectId: string | null = null;
+          let caseId: string | null = null;
+
+          if (meetingType.task_category === "project" && meetingType.context_id) {
+            projectId = meetingType.context_id;
+          } else if (
+            meetingType.task_category === "case" &&
+            analysis.caseIdentifier
+          ) {
+            caseId = await findCaseByIdentifier(
+              supabase,
+              schema,
+              analysis.caseIdentifier
+            );
+          }
+
+          for (const item of analysis.actionItems as MeetingActionItem[]) {
+            const suggested_assignee_id = item.assignee
+              ? await findUserByName(supabase, schema, org.data.id, item.assignee)
+              : null;
+
+            const insightPayload = {
+              suggested_title: item.task,
+              suggested_description:
+                item.context || `Extracted from recording: ${recording.title}`,
+              suggested_priority: item.priority || "medium",
+              suggested_due_date: item.dueDate,
+              suggested_assignee_id,
+              source_type: "transcript",
+              source_reference: recordingId,
+              project_id: projectId,
+              case_id: caseId,
+              confidence_score: 0.9, // Default confidence
+              ai_reasoning: "Extracted from meeting transcript by AI.",
+              created_by: user.id, // The user who initiated the processing
+            };
+
+            const { error: insightError } = await supabase
+              .schema(schema)
+              .from("ai_task_insights")
+              .insert(insightPayload);
+
+            if (insightError) {
+              console.error(
+                "Failed to create AI task insight:",
+                insightError.message
+              );
+            } else {
+              console.log(
+                `Successfully created AI task insight for: ${item.task}`
+              );
+            }
+          }
+        }
+
+        // Step 2b: Update recording with analysis, excluding actionItems
+        // deno-lint-ignore no-unused-vars
+        const { actionItems, ...analysisToSave } = analysis;
+
         await supabase
           .schema(schema)
           .from(recordingsTable)
           .update({
-            ai_analysis: analysis,
+            ai_analysis: analysisToSave,
             ai_summary: analysis.summary,
-            action_items: analysis.actionItems || [],
             key_topics: analysis.topics || [],
             sentiment: analysis.sentiment || "neutral",
             risk_analysis: analysis.risks || [],
