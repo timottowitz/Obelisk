@@ -358,6 +358,38 @@ export class CallRecordingsAPI {
       // Add other fields as needed
     };
   }
+
+  // Clips
+  static async createClip(
+    recordingId: string,
+    startTime: number,
+    endTime: number,
+    title?: string
+  ): Promise<RecordingClip> {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_CONFIG.API_URL}/recording-clips`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        recording_id: recordingId,
+        start_time: startTime,
+        end_time: endTime,
+        title: title,
+      }),
+    });
+    return handleApiResponse<RecordingClip>(response);
+  }
+
+  static async getClip(shareToken: string, schemaName: string): Promise<RecordingClip> {
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Schema-Name': schemaName,
+    };
+    const response = await fetch(`${API_CONFIG.API_URL}/recording-clips/${shareToken}`, {
+      headers,
+    });
+    return handleApiResponse<RecordingClip>(response);
+  }
 }
 
 export const callRecordingsAPI = new CallRecordingsAPI();

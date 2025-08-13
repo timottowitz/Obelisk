@@ -17,11 +17,12 @@ import {
   MoreVertical,
   X
 } from 'lucide-react';
-import { CallRecording, MeetingActionItem } from '@/types/callcaps';
+import { CallRecording, MeetingActionItem, RecordingClip } from '@/types/callcaps';
 import { getAuthHeaders } from '@/config/api';
 import { ShareRecordingDialog } from './share-recording-dialog';
 import { ActionPointProposal } from '@/components/ai/action-point-proposal';
 import TasksAPI from '@/services/tasks';
+import { CallRecordingsAPI } from '@/services/call-recordings-api';
 import { toast } from 'sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
@@ -39,6 +40,8 @@ const FeaturedRecording = ({
   const [videoLoading, setVideoLoading] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [clipStartTime, setClipStartTime] = useState<number | null>(null);
+  const [clipEndTime, setClipEndTime] = useState<number | null>(null);
 
   // Reset video when recording changes
   useEffect(() => {
@@ -175,6 +178,44 @@ const FeaturedRecording = ({
     }
   };
 
+  const handleSegmentClick = (startTime: number) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = startTime;
+      if (videoRef.current.paused) {
+        videoRef.current.play().catch(console.error);
+      }
+    }
+  };
+
+  const handleCreateClip = async () => {
+    if (clipStartTime === null || clipEndTime === null) {
+      toast.error("Please set both start and end times for the clip.");
+      return;
+    }
+    if (clipStartTime >= clipEndTime) {
+      toast.error("Start time must be before end time.");
+      return;
+    }
+
+    try {
+      const newClip = await CallRecordingsAPI.createClip(
+        recording.id,
+        clipStartTime,
+        clipEndTime,
+        `Clip from ${recording.title}`
+      );
+      toast.success("Clip created successfully! You can now share it.");
+      // Optionally, you could open the share dialog here for the new clip
+      // or display the shareable link.
+      console.log("New clip created:", newClip);
+      setClipStartTime(null);
+      setClipEndTime(null);
+    } catch (error) {
+      console.error("Failed to create clip:", error);
+      toast.error("Failed to create clip.");
+    }
+  };
+
   return (
     <div className='bg-card w-full rounded-[var(--radius)] p-0 mb-6 border'>
         {/* Header */}
@@ -288,6 +329,22 @@ const FeaturedRecording = ({
                   </div>
                 </>
               )}
+            </div>
+
+            {/* Clipping UI */}
+            <div className="space-y-2 border-t pt-4">
+                <h4 className="text-sm font-medium text-foreground/80">Create Clip</h4>
+                <div className="flex items-center space-x-2">
+                    <Button onClick={() => setClipStartTime(videoRef.current?.currentTime ?? 0)} size="sm" variant="outline">Set Start</Button>
+                    <Button onClick={() => setClipEndTime(videoRef.current?.currentTime ?? 0)} size="sm" variant="outline">Set End</Button>
+                    <Button onClick={handleCreateClip} size="sm" disabled={clipStartTime === null || clipEndTime === null}>Create Clip</Button>
+                </div>
+                {(clipStartTime !== null || clipEndTime !== null) && (
+                    <div className="text-xs text-muted-foreground">
+                        <p>Start: {clipStartTime?.toFixed(2) ?? 'Not set'}</p>
+                        <p>End: {clipEndTime?.toFixed(2) ?? 'Not set'}</p>
+                    </div>
+                )}
             </div>
 
             {/* Recording Stats */}
@@ -527,7 +584,10 @@ const FeaturedRecording = ({
                             {recording.transcript_segments.map(
                               (segment: any, idx: number) => (
                                 <div key={idx} className='flex'>
-                                  <p>
+                                  <p
+                                    className="cursor-pointer hover:bg-muted p-1 rounded-md"
+                                    onClick={() => handleSegmentClick(segment.startTime)}
+                                  >
                                     <span className='text-primary mr-2 font-semibold'>
                                       {segment.speaker}:
                                     </span>

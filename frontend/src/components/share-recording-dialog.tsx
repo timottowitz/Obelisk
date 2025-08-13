@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { X, Users, Calendar, AlertCircle, CheckCircle, Building } from 'lucide-react';
-import { CallRecording, OrganizationMember } from '@/types/callcaps';
+import { X, Users, Calendar, AlertCircle, CheckCircle, Building, Link } from 'lucide-react';
+import { CallRecording, OrganizationMember, RecordingClip } from '@/types/callcaps';
 import { CallRecordingsAPI } from '@/services/call-recordings-api';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { toast } from 'sonner';
 
 interface ShareRecordingDialogProps {
   recording: CallRecording;
+  clip?: RecordingClip;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
@@ -13,6 +15,7 @@ interface ShareRecordingDialogProps {
 
 export const ShareRecordingDialog: React.FC<ShareRecordingDialogProps> = ({
   recording,
+  clip,
   isOpen,
   onClose,
   onSuccess,
@@ -115,7 +118,7 @@ export const ShareRecordingDialog: React.FC<ShareRecordingDialogProps> = ({
       >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border">
-          <h2 className="text-lg font-semibold text-foreground">Share Recording</h2>
+          <h2 className="text-lg font-semibold text-foreground">{clip ? "Share Clip" : "Share Recording"}</h2>
           <button
             onClick={handleClose}
             className="text-muted-foreground hover:text-foreground transition-colors"
@@ -128,7 +131,7 @@ export const ShareRecordingDialog: React.FC<ShareRecordingDialogProps> = ({
         <div className="p-6 overflow-y-auto">
           {/* Recording Info */}
           <div className="bg-muted rounded-lg p-4 mb-6">
-            <h3 className="font-medium text-foreground mb-2">{recording.title}</h3>
+            <h3 className="font-medium text-foreground mb-2">{clip ? clip.title : recording.title}</h3>
             <div className="flex items-center space-x-4 text-sm text-muted-foreground">
               <span className="flex items-center">
                 <Calendar className="mr-1 h-4 w-4" />
@@ -140,6 +143,32 @@ export const ShareRecordingDialog: React.FC<ShareRecordingDialogProps> = ({
               </span>
             </div>
           </div>
+
+          {/* Public Link for Clips */}
+          {clip && (
+            <div className="mb-6">
+                <label className="block text-sm font-medium text-foreground mb-2">
+                    Public Link
+                </label>
+                <div className="flex items-center space-x-2">
+                    <input
+                        type="text"
+                        readOnly
+                        value={`${window.location.origin}/clips/${clip.share_token}`}
+                        className="w-full px-3 py-2 border border-border rounded-md bg-background text-muted-foreground text-sm"
+                    />
+                    <button
+                        onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/clips/${clip.share_token}`);
+                            toast.success("Link copied to clipboard!");
+                        }}
+                        className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-md hover:bg-primary/90"
+                    >
+                        <Link className="h-4 w-4" />
+                    </button>
+                </div>
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (
@@ -272,7 +301,7 @@ export const ShareRecordingDialog: React.FC<ShareRecordingDialogProps> = ({
             disabled={isLoading || (!shareWithEntireOrg && selectedMemberIds.length === 0)}
             className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-md hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary"
           >
-            {isLoading ? 'Sharing...' : 'Share Recording'}
+            {isLoading ? 'Sharing...' : `Share ${clip ? 'Clip' : 'Recording'}`}
           </button>
         </div>
       </div>

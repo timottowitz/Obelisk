@@ -186,3 +186,15 @@ export interface AccessibleRecordingsFilters {
   endDate?: string;
   accessType?: 'owned' | 'shared' | 'all';
 }
+
+export interface RecordingClip {
+  id: string;
+  recording_id: string;
+  member_id: string;
+  start_time: number;
+  end_time: number;
+  title?: string;
+  share_token: string;
+  created_at: string;
+  call_recordings: CallRecording; // This will be populated when fetching a clip
+}
