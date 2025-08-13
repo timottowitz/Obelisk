@@ -17,9 +17,12 @@ import {
   MoreVertical,
   X
 } from 'lucide-react';
-import { CallRecording } from '@/types/callcaps';
+import { CallRecording, MeetingActionItem } from '@/types/callcaps';
 import { getAuthHeaders } from '@/config/api';
 import { ShareRecordingDialog } from './share-recording-dialog';
+import { ActionPointProposal } from '@/components/ai/action-point-proposal';
+import TasksAPI from '@/services/tasks';
+import { toast } from 'sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
 
@@ -62,7 +65,7 @@ const FeaturedRecording = ({
   const tabs = [
     { id: 'summary', label: 'Summary', icon: FileText },
     { id: 'transcript', label: 'Transcript', icon: MessageSquare },
-    { id: 'actions', label: 'Action Items', icon: Target },
+    { id: 'action-points', label: 'Action Points', icon: Target },
     { id: 'analysis', label: 'Risk Analysis', icon: AlertCircle },
     { id: 'insights', label: 'Insights', icon: Brain }
   ];
@@ -150,6 +153,25 @@ const FeaturedRecording = ({
   const handleShareSuccess = () => {
     if (onRecordingUpdated) {
       onRecordingUpdated();
+    }
+  };
+
+  const handleTaskCreated = async (actionItem: MeetingActionItem, caseId: string, assigneeId: string) => {
+    try {
+      await TasksAPI.createCaseTask(caseId, {
+        name: actionItem.task,
+        description: actionItem.context || '',
+        priority: actionItem.priority,
+        due_date: actionItem.dueDate,
+        assignee_id: assigneeId,
+      });
+      toast.success('Task created successfully!');
+      if (onRecordingUpdated) {
+        onRecordingUpdated();
+      }
+    } catch (error) {
+      console.error('Failed to create task:', error);
+      toast.error('Failed to create task.');
     }
   };
 
@@ -526,40 +548,12 @@ const FeaturedRecording = ({
                     </div>
                   )}
 
-                  {activeTab === 'actions' && recording.transcript && (
-                    <div>
-                      <h3 className='text-foreground mb-4 text-lg font-semibold'>
-                        Action Items & Follow-ups
-                      </h3>
-                      <div className='space-y-4'>
-                        {recording.transcript.actionItems.map((item, index) => (
-                          <div
-                            key={index}
-                            className='bg-card border-border rounded-lg border p-4 transition-shadow hover:shadow-sm'
-                          >
-                            <div className='flex items-start space-x-3'>
-                              <input
-                                type='checkbox'
-                                className='text-primary mt-1 h-4 w-4 rounded border-gray-300'
-                              />
-                              <div className='flex-1'>
-                                <p className='text-foreground font-medium'>
-                                  {item.task}
-                                </p>
-                                <div className='mt-2 flex items-center space-x-4 text-sm text-gray-500'>
-                                  <span>Priority: High</span>
-                                  <span>Due: June 10th</span>
-                                  <span>Assigned: TBD</span>
-                                </div>
-                              </div>
-                              <button className='text-gray-400 hover:text-gray-600'>
-                                <MoreVertical className='h-4 w-4' />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                  {activeTab === 'action-points' && recording.transcript && (
+                    <ActionPointProposal
+                      recording={recording}
+                      actionItems={recording.transcript.actionItems}
+                      onTaskCreated={handleTaskCreated}
+                    />
                   )}
 
                   {activeTab === 'analysis' && (

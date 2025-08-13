@@ -53,14 +53,19 @@ export interface CallRecording {
 
 export interface CallTranscript {
   summary: string;
-  actionItems: {
-    task: string;
-    dueDate: string;
-    assignee: string;
-  }[];
+  actionItems: MeetingActionItem[];
   keyTopics: string[];
   sentiment: 'positive' | 'negative' | 'neutral';
   wordCount: number;
+}
+
+export interface MeetingActionItem {
+  task: string;
+  assignee?: string;
+  assigneeSpeakerLabel?: string;
+  dueDate?: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  context?: string;
 }
 
 export interface WebRecording {
