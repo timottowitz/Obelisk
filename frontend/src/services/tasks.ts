@@ -224,4 +224,14 @@ export default class TasksAPI {
       }[]
     >(response);
   }
+
+  static async getAITaskSuggestions(caseId: string) {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_CONFIG.AI_INSIGHTS_BASE_URL}/ai-task-suggester`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ case_id: caseId }),
+    });
+    return handleApiResponse<{ name: string; description: string }[]>(response);
+  }
 }

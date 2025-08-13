@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { useSession } from '@clerk/nextjs';
 import TasksAPI from '@/services/tasks';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -5,6 +7,7 @@ import {
   TaskCreateData,
   FoundationAITaskData
 } from '@/types/cases';
+import supabase from '@/lib/supabase';
 
 const QUERY_KEYS = {
   tasks: ['tasks'] as const,
@@ -22,12 +25,61 @@ export const useCaseTasks = (
   priority: string,
   view: string
 ) => {
+  const queryClient = useQueryClient();
+  const { session } = useSession();
+  const queryKey = [...QUERY_KEYS.tasks, caseId, page, search, status, priority, view];
+
+  useEffect(() => {
+    if (!caseId || !session) {
+      return;
+    }
+
+    const setAuth = async () => {
+      const token = await session.getToken({ template: 'supabase' });
+      if (token) {
+        supabase.realtime.setAuth(token);
+      }
+    };
+    setAuth();
+
+    const channel = supabase
+      .channel(`case-tasks-${caseId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public', // RLS in Supabase will handle tenant isolation
+          table: 'case_tasks',
+          filter: `case_id=eq.${caseId}`,
+        },
+        (payload) => {
+          console.log('Real-time change received for case_tasks:', payload);
+          // Invalidate the query to trigger a refetch.
+          // This is a simple but effective way to keep the data fresh.
+          queryClient.invalidateQueries({ queryKey });
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log(`Subscribed to case_tasks channel for case ${caseId}`);
+        }
+        if (status === 'CHANNEL_ERROR') {
+          console.error(`Failed to subscribe to case_tasks channel:`, err);
+        }
+      });
+
+    return () => {
+      console.log(`Unsubscribing from case_tasks channel for case ${caseId}`);
+      supabase.removeChannel(channel);
+    };
+  }, [caseId, session, queryClient, queryKey]);
+
   return useQuery({
-    queryKey: [...QUERY_KEYS.tasks, caseId, page, search, status, priority, view],
+    queryKey,
     queryFn: () =>
       TasksAPI.getCaseTasks(caseId, page, search, status, priority, view),
-    staleTime: 1000 * 60 * 5,
-    retry: 2
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: 2,
   });
 };
 
@@ -38,6 +90,12 @@ export const useProjects = () => {
     queryFn: () => TasksAPI.getProjects(),
     staleTime: 1000 * 60 * 5,
     retry: 2
+  });
+};
+
+export const useGetAITaskSuggestions = () => {
+  return useMutation({
+    mutationFn: (caseId: string) => TasksAPI.getAITaskSuggestions(caseId),
   });
 };
 

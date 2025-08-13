@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import { Search, X } from 'lucide-react';
+import { Search, X, Lightbulb } from 'lucide-react';
 import TaskModal from './components/task-modal';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
@@ -19,10 +19,12 @@ import {
   useCaseTasks,
   useCreateCaseTask,
   useUpdateTask,
-  useDeleteTask
+  useDeleteTask,
+  useGetAITaskSuggestions
 } from '@/hooks/useTasks';
 import { useDebounce } from '@/hooks/use-debounce';
 import queryString from 'query-string';
+import AISuggestionsPanel from './components/ai-suggestions-panel';
 
 export default function Tasks({ caseId }: { caseId: string }) {
   const searchParams = useSearchParams();
@@ -35,6 +37,10 @@ export default function Tasks({ caseId }: { caseId: string }) {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  // AI Suggestions State
+  const [aiSuggestions, setAISuggestions] = useState<{ name: string; description: string }[]>([]);
+  const [isAISuggestionsLoading, setIsAISuggestionsLoading] = useState(false);
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState(
@@ -67,6 +73,7 @@ export default function Tasks({ caseId }: { caseId: string }) {
   const createCaseTask = useCreateCaseTask();
   const updateCaseTask = useUpdateTask();
   const deleteCaseTask = useDeleteTask();
+  const getAITaskSuggestions = useGetAITaskSuggestions();
 
   useEffect(() => {
     setCurrentPage(1);
@@ -137,6 +144,37 @@ export default function Tasks({ caseId }: { caseId: string }) {
     [caseId, createCaseTask]
   );
 
+  const handleSuggestTasks = useCallback(async () => {
+    setIsAISuggestionsLoading(true);
+    setAISuggestions([]);
+    try {
+      const suggestions = await getAITaskSuggestions.mutateAsync(caseId);
+      setAISuggestions(suggestions);
+    } catch (error: any) {
+      toast.error('Failed to get AI suggestions: ' + error.message);
+    } finally {
+      setIsAISuggestionsLoading(false);
+    }
+  }, [caseId, getAITaskSuggestions]);
+
+  const handleAcceptSuggestion = useCallback(async (suggestion: { name: string; description: string }) => {
+    try {
+      const taskData: UploadTaskData = {
+        name: suggestion.name,
+        description: suggestion.description,
+        status: 'pending',
+        priority: 'medium',
+        ai_generated: true,
+      };
+      await handleCreateTask(taskData);
+      // Remove the accepted suggestion from the list
+      setAISuggestions(prev => prev.filter(s => s.name !== suggestion.name));
+      toast.success(`Task "${suggestion.name}" created from AI suggestion.`);
+    } catch (error) {
+      // Error is already handled in handleCreateTask
+    }
+  }, [handleCreateTask]);
+
   const handleUpdateTask = useCallback(
     async (taskData: UploadTaskData) => {
       setIsLoading(true);
@@ -190,18 +228,37 @@ export default function Tasks({ caseId }: { caseId: string }) {
     <div className='flex flex-col gap-4'>
       <div className='flex items-center justify-between'>
         <h3 className='text-sm font-semibold text-gray-900'>Case Tasks</h3>
-        <Button
-          size='lg'
-          variant='outline'
-          className='flex w-fit cursor-pointer items-center text-xs'
-          onClick={() => {
-            setIsOpen(true);
-            setSelectedTask(null);
-          }}
-        >
-          Create A Task
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size='lg'
+            variant='outline'
+            className='flex w-fit cursor-pointer items-center text-xs gap-2'
+            onClick={handleSuggestTasks}
+            disabled={isAISuggestionsLoading}
+          >
+            <Lightbulb className="h-4 w-4" />
+            Suggest Tasks with AI
+          </Button>
+          <Button
+            size='lg'
+            variant='outline'
+            className='flex w-fit cursor-pointer items-center text-xs'
+            onClick={() => {
+              setIsOpen(true);
+              setSelectedTask(null);
+            }}
+          >
+            Create A Task
+          </Button>
+        </div>
       </div>
+
+      <AISuggestionsPanel
+        suggestions={aiSuggestions}
+        isLoading={isAISuggestionsLoading}
+        onAccept={handleAcceptSuggestion}
+        onDismiss={() => setAISuggestions([])}
+      />
 
       {/* Filters Section */}
       <div className='flex flex-row items-center gap-3 rounded-lg border bg-white p-4'>
