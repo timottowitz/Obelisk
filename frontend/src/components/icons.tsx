@@ -41,7 +41,8 @@ import {
   IconSquareCheck,
   IconMail,
   IconPhoneCall,
-  IconFolderOpen
+  IconFolderOpen,
+  IconMapPin
 } from '@tabler/icons-react';
 
 export type Icon = React.ComponentType<IconProps>;
@@ -88,5 +89,6 @@ export const Icons = {
   squareCheck: IconSquareCheck,
   mail: IconMail,
   call: IconPhoneCall,
-  folderOpen: IconFolderOpen
+  folderOpen: IconFolderOpen,
+  location: IconMapPin
 };

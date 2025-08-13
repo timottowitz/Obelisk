@@ -53,14 +53,19 @@ export interface CallRecording {
 
 export interface CallTranscript {
   summary: string;
-  actionItems: {
-    task: string;
-    dueDate: string;
-    assignee: string;
-  }[];
+  actionItems: MeetingActionItem[];
   keyTopics: string[];
   sentiment: 'positive' | 'negative' | 'neutral';
   wordCount: number;
+}
+
+export interface MeetingActionItem {
+  task: string;
+  assignee?: string;
+  assigneeSpeakerLabel?: string;
+  dueDate?: string;
+  priority: 'low' | 'medium' | 'high' ;
+  context?: string;
 }
 
 export interface WebRecording {
@@ -180,4 +185,16 @@ export interface AccessibleRecordingsFilters {
   startDate?: string;
   endDate?: string;
   accessType?: 'owned' | 'shared' | 'all';
+}
+
+export interface RecordingClip {
+  id: string;
+  recording_id: string;
+  member_id: string;
+  start_time: number;
+  end_time: number;
+  title?: string;
+  share_token: string;
+  created_at: string;
+  call_recordings: CallRecording; // This will be populated when fetching a clip
 }

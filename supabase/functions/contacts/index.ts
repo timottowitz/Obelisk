@@ -42,12 +42,12 @@ async function getSupabaseClinet() {
 }
 
 //get contact types
-app.get("/contact-types", async (c) => {
+app.get("/contacts/types", async (c) => {
   try {
     const supabaseClient = await getSupabaseClinet();
     const contactTypes = await getContactTypes(supabaseClient);
     return c.json(contactTypes, 200);
-  } catch (error) {
+  } catch (error: any) {
     console.error("getting contact types error", error);
     return c.json({ error: error.message }, 500);
   }
@@ -57,6 +57,7 @@ app.get("/contact-types", async (c) => {
 app.get("/contacts", async (c) => {
   const userId = c.get("userId");
   const orgId = c.get("orgId");
+  const url = new URL(c.req.url);
 
   if (!userId || !orgId) {
     return c.json({ error: "Missing userId or orgId" }, 400);
@@ -82,9 +83,9 @@ app.get("/contacts", async (c) => {
       return c.json({ error: "User or organization not found" }, 404);
     }
 
-    const contacts = await getContacts(supabaseClient, org);
+    const contacts = await getContacts(supabaseClient, org.data?.schema_name.toLowerCase(), url);
     return c.json(contacts, 200);
-  } catch (error) {
+  } catch (error: any) {
     console.error("getting contacts error", error);
     return c.json({ error: error.message }, 500);
   }
@@ -134,7 +135,7 @@ app.get("/contacts/avatars/:contactId", async (c) => {
       .createSignedUrl(avatarPath.split("/").slice(1).join("/"), 60 * 60 * 24);
 
     return c.json({ signedUrl }, 200);
-  } catch (error) {
+  } catch (error: any) {
     console.error("getting signed url error", error);
     return c.json({ error: error.message }, 500);
   }
@@ -168,8 +169,51 @@ app.post("/contacts", async (c) => {
 
     const contact = await createContact(body, supabaseClient, org, userId);
     return c.json(contact, 201);
-  } catch (error) {
+  } catch (error: any) {
     console.error("creating contact error", error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+//Create a new contact type
+app.post("/contacts/types", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const body = await c.req.formData();
+
+  try {
+    const supabaseClient = await getSupabaseClinet();
+    const user = await supabaseClient
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+
+    const org = await supabaseClient
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+
+    if (!user || !org) {
+      return c.json({ error: "User or organization not found" }, 404);
+    }
+
+    const { data: contactType, error: contactTypeError } = await supabaseClient
+      .schema("public")
+      .from("contact_types")
+      .insert({ name: body.get("name") })
+      .select();
+
+    if (contactTypeError) {
+      throw new Error(contactTypeError.message);
+    }
+
+    return c.json(contactType, 201);
+  } catch (error: any) {
+    console.error("creating contact type error", error);
     return c.json({ error: error.message }, 500);
   }
 });
@@ -209,8 +253,63 @@ app.put("/contacts/:contactId", async (c) => {
       userId
     );
     return c.json(contact, 200);
-  } catch (error) {
+  } catch (error: any) {
     console.error("updating contact error", error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+//Archive a contact
+
+app.put("/contacts/:contactId/archive", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const { contactId } = c.req.param();
+
+  try {
+    const supabaseClient = await getSupabaseClinet();
+    const user = await supabaseClient
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+
+    const org = await supabaseClient
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+
+    if (!user || !org) {
+      return c.json({ error: "User or organization not found" }, 404);
+    }
+
+    const { data: contact, error: contactError } = await supabaseClient
+      .schema("public")
+      .from("contacts")
+      .select("*")
+      .eq("id", contactId)
+      .single();
+
+    if (contactError) {
+      throw new Error(contactError.message);
+    }
+
+    const { error: updateError } = await supabaseClient
+      .schema("public")
+      .from("contacts")
+      .update({ "is_archived": !contact.is_archived })
+      .eq("id", contactId);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+
+    return c.json({ message: "Contact archived successfully" }, 200);
+  } catch (error: any) {
+    console.error("archiving contact error", error);
     return c.json({ error: error.message }, 500);
   }
 });
@@ -243,26 +342,79 @@ app.delete("/contacts/:contactId", async (c) => {
 
     await deleteContact(supabaseClient, org, contactId);
     return c.json({ message: "Contact deleted successfully" }, 200);
-  } catch (error) {
+  } catch (error: any) {
     console.error("deleting contact error", error);
     return c.json({ error: error.message }, 500);
   }
 });
 
-async function getContacts(supabaseClient, org) {
-  const { data: contacts, error: contactsError } = await supabaseClient
-    .schema(org.data?.schema_name.toLowerCase())
+async function getContacts(supabaseClient: any, schema: string, url: any) {
+  const search = url.searchParams.get("search") ?? "";
+  const page = parseInt(url.searchParams.get("page") ?? "1");
+  const limit = parseInt(url.searchParams.get("limit") ?? "10");
+  const sortBy = url.searchParams.get("sortBy") ?? "sort_by_first";
+  const typeFilter = url.searchParams.get("typeFilter") ?? "all";
+  const archived = url.searchParams.get("archived") ?? "false";
+
+  let query = supabaseClient
+    .schema(schema)
     .from("contacts")
-    .select("*");
+    .select("*", { count: "exact" });
+
+  if (search) query = query.or(`full_name.ilike.%${search}%`);
+  if (typeFilter !== "all") {
+    const { data: contactType, error: contactTypeError } = await supabaseClient
+      .schema("public")
+      .from("contact_types")
+      .select("*")
+      .eq("name", typeFilter)
+      .single();
+
+    if (contactTypeError) {
+      throw new Error(contactTypeError.message);
+    }
+    query = query.contains("contact_type_ids", [contactType.id]);
+  }
+  if (sortBy) query = query.order(sortBy, { ascending: true });
+  if (archived) query = query.eq("is_archived", archived === "true");
+  if (page && limit) query = query.range(limit * (page - 1), limit * page - 1);
+
+  const { data: contacts, error: contactsError, count } = await query;
 
   if (contactsError) {
     throw new Error(contactsError.message);
   }
 
-  return contacts;
+  for (const contact of contacts) {
+    const contactTypes: string[] = [];
+    for (const contactTypeId of contact.contact_type_ids) {
+      const { data: contactType, error: contactTypeError } =
+        await supabaseClient
+          .schema("public")
+          .from("contact_types")
+          .select("*")
+          .eq("id", contactTypeId)
+          .single();
+
+      if (contactTypeError) {
+        throw new Error(contactTypeError.message);
+      }
+
+      contactTypes.push(contactType.name);
+    }
+
+    contact.contact_type = contactTypes;
+  }
+
+  return { data: contacts, count };
 }
 
-async function createContact(body, supabaseClient, org, userId) {
+async function createContact(
+  body: any,
+  supabaseClient: any,
+  org: any,
+  userId: any
+) {
   const avatar = body.get("avatar") as File;
 
   const {
@@ -271,23 +423,22 @@ async function createContact(body, supabaseClient, org, userId) {
     last_name,
     suffix,
     prefix,
-    nickname,
     company,
     department,
     job_title,
     phone,
     email,
     address,
-    contact_type_id,
+    contact_type_ids,
     tags,
   } = Object.fromEntries(body);
 
-  if (contact_type_id) {
-    const { data: contactType, error: contactTypeError } = await supabaseClient
+  for (const id of JSON.parse(contact_type_ids)) {
+    const { error: contactTypeError } = await supabaseClient
       .schema("public")
       .from("contact_types")
       .select("*")
-      .eq("id", contact_type_id)
+      .eq("id", id)
       .single();
 
     if (contactTypeError) {
@@ -299,15 +450,22 @@ async function createContact(body, supabaseClient, org, userId) {
 
   if (avatar) {
     const fileName = avatar.name;
-    const mimeType = avatar.type;
     avatar_storage_url = await uploadAvatar(supabaseClient, {
       userId,
       fileName,
       file: avatar,
-      mimeType,
       tenantId: org.data?.id,
     });
   }
+
+  const fullName = [first_name, middle_name, last_name]
+    .filter(Boolean)
+    .join(" ");
+
+  const phoneArray = phone ? JSON.parse(phone) : [];
+  const emailArray = email ? JSON.parse(email) : [];
+  const addressArray = address ? JSON.parse(address) : [];
+  const contactTypeIds = JSON.parse(contact_type_ids);
 
   const { data: contact, error: contactError } = await supabaseClient
     .schema(org.data?.schema_name.toLowerCase())
@@ -316,29 +474,36 @@ async function createContact(body, supabaseClient, org, userId) {
       first_name,
       middle_name,
       last_name,
+      full_name: fullName,
       suffix,
       prefix,
-      nickname,
       company,
       department,
       job_title,
-      phone,
-      email,
-      address,
-      contact_type_id,
+      phones: phoneArray,
+      emails: emailArray,
+      addresses: addressArray,
+      contact_type_ids: contactTypeIds,
       tags,
-      avatar_storage_url,
+      picture_url: avatar_storage_url,
     })
     .select();
 
   if (contactError) {
+    console.error("creating contact error", contactError);
     throw new Error(contactError.message);
   }
 
   return contact;
 }
 
-async function updateContact(body, supabaseClient, org, contactId, userId) {
+async function updateContact(
+  body: any,
+  supabaseClient: any,
+  org: any,
+  contactId: any,
+  userId: any,
+) {
   const avatar = body.get("avatar") as File;
 
   const {
@@ -347,29 +512,32 @@ async function updateContact(body, supabaseClient, org, contactId, userId) {
     last_name,
     suffix,
     prefix,
-    nickname,
     company,
     department,
     job_title,
     phone,
     email,
     address,
-    contact_type_id,
+    contact_type_ids,
     tags,
   } = Object.fromEntries(body);
 
-  if (contact_type_id) {
-    const { data: contactType, error: contactTypeError } = await supabaseClient
+  for (const id of JSON.parse(contact_type_ids)) {
+    const { error: contactTypeError } = await supabaseClient
       .schema("public")
       .from("contact_types")
       .select("*")
-      .eq("id", contact_type_id)
+      .eq("id", id)
       .single();
 
     if (contactTypeError) {
       throw new Error("Contact type not found");
     }
   }
+
+  const fullName = [first_name, middle_name, last_name]
+    .filter(Boolean)
+    .join(" ");
 
   const contact = await supabaseClient
     .schema(org.data?.schema_name.toLowerCase())
@@ -394,6 +562,11 @@ async function updateContact(body, supabaseClient, org, contactId, userId) {
       tenantId: org.data?.id,
     });
   }
+
+  const phoneArray = phone ? JSON.parse(phone) : [];
+  const emailArray = email ? JSON.parse(email) : [];
+  const addressArray = address ? JSON.parse(address) : [];
+  const contactTypeIds = JSON.parse(contact_type_ids);
   const { data: updatedContact, error: updatedContactError } =
     await supabaseClient
       .schema(org.data?.schema_name.toLowerCase())
@@ -402,18 +575,18 @@ async function updateContact(body, supabaseClient, org, contactId, userId) {
         first_name,
         middle_name,
         last_name,
+        full_name: fullName,
         suffix,
         prefix,
-        nickname,
         company,
         department,
         job_title,
-        phone,
-        email,
-        address,
-        contact_type_id,
+        phones: phoneArray,
+        emails: emailArray,
+        addresses: addressArray,
+        contact_type_ids: contactTypeIds,
         tags,
-        avatar_storage_url,
+        picture_url: avatar_storage_url,
       })
       .eq("id", contactId)
       .select();
@@ -425,7 +598,7 @@ async function updateContact(body, supabaseClient, org, contactId, userId) {
   return updatedContact;
 }
 
-async function deleteContact(supabaseClient, org, contactId) {
+async function deleteContact(supabaseClient: any, org: any, contactId: any) {
   try {
     const { data: contact, error: contactError } = await supabaseClient
       .schema(org.data?.schema_name.toLowerCase())
@@ -446,26 +619,25 @@ async function deleteContact(supabaseClient, org, contactId) {
       await supabaseClient.storage.from("avatars").remove([path, fileName]);
     }
 
-    const { data: deletedContact, error: deletedContactError } =
-      await supabaseClient
-        .schema(org.data?.schema_name.toLowerCase())
-        .from("contacts")
-        .delete()
-        .eq("id", contactId);
+    const { error: deletedContactError } = await supabaseClient
+      .schema(org.data?.schema_name.toLowerCase())
+      .from("contacts")
+      .delete()
+      .eq("id", contactId);
 
     if (deletedContactError) {
       throw new Error(deletedContactError.message);
     }
 
     return "successfully deleted contact";
-  } catch (error) {
+  } catch (error: any) {
     console.error("deleting contact error", error);
     throw new Error(error.message);
   }
 }
 
 async function uploadAvatar(
-  supabaseClient,
+  supabaseClient: any,
   params: {
     userId: string;
     fileName: string;
@@ -486,26 +658,34 @@ async function uploadAvatar(
       });
     }
 
-    const { data: uploadData, error: uploadError } =
-      await supabaseClient.storage
-        .from("avatars")
-        .upload(`${tenantId}/${userId}/${fileName}`, file, {
-          cacheControl: "3600",
-          upsert: true,
-        });
+    const { error: uploadError } = await supabaseClient.storage
+      .from("avatars")
+      .upload(`${tenantId}/${userId}/${fileName}`, file, {
+        cacheControl: "3600",
+        upsert: true,
+      });
 
     if (uploadError) {
       throw new Error(uploadError.message);
     }
 
-    return uploadData.fullPath;
-  } catch (error) {
+    const { data: publicUrl, error: publicUrlError } =
+      await supabaseClient.storage
+        .from("avatars")
+        .getPublicUrl(`${tenantId}/${userId}/${fileName}`);
+
+    if (publicUrlError) {
+      throw new Error(publicUrlError.message);
+    }
+
+    return publicUrl.publicUrl;
+  } catch (error: any) {
     console.error("uploading avatar error", error);
     throw new Error(error.message);
   }
 }
 
-async function getContactTypes(supabaseClient) {
+async function getContactTypes(supabaseClient: any) {
   const { data: contactType, error: contactTypeError } = await supabaseClient
     .schema("public")
     .from("contact_types")

@@ -34,13 +34,15 @@ import {
   RecordingProcessModal,
   RecordingProcessOptions
 } from './RecordingProcessModal';
-import RecordingDetailModal from '@/components/recording-detail-modal';
+import FeaturedRecording from '@/components/featured-recording';
 
 interface MeetingDataTableProps {
   meetingType?: 'all' | string; // Made more flexible to support custom meeting types
 }
 
-export function MeetingDataTable({ meetingType = 'all' }: MeetingDataTableProps) {
+export function MeetingDataTable({
+  meetingType = 'all'
+}: MeetingDataTableProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -77,14 +79,18 @@ export function MeetingDataTable({ meetingType = 'all' }: MeetingDataTableProps)
   const [pendingRecording, setPendingRecording] = useState<any>(null);
 
   // State for detail modal
-  const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedRecording, setSelectedRecording] =
     useState<EnhancedCallRecording | null>(null);
+
+  useEffect(() => {
+    if (meetings && meetings.length > 0) {
+      setSelectedRecording(meetings[0]);
+    }
+  }, [meetings]);
 
   // Handler to open detail modal
   const handleViewDetails = (recording: EnhancedCallRecording) => {
     setSelectedRecording(recording);
-    setDetailModalOpen(true);
   };
 
   // Handle processing existing recordings
@@ -122,7 +128,7 @@ export function MeetingDataTable({ meetingType = 'all' }: MeetingDataTableProps)
   useEffect(() => {
     const urlPage = parseInt(searchParams.get('page') || '1', 10);
     const urlPerPage = parseInt(searchParams.get('perPage') || '10', 10);
-    
+
     // Update useCallRecordings pagination when URL changes
     setPagination({
       page: urlPage,
@@ -228,11 +234,10 @@ export function MeetingDataTable({ meetingType = 'all' }: MeetingDataTableProps)
         onSubmit={handleProcessSubmit}
       />
       {/* Recording Detail Modal */}
-      {detailModalOpen && selectedRecording && (
-        <RecordingDetailModal
+      {selectedRecording && (
+        <FeaturedRecording
           recording={selectedRecording}
           onClose={() => {
-            setDetailModalOpen(false);
             setSelectedRecording(null);
           }}
         />

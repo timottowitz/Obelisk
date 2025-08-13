@@ -106,7 +106,7 @@ app.get("/members", async (c) => {
       joinedAt: member.joined_at,
     }));
 
-    return c.json({ members: formattedMembers }, 200);
+    return c.json(formattedMembers, 200);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }

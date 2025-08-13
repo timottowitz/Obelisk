@@ -136,7 +136,7 @@ export function useDownloadFile() {
     mutationFn: async (fileId: string) => {
       const response = (await StoreDocumentsAPI.downloadFile(
         fileId
-      )) as ApiResponse<{ sasUrl: string }>;
+      )) as ApiResponse<{ signedUrl: string }>;
       if (!response.success) {
         throw new Error(response.error || 'Download failed');
       }

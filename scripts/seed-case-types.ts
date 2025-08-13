@@ -315,20 +315,17 @@ class CaseTypeSeeder {
       config: null,
     };
 
-    process.argv.slice(2).forEach((arg) => {
-      if (arg.startsWith("--org=")) {
-        args.org = arg.split("=")[1];
-      } else if (arg === "--force") {
-        args.force = true;
-      } else if (arg === "--preview") {
-        args.preview = true;
-      } else if (arg === "--help") {
-        args.help = true;
-      } else if (arg.startsWith("--config=")) {
-        args.config = arg.split("=")[1];
-      }
-    });
-
+    if (process.env.npm_config_org) {
+      args.org = process.env.npm_config_org;
+    } else if (process.env.npm_config_force) {
+      args.force = true;
+    } else if (process.env.npm_config_preview) {
+      args.preview = true;
+    } else if (process.env.npm_config_helpme) {
+      args.help = true;
+    } else if (process.env.npm_config_config) {
+      args.config = process.env.npm_config_config;
+    }
     return args;
   }
 

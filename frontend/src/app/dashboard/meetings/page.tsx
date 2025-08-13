@@ -11,7 +11,6 @@ import { Heading } from '@/components/ui/heading';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MeetingDataTable } from '@/features/meetings/components/meeting-data-table';
-import { MeetingStats } from '@/features/meetings/components/meeting-stats';
 import { RecentMeetings } from '@/features/meetings/components/recent-meetings';
 import { MeetingInsights } from '@/features/meetings/components/meeting-insights';
 import { DataTableSkeleton } from '@/components/ui/table/data-table-skeleton';
@@ -34,11 +33,6 @@ export default function MeetingsPage() {
         </div>
         
         <Separator />
-
-        {/* Stats Overview */}
-        <Suspense fallback={<div className="h-32 bg-muted animate-pulse rounded-lg" />}>
-          <MeetingStats />
-        </Suspense>
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="all" className="space-y-4">

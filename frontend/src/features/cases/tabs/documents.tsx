@@ -332,6 +332,7 @@ export default function Documents({
 
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [isLoadingDownloadUrl, setIsLoadingDownloadUrl] = useState(false);
+  console.log(downloadUrl);
 
   const handleGetDownloadUrl = useCallback(
     async (document: SolarDocumentItem) => {
@@ -343,8 +344,8 @@ export default function Documents({
 
       try {
         const response = await downloadFile.mutateAsync(document.id);
-        if (response.success && response.data?.sasUrl) {
-          setDownloadUrl(response.data.sasUrl);
+        if (response.success && response.data?.signedUrl) {
+          setDownloadUrl(response.data.signedUrl);
         } else {
           toast.error('Failed to download document');
         }
@@ -362,25 +363,26 @@ export default function Documents({
       toast.error('No download URL found');
       return;
     }
-    // Download the file using the downloadUrl
     try {
-      // Create a temporary anchor element and trigger download
-      // Download the file using the same URL, but use the Fetch API to get the blob and trigger download
       const filename =
         (selectedDocument && selectedDocument.name) || 'document';
-      const response = await fetch(downloadUrl);
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
+
+      window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+
+      const url = new URL(downloadUrl);
+      url.searchParams.set(
+        'response-content-disposition',
+        `attachment; filename="${encodeURIComponent(filename)}"`
+      );
+      url.searchParams.set('response-content-type', 'application/octet-stream');
+
+      const a = document.createElement('a');
+      a.href = url.toString();
+      a.download = filename;
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
       toast.success('Download started');
     } catch (error) {
       console.error('Error downloading file:', error);

@@ -323,12 +323,3 @@ export const useDeleteTask = () => {
     }
   });
 };
-
-export const useGetTeamMembers = () => {
-  return useQuery({
-    queryKey: [...QUERY_KEYS.tasks, 'team-members'],
-    queryFn: () => TasksAPI.getTeamMembers(),
-    staleTime: 1000 * 60 * 5,
-    retry: 2
-  });
-};
