@@ -64,7 +64,7 @@ export const ActionPointProposal = ({
         <h3 className="mt-2 text-lg font-medium text-foreground">No Action Items</h3>
         <p className="mt-1 text-sm text-muted-foreground">
           The AI did not identify any action items in this recording.
-        p>
+        </p>
       </div>
     );
   }
