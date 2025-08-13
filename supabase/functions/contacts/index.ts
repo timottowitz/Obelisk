@@ -83,7 +83,7 @@ app.get("/contacts", async (c) => {
       return c.json({ error: "User or organization not found" }, 404);
     }
 
-    const contacts = await getContacts(supabaseClient, url);
+    const contacts = await getContacts(supabaseClient, org.data?.schema_name.toLowerCase(), url);
     return c.json(contacts, 200);
   } catch (error: any) {
     console.error("getting contacts error", error);
@@ -348,7 +348,7 @@ app.delete("/contacts/:contactId", async (c) => {
   }
 });
 
-async function getContacts(supabaseClient: any, url: any) {
+async function getContacts(supabaseClient: any, schema: string, url: any) {
   const search = url.searchParams.get("search") ?? "";
   const page = parseInt(url.searchParams.get("page") ?? "1");
   const limit = parseInt(url.searchParams.get("limit") ?? "10");
@@ -357,7 +357,7 @@ async function getContacts(supabaseClient: any, url: any) {
   const archived = url.searchParams.get("archived") ?? "false";
 
   let query = supabaseClient
-    .schema("public")
+    .schema(schema)
     .from("contacts")
     .select("*", { count: "exact" });
 
@@ -468,7 +468,7 @@ async function createContact(
   const contactTypeIds = JSON.parse(contact_type_ids);
 
   const { data: contact, error: contactError } = await supabaseClient
-    .schema("public")
+    .schema(org.data?.schema_name.toLowerCase())
     .from("contacts")
     .insert({
       first_name,
@@ -502,7 +502,7 @@ async function updateContact(
   supabaseClient: any,
   org: any,
   contactId: any,
-  userId: any
+  userId: any,
 ) {
   const avatar = body.get("avatar") as File;
 
@@ -540,7 +540,7 @@ async function updateContact(
     .join(" ");
 
   const contact = await supabaseClient
-    .schema("public")
+    .schema(org.data?.schema_name.toLowerCase())
     .from("contacts")
     .select("*")
     .eq("id", contactId)
@@ -569,7 +569,7 @@ async function updateContact(
   const contactTypeIds = JSON.parse(contact_type_ids);
   const { data: updatedContact, error: updatedContactError } =
     await supabaseClient
-      .schema("public")
+      .schema(org.data?.schema_name.toLowerCase())
       .from("contacts")
       .update({
         first_name,
@@ -601,7 +601,7 @@ async function updateContact(
 async function deleteContact(supabaseClient: any, org: any, contactId: any) {
   try {
     const { data: contact, error: contactError } = await supabaseClient
-      .schema("public")
+      .schema(org.data?.schema_name.toLowerCase())
       .from("contacts")
       .select("*")
       .eq("id", contactId)
@@ -620,7 +620,7 @@ async function deleteContact(supabaseClient: any, org: any, contactId: any) {
     }
 
     const { error: deletedContactError } = await supabaseClient
-      .schema("public")
+      .schema(org.data?.schema_name.toLowerCase())
       .from("contacts")
       .delete()
       .eq("id", contactId);
