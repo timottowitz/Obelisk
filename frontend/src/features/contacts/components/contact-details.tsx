@@ -7,9 +7,9 @@ import { phoneTypeIcon, phoneTypeToLabel } from './phone-display';
 import { Contact, PhoneEntry, PhoneType } from '@/types/contacts';
 
 const getPhones = (c: Contact): PhoneEntry[] => {
-  if (c.phone && c.phone.length) {
-    return c.phone.map((p) => ({
-      type: p.type as PhoneType,
+  if (c.phones && c.phones.length) {
+    return c.phones.map((p) => ({
+      type: p.phoneLabel as PhoneType,
       value: p.number
     }));
   }
@@ -43,13 +43,10 @@ export default function ContactDetails({
           {contact && (
             <div className='space-y-6 p-6'>
               <div className='flex flex-col items-center gap-4'>
-                <ContactAvatar
-                  name={contact.name || contact.company || ''}
-                  size='lg'
-                />
+                <ContactAvatar name={contact.full_name} size='lg' />
                 <div>
                   <div className='text-foreground text-xl font-semibold'>
-                    {contact.name || contact.company}
+                    {contact.full_name}
                   </div>
                   <div className='mt-2 flex flex-wrap justify-center gap-2'>
                     <Badge
@@ -59,9 +56,9 @@ export default function ContactDetails({
                       {contact.contact_type}
                     </Badge>
                   </div>
-                  {contact.tags?.length ? (
+                  {contact.flattened_hash_tags && contact.flattened_hash_tags.split(',').length ? (
                     <div className='mt-2 flex flex-wrap justify-center gap-1'>
-                      {contact.tags.map((t) => (
+                      {contact.flattened_hash_tags.split(',').map((t) => (
                         <Badge
                           key={t}
                           variant='secondary'
@@ -109,9 +106,12 @@ export default function ContactDetails({
                   <Icons.mail className='text-muted-foreground mt-0.5 h-4 w-4' />
                   <div className='text-sm'>
                     <div className='text-muted-foreground'>Email</div>
-                    {contact.email.map((e) => (
-                      <div key={e.email} className='truncate whitespace-nowrap'>
-                        {e.email}
+                    {contact.emails.map((e) => (
+                      <div
+                        key={e.address}
+                        className='truncate whitespace-nowrap'
+                      >
+                        {e.address}
                       </div>
                     ))}
                   </div>
@@ -121,8 +121,8 @@ export default function ContactDetails({
                   <div className='text-sm'>
                     <div className='text-muted-foreground'>Address</div>
                     <div className='text-foreground'>
-                      {contact.address.map((a) => (
-                        <div key={a.street}>
+                      {contact.addresses.map((a, _index) => (
+                        <div key={_index}>
                           {a.street}
                           {a.street2 && ` ${a.street2}`}
                           {a.city && ` ${a.city}`}

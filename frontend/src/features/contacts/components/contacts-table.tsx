@@ -35,9 +35,9 @@ interface ContactsTableProps {
 }
 
 const getPhones = (c: Contact): PhoneEntry[] => {
-  if (c.phone && c.phone.length) {
-    return c.phone.map((p) => ({
-      type: p.type as PhoneType,
+  if (c.phones && c.phones.length) {
+    return c.phones.map((p) => ({
+      type: p.phoneLabel as PhoneType,
       value: p.number
     }));
   }
@@ -73,7 +73,7 @@ export default function ContactsTable({
     []
   );
 
-  const getEmails = useCallback((c: Contact) => c.email ?? [], []);
+  const getEmails = useCallback((c: Contact) => c.emails ?? [], []);
   const cycleEmail = useCallback(
     (id: string, emailsLen: number, delta: number) => {
       if (emailsLen <= 1) return;
@@ -86,7 +86,7 @@ export default function ContactsTable({
     []
   );
 
-  const getAddresses = useCallback((c: Contact) => c.address ?? [], []);
+  const getAddresses = useCallback((c: Contact) => c.addresses ?? [], []);
   const cycleAddress = useCallback(
     (id: string, addressesLen: number, delta: number) => {
       if (addressesLen <= 1) return;
@@ -159,19 +159,22 @@ export default function ContactsTable({
               >
                 <TableCell className='border-x'>
                   <div className='flex items-center gap-3'>
-                    <ContactAvatar name={c.name || c.company || ''} size='sm' />
+                    <ContactAvatar name={c.full_name} size='sm' />
                     <div className='min-w-0'>
                       <div className='flex min-w-0 items-center gap-2'>
                         <div className='text-foreground font-medium break-words whitespace-normal'>
-                          {c.name || c.company}
+                          {c.full_name}
                         </div>
-                        <Badge
-                          variant='outline'
-                          className='shrink-0 border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-300'
-                        >
-                          {c.contact_type.charAt(0).toUpperCase() +
-                            c.contact_type.slice(1)}
-                        </Badge>
+                        {c.contact_type.length > 0 &&
+                          c.contact_type.map((type) => (
+                            <Badge
+                              key={type}
+                              variant='outline'
+                              className='shrink-0 border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-300'
+                            >
+                              {type}
+                            </Badge>
+                          ))}
                       </div>
                     </div>
                   </div>

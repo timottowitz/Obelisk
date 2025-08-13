@@ -42,7 +42,8 @@ function parseName(raw: string | undefined): {
   if (!name) return { first: '', middle: '', last: '' };
   const parts = name.split(/\s+/);
   if (parts.length === 1) return { first: parts[0], middle: '', last: '' };
-  if (parts.length === 2) return { first: parts[0], middle: '', last: parts[1] };
+  if (parts.length === 2)
+    return { first: parts[0], middle: '', last: parts[1] };
   return {
     first: parts[0],
     middle: parts.slice(1, -1).join(' '),
@@ -60,8 +61,8 @@ interface ContactModalProps {
 }
 
 // Local list row types
-type PhoneRow = { id: string; type: string; number: string };
-type EmailRow = { id: string; type: string; email: string };
+type PhoneRow = { id: string; notes: string; phoneLabel: string; number: string };
+type EmailRow = { id: string; notes: string; emailLabel: string; address: string; emailDomain: string };
 type AddressRow = {
   id: string;
   street?: string;
@@ -88,7 +89,7 @@ type ContactFormState = {
   phones: PhoneRow[];
   emails: EmailRow[];
   addresses: AddressRow[];
-  contactTypeId: string;
+  contactTypeIds: string[];
   tags: string[];
 };
 
@@ -111,11 +112,11 @@ export default function ContactModal({
     company: '',
     department: '',
     jobTitle: '',
-    contactTypeId: '',
+    contactTypeIds: [],
     avatar_storage_url: '',
     avatar: null,
-    phones: [{ id: uid(), type: 'phone', number: '' }],
-    emails: [{ id: uid(), type: 'email', email: '' }],
+    phones: [{ id: uid(), notes: '', phoneLabel: 'phone', number: '' }],
+    emails: [{ id: uid(), notes: '', emailLabel: 'email', address: '', emailDomain: '' }],
     addresses: [
       { id: uid(), street: '', street2: '', city: '', st: '', zip: '' }
     ],
@@ -124,33 +125,50 @@ export default function ContactModal({
 
   useEffect(() => {
     if (selectedContact) {
-      const { first, middle, last } = parseName(selectedContact.name);
       setForm((f) => ({
         ...f,
-        firstName: first,
-        middleName: middle,
-        lastName: last,
+        firstName: selectedContact.first_name ?? '',
+        middleName: selectedContact.middle_name ?? '',
+        lastName: selectedContact.last_name ?? '',
         prefix: selectedContact.prefix ?? '',
         suffix: selectedContact.suffix ?? '',
-        nickname: selectedContact.nickname ?? '',
+        nickname: '',
         company: selectedContact.company ?? '',
         department: selectedContact.department ?? '',
         jobTitle: selectedContact.job_title ?? '',
-        contactTypeId: selectedContact.contact_type_id ?? '',
-        avatar_storage_url: selectedContact.avatar_storage_url ?? '',
+        contactTypeIds: selectedContact.contact_type_ids.map((t) => t) ?? [],
+        avatar_storage_url: selectedContact.picture_url ?? '',
         avatar: null,
-        phones: selectedContact.phone.map((p: { type: string; number: string }) => ({
-          id: uid(),
-          type: p.type,
-          number: p.number
-        })),
-        emails: selectedContact.email.map((e: { type: string; email: string }) => ({
-          id: uid(),
-          type: e.type,
-          email: e.email
-        })),
-        addresses: selectedContact.address.map(
-          (a: { street: string; street2: string; city: string; st: string; zip: string }) => ({
+        phones: selectedContact.phones.map(
+          (p: { notes: string; phoneLabel: string; number: string }) => ({
+            id: uid(),
+            notes: p.notes,
+            phoneLabel: p.phoneLabel,
+            number: p.number
+          })
+        ),
+        emails: selectedContact.emails.map(
+          (e: {
+            notes: string;
+            emailLabel: string;
+            address: string;
+            emailDomain: string;
+          }) => ({
+            id: uid(),
+            notes: e.notes,
+            emailLabel: e.emailLabel,
+            address: e.address,
+            emailDomain: e.emailDomain
+          })
+        ),
+        addresses: selectedContact.addresses.map(
+          (a: {
+            street: string;
+            street2: string;
+            city: string;
+            st: string;
+            zip: string;
+          }) => ({
             id: uid(),
             street: a.street,
             street2: a.street2,
@@ -162,7 +180,7 @@ export default function ContactModal({
       }));
     }
     if (availableTypes.length > 0 && !selectedContact) {
-      setForm((f) => ({ ...f, contactTypeId: availableTypes[0].id }));
+      setForm((f) => ({ ...f, contactTypeIds: [availableTypes[0].id] }));
     }
     if (!selectedContact) {
       handleResetForm();
@@ -190,9 +208,7 @@ export default function ContactModal({
     [firstName, middleName, lastName]
   );
 
-  const canCreate =
-    fullName.trim().length > 0 ||
-    (activeTab === 'company' && company.trim().length > 0);
+  const canCreate = fullName.trim().length > 0;
 
   const handleResetForm = () => {
     setForm({
@@ -205,11 +221,11 @@ export default function ContactModal({
       company: '',
       department: '',
       jobTitle: '',
-      contactTypeId: availableTypes?.length > 0 ? availableTypes[0].id : '',
+      contactTypeIds: availableTypes?.length > 0 ? [availableTypes[0].id] : [],
       avatar_storage_url: '',
       avatar: null,
-      phones: [{ id: uid(), type: 'phone', number: '' }],
-      emails: [{ id: uid(), type: 'email', email: '' }],
+      phones: [{ id: uid(), notes: '', phoneLabel: 'phone', number: '' }],
+      emails: [{ id: uid(), notes: '', emailLabel: 'email', address: '', emailDomain: '' }],
       addresses: [
         { id: uid(), street: '', street2: '', city: '', st: '', zip: '' }
       ],
@@ -221,7 +237,7 @@ export default function ContactModal({
   const addPhone = () =>
     setForm((f) => ({
       ...f,
-      phones: [...f.phones, { id: uid(), type: 'phone', number: '' }]
+      phones: [...f.phones, { id: uid(), notes: '', phoneLabel: 'phone', number: '' }]
     }));
   const removePhone = (id: string) =>
     setForm((f) => ({ ...f, phones: f.phones.filter((r) => r.id !== id) }));
@@ -229,7 +245,7 @@ export default function ContactModal({
   const addEmail = () =>
     setForm((f) => ({
       ...f,
-      emails: [...f.emails, { id: uid(), type: 'email', email: '' }]
+      emails: [...f.emails, { id: uid(), notes: '', emailLabel: 'email', address: '', emailDomain: '' }]
     }));
   const removeEmail = (id: string) =>
     setForm((f) => ({ ...f, emails: f.emails.filter((r) => r.id !== id) }));
@@ -250,15 +266,16 @@ export default function ContactModal({
 
   const submit = () => {
     const formData = new FormData();
-    const nameToSave = activeTab === 'person' ? fullName : company;
-    formData.append('name', nameToSave);
+    formData.append('first_name', firstName);
+    formData.append('middle_name', middleName ?? '');
+    formData.append('last_name', lastName ?? '');
     formData.append('prefix', prefix);
     formData.append('suffix', suffix);
     formData.append('nickname', nickname);
     formData.append('company', company);
     formData.append('department', department);
     formData.append('job_title', jobTitle);
-    formData.append('contact_type_id', form.contactTypeId);
+    formData.append('contact_type_ids', JSON.stringify(form.contactTypeIds));
     if (form.avatar) {
       formData.append('avatar', form.avatar);
     }
@@ -267,15 +284,15 @@ export default function ContactModal({
       JSON.stringify(
         phones
           .filter(({ number }) => number.trim() !== '')
-          .map(({ type, number }) => ({ type, number }))
+          .map(({ phoneLabel, number }) => ({ phoneLabel, number }))
       )
     );
     formData.append(
       'email',
       JSON.stringify(
         emails
-          .filter(({ email }) => email.trim() !== '')
-          .map(({ type, email }) => ({ type, email }))
+          .filter(({ address }) => address.trim() !== '')
+          .map(({ emailLabel, address }) => ({ emailLabel, address }))
       )
     );
     formData.append(
@@ -358,9 +375,9 @@ export default function ContactModal({
                 Contact Type:
               </Label>
               <Select
-                value={form.contactTypeId}
+                value={form.contactTypeIds[0]}
                 onValueChange={(value) =>
-                  setForm((f) => ({ ...f, contactTypeId: value }))
+                  setForm((f) => ({ ...f, contactTypeIds: [value] }))
                 }
               >
                 <SelectTrigger className='bg-card'>
@@ -458,27 +475,6 @@ export default function ContactModal({
                     )}
                     onClick={() => {
                       setActiveTab('person');
-                      setForm((f) => ({
-                        ...f,
-                        company: selectedContact?.company || company,
-                        firstName:
-                          selectedContact?.name?.split(' ')[0] || firstName,
-                        middleName:
-                          selectedContact?.name?.split(' ').length &&
-                          selectedContact?.name?.split(' ').length > 2
-                            ? selectedContact?.name?.split(' ')[1]
-                            : middleName,
-                        lastName:
-                          selectedContact?.name?.split(' ').length &&
-                          selectedContact?.name?.split(' ').length > 2
-                            ? selectedContact?.name?.split(' ')[2]
-                            : selectedContact?.name?.split(' ')[1] || lastName,
-                        prefix: selectedContact?.prefix || prefix,
-                        suffix: selectedContact?.suffix || suffix,
-                        nickname: selectedContact?.nickname || nickname,
-                        department: selectedContact?.department || department,
-                        jobTitle: selectedContact?.job_title || jobTitle
-                      }));
                     }}
                   />
                   <Building2
@@ -488,18 +484,6 @@ export default function ContactModal({
                     )}
                     onClick={() => {
                       setActiveTab('company');
-                      setForm((f) => ({
-                        ...f,
-                        firstName: '',
-                        middleName: '',
-                        lastName: '',
-                        prefix: '',
-                        suffix: '',
-                        nickname: '',
-                        company: selectedContact?.company || company,
-                        department: '',
-                        jobTitle: ''
-                      }));
                     }}
                   />
                 </div>
@@ -510,13 +494,12 @@ export default function ContactModal({
                   </Label>
                   <Input
                     className='bg-card'
-                    value={activeTab === 'person' ? firstName : company}
+                    value={firstName}
                     onChange={(e) =>
-                      setForm((f) =>
-                        activeTab === 'person'
-                          ? { ...f, firstName: e.target.value }
-                          : { ...f, company: e.target.value }
-                      )
+                      setForm((f) => ({
+                        ...f,
+                        firstName: e.target.value
+                      }))
                     }
                     required
                   />
@@ -657,12 +640,12 @@ export default function ContactModal({
                     <Trash2 className='h-4 w-4 text-red-500' />
                   </Button>
                   <Select
-                    value={row.type}
+                    value={row.phoneLabel}
                     onValueChange={(v) =>
                       setForm((f) => ({
                         ...f,
                         phones: f.phones.map((r) =>
-                          r.id === row.id ? { ...r, type: v } : r
+                          r.id === row.id ? { ...r, phoneLabel: v } : r
                         )
                       }))
                     }
@@ -726,12 +709,12 @@ export default function ContactModal({
                     <Trash2 className='h-4 w-4 text-red-500' />
                   </Button>
                   <Select
-                    value={row.type}
+                    value={row.emailLabel}
                     onValueChange={(v) =>
                       setForm((f) => ({
                         ...f,
                         emails: f.emails.map((r) =>
-                          r.id === row.id ? { ...r, type: v } : r
+                          r.id === row.id ? { ...r, emailLabel: v } : r
                         )
                       }))
                     }
@@ -748,12 +731,12 @@ export default function ContactModal({
                   <Input
                     className='bg-card flex-1'
                     placeholder='Email Address'
-                    value={row.email}
+                    value={row.address}
                     onChange={(e) =>
                       setForm((f) => ({
                         ...f,
                         emails: f.emails.map((r) =>
-                          r.id === row.id ? { ...r, email: e.target.value } : r
+                          r.id === row.id ? { ...r, address: e.target.value } : r
                         )
                       }))
                     }

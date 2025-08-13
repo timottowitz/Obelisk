@@ -36,7 +36,7 @@ export default function ContactsPage() {
   const [queryParams, setQueryParams] = useState({
     search: searchParams.get('search') ?? '',
     page: Number(searchParams.get('page')) ?? 1,
-    sortBy: (searchParams.get('sortBy') ?? 'asc') as 'asc' | 'desc',
+    sortBy: (searchParams.get('sortBy') ?? 'sort_by_first') as 'sort_by_first' | 'sort_by_last',
     typeFilter: searchParams.get('typeFilter') ?? 'all',
     archived: searchParams.get('archived') ?? 'false'
   });
@@ -84,7 +84,7 @@ export default function ContactsPage() {
   const [showInfo, setShowInfo] = useState(false);
   const [open, setOpen] = useState(false);
   const [openDelete, setOpenDelete] = useState(false);
-  const pageSize = 5;
+  const pageSize = 10;
 
   const totalPages = Math.ceil((contacts?.count ?? 0) / pageSize) || 1;
 
@@ -164,6 +164,8 @@ export default function ContactsPage() {
       try {
         await archiveContact.mutateAsync(contactId);
         toast.success('Contact archived successfully');
+        setSelected(null);
+        setShowInfo(false);
       } catch (error) {
         console.error('Error archiving contact:', error);
         toast.error('Error archiving contact');
