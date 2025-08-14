@@ -167,8 +167,9 @@ const FeaturedRecording = ({
           name: actionItem.task,
           description: actionItem.context || '',
           priority: actionItem.priority,
-          due_date: actionItem.dueDate,
-          assignee_id: assigneeId
+          due_date: actionItem.dueDate || null,
+          assignee_id: assigneeId,
+          case_project_id: ''
         }
       });
       toast.success('Task created successfully!');
