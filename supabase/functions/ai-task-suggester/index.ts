@@ -119,7 +119,7 @@ app.post("/ai-task-suggester", async (c) => {
 
     return c.json(suggestions, 200);
 
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error in AI task suggester:", err);
     return c.json({ error: err.message }, 500);
   }

@@ -2,16 +2,12 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Lightbulb } from 'lucide-react';
-
-interface AISuggestion {
-  name: string;
-  description: string;
-}
+import { AITaskInsight } from '@/types/ai-insights';
 
 interface AISuggestionsPanelProps {
-  suggestions: AISuggestion[];
+  suggestions: AITaskInsight[];
   isLoading: boolean;
-  onAccept: (suggestion: AISuggestion) => void;
+  onAccept: (suggestion: AITaskInsight) => void;
   onDismiss: () => void;
 }
 
@@ -46,15 +42,32 @@ export default function AISuggestionsPanel({
         </Button>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
           {suggestions.map((suggestion, index) => (
             <div
               key={index}
-              className="p-4 bg-white rounded-lg border border-gray-200 flex flex-col justify-between"
+              className='flex flex-col justify-between rounded-lg border border-gray-200 bg-white p-4'
             >
               <div>
-                <h4 className="font-semibold text-gray-800">{suggestion.name}</h4>
-                <p className="text-sm text-gray-600 mt-1">{suggestion.description}</p>
+                <h4 className='font-semibold text-gray-800'>
+                  Title: {suggestion.suggested_title}
+                </h4>
+                <p className='mt-1 text-sm text-gray-600'>
+                  Description: {suggestion.suggested_description}
+                </p>
+                <p className='mt-1 text-sm text-gray-600'>
+                  Priority:
+                  {suggestion.suggested_priority}
+                </p>
+                <p className='mt-1 text-sm text-gray-600'>
+                  Due Date: {suggestion.suggested_due_date}
+                </p>
+                <p className='mt-1 text-sm text-gray-600'>
+                  Assignee: {suggestion.suggested_assignee_id}
+                </p>
+                <p className='mt-1 text-sm text-gray-600'>
+                  Project: {suggestion.project_id}
+                </p>
               </div>
               <div className="mt-4 text-right">
                 <Button

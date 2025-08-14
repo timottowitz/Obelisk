@@ -48,7 +48,7 @@ export default function TaskModal({
 }: TaskDetailModalProps) {
   const [formData, setFormData] = useState<UploadTaskData>({
     name: '',
-    due_date: '',
+    due_date: null,
     description: '',
     assignee_id: '',
     priority: 'medium',
@@ -70,7 +70,7 @@ export default function TaskModal({
     if (initialData) {
       setFormData({
         name: initialData.name || '',
-        due_date: dayjs(initialData.due_date).format('YYYY-MM-DD') || '',
+        due_date: dayjs(initialData.due_date).format('YYYY-MM-DD') || null,
         description: initialData.description || '',
         assignee_id: initialData.assignee_id || '',
         priority: initialData.priority || 'medium',
@@ -80,9 +80,9 @@ export default function TaskModal({
       // Reset form when no initial data
       setFormData({
         name: '',
-        due_date: '',
+        due_date: null,
         description: '',
-        assignee_id: teamMembers?.[0]?.id || '',
+        assignee_id: teamMembers?.[0]?.userId || '',
         priority: 'medium',
         case_project_id: caseProjects?.[0]?.id || ''
       });
@@ -110,9 +110,9 @@ export default function TaskModal({
       onSave(formData);
       setFormData({
         name: '',
-        due_date: '',
+        due_date: null,
         description: '',
-        assignee_id: teamMembers?.[0]?.id || '',
+        assignee_id: teamMembers?.[0]?.userId || '',
         priority: 'medium',
         case_project_id: caseProjects?.[0]?.id || ''
       });
@@ -319,7 +319,7 @@ export default function TaskModal({
                       id='due_date'
                       type='date'
                       placeholder='mm/dd/yy'
-                      value={formData.due_date}
+                      value={formData.due_date || ''}
                       onChange={(e) =>
                         handleInputChange('due_date', e.target.value)
                       }
@@ -349,7 +349,7 @@ export default function TaskModal({
                   </SelectTrigger>
                   <SelectContent>
                     {teamMembers?.map((member) => (
-                      <SelectItem key={member.id} value={member.id}>
+                      <SelectItem key={member.userId} value={member.userId}>
                         <div className='flex items-center gap-2'>
                           <span>{member.email}</span>
                           <span className='text-xs text-gray-500'>
@@ -384,7 +384,7 @@ export default function TaskModal({
                   maxLength={1000}
                 />
                 <div className='absolute right-2 bottom-2 text-xs text-gray-400'>
-                  {formData.description.length}/1000
+                  {formData.description?.length || 0}/1000
                 </div>
               </div>
             </div>

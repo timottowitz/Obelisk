@@ -96,7 +96,10 @@ app.get("/tasks/cases/:caseId", async (c) => {
   const view = url.searchParams.get("view") ?? "all";
 
   try {
-    const { supabase, schema, user } = await getSupabaseAndOrgInfo(orgId, userId);
+    const { supabase, schema, user } = await getSupabaseAndOrgInfo(
+      orgId,
+      userId
+    );
 
     let query = supabase
       .schema(schema)
@@ -326,7 +329,7 @@ app.get("/tasks/cases/:caseId/projects", async (c) => {
 });
 
 // Create case task
-app.post("/tasks/cases/:caseId/tasks", async (c) => {
+app.post("/tasks/cases/:caseId", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const caseId = c.req.param("caseId");
@@ -337,15 +340,32 @@ app.post("/tasks/cases/:caseId/tasks", async (c) => {
       userId
     );
     const taskData = await c.req.json();
+    const { insight_id, ...rest } = taskData;
 
     const { data, error } = await supabase
       .schema(schema)
       .from("case_tasks")
-      .insert({ ...taskData, case_id: caseId, assigner_id: user.id })
+      .insert({ ...rest, case_id: caseId, assigner_id: user.id })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      return c.json({ error: error.message }, 500);
+    }
+
+    if (insight_id) {
+      const { error: insightError } = await supabase
+        .schema(schema)
+        .from("ai_task_insights")
+        .update({ status: "accepted", task_id: data.id })
+        .eq("id", insight_id)
+        .select()
+        .single();
+
+      if (insightError) {
+        return c.json({ error: insightError.message }, 500);
+      }
+    }
 
     return c.json(data, 201);
   } catch (error: any) {

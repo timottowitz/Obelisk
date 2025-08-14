@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Pagination,
   PaginationContent,
@@ -26,25 +25,18 @@ import {
   Brain,
   MessageCircle,
   Calendar,
-  Clock,
   User,
   AlertTriangle,
   CheckCircle2,
   Circle
 } from 'lucide-react';
-import { Task, TaskFilterOptions } from '@/types/cases';
+import { Task } from '@/types/cases';
 import { cn } from '@/lib/utils';
 import {
   AISuggestionBadge,
   AIInsightIndicator
 } from '@/components/ai/ai-suggestion-badge';
-import { AISuggestionPanel } from '@/components/ai/ai-suggestion-panel';
-import {
-  BulkReviewBar,
-  BulkSelectCheckbox,
-  BulkSelectHeader
-} from '@/components/ai/bulk-review-bar';
-import { useAIInsightsForCase, useTaskInsights } from '@/hooks/useAIInsights';
+import { useAIInsightsForCase } from '@/hooks/useAIInsights';
 import type { AITaskInsightWithDetails } from '@/types/ai-insights';
 
 interface EnhancedCaseTasksTableProps {
@@ -63,16 +55,12 @@ function TaskRow({
   onEditTask,
   onDeleteTask,
   aiInsights,
-  isSelected,
-  onSelectionChange,
   onOpenAIPanel
 }: {
   task: Task;
   onEditTask: (task: Task) => void;
   onDeleteTask: (task: Task) => void;
   aiInsights?: AITaskInsightWithDetails[];
-  isSelected?: boolean;
-  onSelectionChange?: (selected: boolean) => void;
   onOpenAIPanel?: (insight: AITaskInsightWithDetails) => void;
 }) {
   const getDueDateStatus = (dueDate: string) => {
@@ -123,15 +111,6 @@ function TaskRow({
 
   return (
     <TableRow className='transition-colors hover:bg-gray-50'>
-      {/* Selection Checkbox */}
-      {pendingInsights.length > 0 && onSelectionChange && (
-        <TableCell className='w-8'>
-          <BulkSelectCheckbox
-            checked={isSelected || false}
-            onCheckedChange={onSelectionChange}
-          />
-        </TableCell>
-      )}
       {/* Task Name & Status */}
       <TableCell className='max-w-xs'>
         <div className='flex items-start space-x-3'>
@@ -305,11 +284,6 @@ export default function EnhancedCaseTasksTable({
   onEditTask,
   onDeleteTask
 }: EnhancedCaseTasksTableProps) {
-  const [selectedInsightIds, setSelectedInsightIds] = useState<string[]>([]);
-  const [selectedAIInsight, setSelectedAIInsight] =
-    useState<AITaskInsightWithDetails | null>(null);
-  const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
-
   // Get AI insights for this case
   const { data: aiInsights = [] } = useAIInsightsForCase(caseId);
   const totalPages = Math.ceil(count / 5);
@@ -318,37 +292,6 @@ export default function EnhancedCaseTasksTable({
   const pendingInsights = aiInsights.filter(
     (insight) => insight.status === 'pending'
   );
-  const tasksWithPendingInsights = tasks.filter((task) =>
-    pendingInsights.some((insight) => insight.task_id === task.id)
-  );
-
-  const handleSelectInsight = (insightId: string, selected: boolean) => {
-    setSelectedInsightIds((prev) =>
-      selected ? [...prev, insightId] : prev.filter((id) => id !== insightId)
-    );
-  };
-
-  const handleSelectAllInsights = (selected: boolean) => {
-    if (selected) {
-      setSelectedInsightIds(pendingInsights.map((insight) => insight.id));
-    } else {
-      setSelectedInsightIds([]);
-    }
-  };
-
-  const handleClearSelection = () => {
-    setSelectedInsightIds([]);
-  };
-
-  const handleOpenAIPanel = (insight: AITaskInsightWithDetails) => {
-    setSelectedAIInsight(insight);
-    setIsAIPanelOpen(true);
-  };
-
-  const handleCloseAIPanel = () => {
-    setIsAIPanelOpen(false);
-    setSelectedAIInsight(null);
-  };
 
   const showSelectionColumn = pendingInsights.length > 0;
 
@@ -381,21 +324,6 @@ export default function EnhancedCaseTasksTable({
   return (
     <>
       <div className='space-y-4'>
-        {/* AI Insights Header */}
-        {showSelectionColumn && (
-          <div className='flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 p-4'>
-            <BulkSelectHeader
-              selectedCount={selectedInsightIds.length}
-              totalCount={pendingInsights.length}
-              onSelectAll={handleSelectAllInsights}
-            />
-            <div className='text-sm text-blue-700'>
-              {pendingInsights.length} AI suggestion
-              {pendingInsights.length !== 1 ? 's' : ''} pending review
-            </div>
-          </div>
-        )}
-
         {/* Table */}
         <div className='rounded-lg border border-gray-200 bg-white shadow-sm'>
           <Table>
@@ -427,13 +355,6 @@ export default function EnhancedCaseTasksTable({
                 <LoadingRow showSelection={showSelectionColumn} />
               ) : tasks.length > 0 ? (
                 tasks.map((task) => {
-                  const taskPendingInsights = pendingInsights.filter(
-                    (insight) => insight.task_id === task.id
-                  );
-                  const isTaskSelected = taskPendingInsights.some((insight) =>
-                    selectedInsightIds.includes(insight.id)
-                  );
-
                   return (
                     <TaskRow
                       key={task.id}
@@ -441,13 +362,6 @@ export default function EnhancedCaseTasksTable({
                       onEditTask={onEditTask}
                       onDeleteTask={onDeleteTask}
                       aiInsights={aiInsights}
-                      isSelected={isTaskSelected}
-                      onSelectionChange={(selected) => {
-                        taskPendingInsights.forEach((insight) => {
-                          handleSelectInsight(insight.id, selected);
-                        });
-                      }}
-                      onOpenAIPanel={handleOpenAIPanel}
                     />
                   );
                 })
@@ -513,24 +427,6 @@ export default function EnhancedCaseTasksTable({
           </div>
         )}
       </div>
-
-      {/* AI Suggestion Panel */}
-      {selectedAIInsight && (
-        <AISuggestionPanel
-          insight={selectedAIInsight}
-          open={isAIPanelOpen}
-          onOpenChange={handleCloseAIPanel}
-        />
-      )}
-
-      {/* Bulk Review Bar */}
-      <BulkReviewBar
-        selectedInsightIds={selectedInsightIds}
-        onClearSelection={handleClearSelection}
-        onBulkAction={(action, count) => {
-          // Optional callback for additional handling
-        }}
-      />
     </>
   );
 }

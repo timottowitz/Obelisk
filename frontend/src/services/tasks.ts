@@ -108,7 +108,7 @@ export default class TasksAPI {
 
   static async createCaseTask(caseId: string, taskData: TaskCreateData) {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/cases/${caseId}/tasks`, {
+    const response = await fetch(`${API_BASE_URL}/cases/${caseId}`, {
       method: 'POST',
       headers,
       body: JSON.stringify(taskData)

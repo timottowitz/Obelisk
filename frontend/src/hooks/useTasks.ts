@@ -1,5 +1,3 @@
-import { useEffect } from 'react';
-import { useSession } from '@clerk/nextjs';
 import TasksAPI from '@/services/tasks';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -7,7 +5,6 @@ import {
   TaskCreateData,
   FoundationAITaskData
 } from '@/types/cases';
-import supabase from '@/lib/supabase';
 
 const QUERY_KEYS = {
   tasks: ['tasks'] as const,
@@ -16,7 +13,7 @@ const QUERY_KEYS = {
   aiInsights: ['ai-insights'] as const
 };
 
-// General project tasks (non-case specific)
+// Case-specific tasks
 export const useCaseTasks = (
   caseId: string,
   page: number,
@@ -25,61 +22,85 @@ export const useCaseTasks = (
   priority: string,
   view: string
 ) => {
-  const queryClient = useQueryClient();
-  const { session } = useSession();
-  const queryKey = [...QUERY_KEYS.tasks, caseId, page, search, status, priority, view];
+  const queryKey = [
+    ...QUERY_KEYS.tasks,
+    caseId,
+    page,
+    search,
+    status,
+    priority,
+    view
+  ];
 
-  useEffect(() => {
-    if (!caseId || !session) {
-      return;
-    }
+  // useEffect(() => {
+  //   const setupRealtime = async () => {
+  //     if (!caseId || !session || !organization?.id) {
+  //       return;
+  //     }
 
-    const setAuth = async () => {
-      const token = await session.getToken({ template: 'supabase' });
-      if (token) {
-        supabase.realtime.setAuth(token);
-      }
-    };
-    setAuth();
+  //     const organizationSchema = organization.id.toLowerCase();
+  //     const tableName = 'case_tasks';
 
-    const channel = supabase
-      .channel(`case-tasks-${caseId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public', // RLS in Supabase will handle tenant isolation
-          table: 'case_tasks',
-          filter: `case_id=eq.${caseId}`,
-        },
-        (payload) => {
-          console.log('Real-time change received for case_tasks:', payload);
-          // Invalidate the query to trigger a refetch.
-          // This is a simple but effective way to keep the data fresh.
-          queryClient.invalidateQueries({ queryKey });
-        }
-      )
-      .subscribe((status, err) => {
-        if (status === 'SUBSCRIBED') {
-          console.log(`Subscribed to case_tasks channel for case ${caseId}`);
-        }
-        if (status === 'CHANNEL_ERROR') {
-          console.error(`Failed to subscribe to case_tasks channel:`, err);
-        }
-      });
+  //     const channel = supabase.channel(
+  //       `realtime-${organizationSchema}-${tableName}`
+  //     );
 
-    return () => {
-      console.log(`Unsubscribing from case_tasks channel for case ${caseId}`);
-      supabase.removeChannel(channel);
-    };
-  }, [caseId, session, queryClient, queryKey]);
+  //     channel
+  //       .on(
+  //         'postgres_changes',
+  //         {
+  //           event: '*',
+  //           schema: organizationSchema,
+  //           table: tableName,
+  //         },
+  //         (payload) => {
+  //           console.log(
+  //             'Real-time change received for case_tasks:',
+  //             payload
+  //           );
+  //           queryClient.invalidateQueries({ queryKey });
+  //         }
+  //       )
+  //       .subscribe((status, error) => {
+  //         if (error) {
+  //           console.error('Subscription error:', error);
+  //           console.error(`Failed to subscribe to case_tasks channel`);
+  //         } else if (status === 'SUBSCRIBED') {
+  //           console.log(
+  //             `Subscribed to case_tasks channel for case ${caseId}`
+  //           );
+  //         } else if (status === 'CHANNEL_ERROR') {
+  //           console.error('Channel error occurred');
+  //         } else if (status === 'TIMED_OUT') {
+  //           console.error('Subscription timed out');
+  //         } else if (status === 'CLOSED') {
+  //           console.log('Channel closed');
+  //         }
+  //       });
+
+  //     return () => {
+  //       console.log(
+  //         `Unsubscribing from case_tasks channel for case ${caseId}`
+  //       );
+  //       supabase.removeChannel(channel);
+  //     };
+  //   };
+
+  //   const cleanupPromise = setupRealtime();
+  //   return () => {
+  //     // Ensure cleanup if setup completed
+  //     Promise.resolve(cleanupPromise).then((cleanup) => {
+  //       // if (typeof cleanup === 'function') cleanup();
+  //     });
+  //   };
+  // }, [caseId, organization?.id, queryKey]);
 
   return useQuery({
     queryKey,
     queryFn: () =>
       TasksAPI.getCaseTasks(caseId, page, search, status, priority, view),
     staleTime: 1000 * 60 * 5, // 5 minutes
-    retry: 2,
+    retry: 2
   });
 };
 
@@ -90,12 +111,6 @@ export const useProjects = () => {
     queryFn: () => TasksAPI.getProjects(),
     staleTime: 1000 * 60 * 5,
     retry: 2
-  });
-};
-
-export const useGetAITaskSuggestions = () => {
-  return useMutation({
-    mutationFn: (caseId: string) => TasksAPI.getAITaskSuggestions(caseId),
   });
 };
 
@@ -122,8 +137,14 @@ export const useCreateCaseTask = () => {
       caseId: string;
       taskData: TaskCreateData;
     }) => TasksAPI.createCaseTask(caseId, taskData),
-    onSuccess: () => {
+    onSuccess: (_, { caseId }) => {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.tasks] });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.aiInsights, 'case', caseId]
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['ai-insights', 'pending']
+      });
     }
   });
 };

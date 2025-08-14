@@ -7,6 +7,16 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Supabase URL and anonymous key are required.');
 }
 
-const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
+  },
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true
+  }
+});
 
 export default supabase;

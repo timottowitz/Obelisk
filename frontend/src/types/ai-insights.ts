@@ -18,9 +18,10 @@ export interface AITaskInsight {
   // AI Generated Data
   suggested_title: string;
   suggested_description?: string;
-  suggested_priority: 'low' | 'medium' | 'high' | 'urgent';
-  suggested_due_date?: string;
-  suggested_assignee_id?: string;
+  suggested_priority: 'low' | 'medium' | 'high';
+  suggested_due_date: string | null;
+  suggested_assignee_id: string;
+  suggested_case_project_id: string;
   
   // AI Metadata
   confidence_score: number;
