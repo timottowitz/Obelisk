@@ -100,7 +100,7 @@ export function usePendingAIInsights() {
         supabase.removeChannel(channel);
       }
     };
-  }, [session, organization?.id, queryClient]);
+  }, [session, organization?.id, queryClient, queryKey]);
 
   return useQuery({
     queryKey,
