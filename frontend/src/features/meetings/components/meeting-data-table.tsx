@@ -189,7 +189,8 @@ export function MeetingDataTable({
           endTime: pendingRecording.endTime,
           title: opts.title,
           participants: ['Current User'],
-          meetingTypeId: opts.meetingTypeId
+          meetingTypeId: opts.meetingTypeId,
+          taskType: opts.taskType as 'all' | 'transcribe' | 'analyze' | undefined
         }
       );
       // Process the recording with modal options
