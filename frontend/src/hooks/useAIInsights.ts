@@ -7,6 +7,10 @@ import type {
 } from '@/types/ai-insights';
 import { toast } from 'sonner';
 import { trackAIEvent } from './useAIAnalytics';
+import { useSession } from '@clerk/clerk-react';
+import { useOrganization } from '@clerk/clerk-react';
+import supabase from '@/lib/supabase';
+import { useEffect } from 'react';
 
 /**
  * Hook to get AI insights for a case
@@ -31,13 +35,78 @@ export function useAIInsightsForProject(projectId?: string) {
 }
 
 /**
- * Hook to get all pending AI insights
+ * Hook to get all pending AI insights with real-time updates
  */
 export function usePendingAIInsights() {
+  const { session } = useSession();
+  const { organization } = useOrganization();
+  const queryClient = useQueryClient();
+  const queryKey = ['ai-insights', 'pending'];
+
+  useEffect(() => {
+    if (!session || !organization?.id) {
+      return;
+    }
+
+    const organizationSchema = organization.id.toLowerCase();
+    const tableName = 'ai_task_insights';
+
+    const channel = supabase.channel(
+      `realtime-${organizationSchema}-${tableName}-pending`
+    );
+
+    let isSubscribed = false;
+
+    channel
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: organizationSchema,
+          table: tableName,
+        },
+        (payload) => {
+          console.log('Real-time change received for pending AI insights:', payload);
+          
+          // Invalidate the pending insights query
+          queryClient.invalidateQueries({ queryKey });
+          
+          // Show notification for new pending insights
+          if (payload.eventType === 'INSERT') {
+            toast.info('New AI task suggestion available', {
+              description: 'Review pending AI insights to manage tasks'
+            });
+          }
+        }
+      )
+      .subscribe((status, error) => {
+        if (error) {
+          console.error('Subscription error for AI insights:', error);
+        } else if (status === 'SUBSCRIBED') {
+          isSubscribed = true;
+          console.log('Subscribed to pending AI insights channel');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('AI insights channel error occurred');
+        } else if (status === 'TIMED_OUT') {
+          console.error('AI insights subscription timed out');
+        } else if (status === 'CLOSED') {
+          console.log('AI insights channel closed');
+        }
+      });
+
+    return () => {
+      if (isSubscribed) {
+        console.log('Unsubscribing from pending AI insights channel');
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [session, organization?.id, queryClient]);
+
   return useQuery({
-    queryKey: ['ai-insights', 'pending'],
+    queryKey,
     queryFn: () => AiInsightsService.getPendingInsights(),
-    refetchInterval: 30000, // Refetch every 30 seconds
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: 2
   });
 }
 

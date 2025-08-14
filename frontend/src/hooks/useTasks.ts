@@ -5,6 +5,9 @@ import {
   TaskCreateData,
   FoundationAITaskData
 } from '@/types/cases';
+import { useEffect } from 'react';
+import { useOrganization, useSession } from '@clerk/clerk-react';
+import supabase from '@/lib/supabase';  
 
 const QUERY_KEYS = {
   tasks: ['tasks'] as const,
@@ -22,6 +25,9 @@ export const useCaseTasks = (
   priority: string,
   view: string
 ) => {
+  const { session } = useSession();
+  const { organization } = useOrganization();
+
   const queryKey = [
     ...QUERY_KEYS.tasks,
     caseId,
@@ -32,68 +38,58 @@ export const useCaseTasks = (
     view
   ];
 
-  // useEffect(() => {
-  //   const setupRealtime = async () => {
-  //     if (!caseId || !session || !organization?.id) {
-  //       return;
-  //     }
+  const queryClient = useQueryClient();
 
-  //     const organizationSchema = organization.id.toLowerCase();
-  //     const tableName = 'case_tasks';
+  useEffect(() => {
+    if (!caseId || !session || !organization?.id) {
+      return;
+    }
 
-  //     const channel = supabase.channel(
-  //       `realtime-${organizationSchema}-${tableName}`
-  //     );
+    const organizationSchema = organization.id.toLowerCase();
+    const tableName = 'case_tasks';
 
-  //     channel
-  //       .on(
-  //         'postgres_changes',
-  //         {
-  //           event: '*',
-  //           schema: organizationSchema,
-  //           table: tableName,
-  //         },
-  //         (payload) => {
-  //           console.log(
-  //             'Real-time change received for case_tasks:',
-  //             payload
-  //           );
-  //           queryClient.invalidateQueries({ queryKey });
-  //         }
-  //       )
-  //       .subscribe((status, error) => {
-  //         if (error) {
-  //           console.error('Subscription error:', error);
-  //           console.error(`Failed to subscribe to case_tasks channel`);
-  //         } else if (status === 'SUBSCRIBED') {
-  //           console.log(
-  //             `Subscribed to case_tasks channel for case ${caseId}`
-  //           );
-  //         } else if (status === 'CHANNEL_ERROR') {
-  //           console.error('Channel error occurred');
-  //         } else if (status === 'TIMED_OUT') {
-  //           console.error('Subscription timed out');
-  //         } else if (status === 'CLOSED') {
-  //           console.log('Channel closed');
-  //         }
-  //       });
+    const channel = supabase.channel(
+      `realtime-${organizationSchema}-${tableName}`
+    );
 
-  //     return () => {
-  //       console.log(
-  //         `Unsubscribing from case_tasks channel for case ${caseId}`
-  //       );
-  //       supabase.removeChannel(channel);
-  //     };
-  //   };
+    let isSubscribed = false;
 
-  //   const cleanupPromise = setupRealtime();
-  //   return () => {
-  //     // Ensure cleanup if setup completed
-  //     Promise.resolve(cleanupPromise).then((cleanup) => {
-  //       // if (typeof cleanup === 'function') cleanup();
-  //     });
-  //   };
-  // }, [caseId, organization?.id, queryKey]);
+    channel
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: organizationSchema,
+          table: tableName
+        },
+        (payload) => {
+          console.log('Real-time change received for case_tasks:', payload);
+          queryClient.invalidateQueries({ queryKey });
+        }
+      )
+      .subscribe((status, error) => {
+        if (error) {
+          console.error('Subscription error:', error);
+          console.error(`Failed to subscribe to case_tasks channel`);
+        } else if (status === 'SUBSCRIBED') {
+          isSubscribed = true;
+          console.log(`Subscribed to case_tasks channel for case ${caseId}`);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('Channel error occurred');
+        } else if (status === 'TIMED_OUT') {
+          console.error('Subscription timed out');
+        } else if (status === 'CLOSED') {
+          console.log('Channel closed');
+        }
+      });
+
+    return () => {
+      if (isSubscribed) {
+        console.log(`Unsubscribing from case_tasks channel for case ${caseId}`);
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [caseId, session, organization?.id, queryKey, queryClient]);
 
   return useQuery({
     queryKey,
