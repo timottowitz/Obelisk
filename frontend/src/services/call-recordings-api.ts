@@ -124,6 +124,7 @@ export class CallRecordingsAPI {
       title: string;
       participants?: string[];
       meetingTypeId?: string;
+      taskType?: string
     }
   ): Promise<{
     success: boolean;

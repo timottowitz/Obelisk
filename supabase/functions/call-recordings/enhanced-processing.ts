@@ -1,7 +1,6 @@
 // Enhanced Meeting Intelligence Processing
 // Extends existing call-recordings with meeting intelligence using ONLY Vertex AI Gemini
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
 import { GoogleCloudStorageService } from "../_shared/google-storage.ts";
 import {
   GeminiMeetingIntelligence,
@@ -18,6 +17,224 @@ export interface EnhancedProcessingOptions {
   schema: string;
   supabase: any;
   googleApiKey: string;
+  orgId: string;
+  userId: string;
+}
+
+// Helper to find userId by name
+async function findUserIdByName(
+  supabase: any,
+  orgId: string,
+  name: string
+): Promise<string | null> {
+  if (!name) return null;
+
+  const { data: users, error: usersError } = await supabase
+    .schema("private")
+    .from("users")
+    .select("id")
+    .eq("full_name", name);
+
+  if (usersError) {
+    throw usersError;
+  }
+
+  if (!users || users.length === 0) {
+    return null;
+  }
+
+  if (users.length === 1) {
+    return users[0].id;
+  }
+
+  const candidateIds = users.map((u: { id: string }) => u.id);
+
+  const { data: memberships, error: membershipsError } = await supabase
+    .schema("private")
+    .from("organization_members")
+    .select("user_id")
+    .in("user_id", candidateIds)
+    .eq("organization_id", orgId)
+    .eq("status", "active");
+
+  if (membershipsError) {
+    throw membershipsError;
+  }
+
+  if (!memberships || memberships.length === 0) {
+    return null;
+  }
+
+  if (memberships.length === 1) {
+    return memberships[0].user_id;
+  }
+
+  return null;
+}
+
+// Helper to find case by identifier
+async function findCaseByIdentifier(
+  supabase: any,
+  schema: string,
+  identifier: string
+): Promise<string | null> {
+  if (!identifier) return null;
+
+  const { data: caseData, error } = await supabase
+    .schema(schema)
+    .from("cases")
+    .select("id")
+    .or(`case_number.eq.${identifier},details->>title.ilike.%${identifier}%`)
+    .maybeSingle();
+
+  if (error) {
+    console.error(`Error finding case by identifier "${identifier}":`, error);
+    return null;
+  }
+
+  return caseData ? caseData.id : null;
+}
+
+// Helper to generate markdown report
+function generateMarkdownReport(
+  recording: any,
+  transcript: string,
+  analysis: any
+): string {
+  const formatDate = (isoString: string) => {
+    const date = new Date(isoString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const formatDuration = (milliseconds: number) => {
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${seconds}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    } else {
+      return `${seconds}s`;
+    }
+  };
+
+  return `# Legal Meeting Analysis Report
+
+## 📋 Meeting Information
+- **Meeting ID**: ${recording.id}
+- **Title**: ${recording.title}
+- **Date & Time**: ${formatDate(recording.start_time)}
+- **Duration**: ${formatDuration(recording.duration)}
+- **Participants**: ${recording.participants?.join(", ") || "Not specified"}
+
+## 🎯 Executive Summary
+${analysis.summary || "No summary available"}
+
+## 📊 Meeting Metrics
+- **Sentiment**: ${
+    analysis.sentiment
+      ? analysis.sentiment.charAt(0).toUpperCase() + analysis.sentiment.slice(1)
+      : "N/A"
+  }
+- **Word Count**: ${recording.word_count || 0}
+- **Action Items**: ${analysis.actionItems?.length || 0}
+- **Decisions Made**: ${analysis.decisions?.length || 0}
+- **Risk Items**: ${analysis.risks?.length || 0}
+
+## 🔑 Key Points
+${
+  analysis.keyPoints?.length > 0
+    ? analysis.keyPoints
+        .map((point: string, i: number) => `${i + 1}. ${point}`)
+        .join("\n")
+    : "No key points identified"
+}
+
+## ✅ Action Items
+${
+  analysis.actionItems?.length > 0
+    ? analysis.actionItems
+        .map((item: any) => {
+          const assignee = item.assignee
+            ? ` - Assigned to: ${item.assignee}`
+            : "";
+          const dueDate = item.dueDate ? ` - Due: ${item.dueDate}` : "";
+          return `- [ ] ${item.task || item}${assignee}${dueDate}`;
+        })
+        .join("\n")
+    : "No action items identified"
+}
+
+## 🎯 Decisions Made
+${
+  analysis.decisions?.length > 0
+    ? analysis.decisions
+        .map((decision: string, i: number) => `${i + 1}. ${decision}`)
+        .join("\n")
+    : "No decisions recorded"
+}
+
+## ⚠️ Risk Analysis
+${
+  analysis.risks?.length > 0
+    ? analysis.risks
+        .map((risk: any) => {
+          return `### ${risk.risk || risk}
+- **Severity**: ${risk.severity || "Medium"}
+- **Mitigation**: ${risk.mitigation || "To be determined"}`;
+        })
+        .join("\n\n")
+    : "No significant risks identified"
+}
+
+## 📋 Compliance Notes
+${
+  analysis.compliance?.length > 0
+    ? analysis.compliance.map((note: string) => `- ${note}`).join("\n")
+    : "No compliance notes"
+}
+
+## 📌 Follow-up Tasks
+${
+  analysis.followUp?.length > 0
+    ? analysis.followUp.map((task: string) => `- [ ] ${task}`).join("\n")
+    : "No follow-up tasks identified"
+}
+
+## 🏷️ Topics Discussed
+${
+  analysis.topics?.length > 0
+    ? analysis.topics.map((topic: string) => `- ${topic}`).join("\n")
+    : "Topics not identified"
+}
+
+## 📝 Full Transcript
+
+${transcript || "Transcript not available"}
+
+---
+
+*Generated by Call Caps AI Legal Analysis System*  
+*Powered by OpenAI Whisper & GPT-4*  
+*Generated on: ${new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })}*
+
+**Confidentiality Notice**: This document contains attorney-client privileged information and is strictly confidential.
+`;
 }
 
 export interface ProcessingResult {
@@ -87,11 +304,20 @@ export class EnhancedMeetingProcessor {
       }
 
       // Step 3: Save enhanced data to database
-      await this.saveEnhancedData(recording, options, result);
+      await this.saveEnhancedData(options, result);
 
       result.processingTime = Date.now() - startTime;
       console.log(
         `Enhanced processing completed in ${result.processingTime}ms`
+      );
+
+      await this.saveMarkDownReport(
+        recording,
+        result.transcript,
+        result.analysis,
+        options.supabase,
+        options.schema,
+        options.userId
       );
 
       return result;
@@ -164,7 +390,8 @@ export class EnhancedMeetingProcessor {
           speakers_metadata: this.extractSpeakersMetadata(
             transcriptionResult.segments
           ),
-          status: options.taskType === "transcribe" ? "completed" : "processing",
+          status:
+            options.taskType === "transcribe" ? "completed" : "processing",
         })
         .eq("id", options.recordingId);
 
@@ -190,7 +417,8 @@ export class EnhancedMeetingProcessor {
         .from("call_recordings")
         .update({
           status: "failed",
-          processing_error: error instanceof Error ? error.message : String(error),
+          processing_error:
+            error instanceof Error ? error.message : String(error),
         })
         .eq("id", options.recordingId);
 
@@ -250,12 +478,19 @@ export class EnhancedMeetingProcessor {
 
       console.log("analysisResult", analysisResult);
 
+      const { actionItems, ...analysisToSave } = analysisResult;
       // Update recording with analysis results
       const updateData = {
-        ai_analysis: analysisResult,
-        ai_summary: analysisResult.summary || (typeof analysisResult === 'string' ? analysisResult : JSON.stringify(analysisResult)),
+        ai_analysis: analysisToSave,
+        action_items: actionItems,
+        ai_summary:
+          analysisResult.summary ||
+          (typeof analysisResult === "string"
+            ? analysisResult
+            : JSON.stringify(analysisResult)),
         key_topics: analysisResult.keyTakeaways || [],
-        sentiment: analysisResult.sentiment || 'neutral',
+        risk_analysis: analysisResult.risks || [],
+        sentiment: analysisResult.sentiment || "neutral",
         status: "processed",
       };
 
@@ -263,7 +498,7 @@ export class EnhancedMeetingProcessor {
       //   updateData.specific_analysis = specificAnalysis;
       // }
 
-      const {error: updateError} = await options.supabase
+      const { error: updateError } = await options.supabase
         .schema(options.schema)
         .from("call_recordings")
         .update(updateData)
@@ -286,7 +521,8 @@ export class EnhancedMeetingProcessor {
         .from("call_recordings")
         .update({
           status: "failed",
-          processing_error: error instanceof Error ? error.message : String(error),
+          processing_error:
+            error instanceof Error ? error.message : String(error),
         })
         .eq("id", options.recordingId);
 
@@ -338,7 +574,7 @@ export class EnhancedMeetingProcessor {
     try {
       if (promptTemplate.outputFormat === "json" && responseText) {
         // Remove code fences and language tags
-        const cleanText = responseText.replace(/```json|```/g, '').trim();
+        const cleanText = responseText.replace(/```json|```/g, "").trim();
         return JSON.parse(cleanText || "{}");
       }
       return responseText;
@@ -436,6 +672,87 @@ export class EnhancedMeetingProcessor {
         .schema(options.schema)
         .from("meeting_action_items")
         .insert(actionItems);
+
+      // Save action items to task_insights table
+      let projectId: string | null = null;
+      let caseId: string | null = null;
+
+      const { data: recording, error: recordingError } = await options.supabase
+        .schema(options.schema)
+        .from("call_recordings")
+        .select("*")
+        .eq("id", recordingId)
+        .single();
+
+      if (recordingError) {
+        console.error("Error fetching recording:", recordingError);
+        return;
+      }
+
+      const meetingTypeId = recording.meeting_type_id;
+
+      const { data: meetingType, error: meetingTypeError } =
+        await options.supabase
+          .schema(options.schema)
+          .from("meeting_types")
+          .select("*")
+          .eq("id", meetingTypeId)
+          .single();
+
+      if (meetingTypeError) {
+        console.error("Error fetching meeting type:", meetingTypeError);
+        return;
+      }
+
+      //todo
+      if (meetingType.task_category === "project" && meetingType.context_id) {
+        projectId = meetingType.context_id;
+      } else if (
+        meetingType.task_category === "case" &&
+        analysis.caseIdentifier
+      ) {
+        caseId = await findCaseByIdentifier(
+          options.supabase,
+          options.schema,
+          analysis.caseIdentifier
+        );
+      }
+
+      for (const item of analysis.actionItems) {
+        const suggested_assignee_id = item.assignee
+          ? await findUserIdByName(options.supabase, options.orgId, item.assignee)
+          : null;
+
+        const insightPayload = {
+          suggested_title: item.task,
+          suggested_description:
+            item.context || `Extracted from recording: ${recording.title}`,
+          suggested_priority: item.priority || "medium",
+          suggested_due_date: item.dueDate,
+          suggested_assignee_id,
+          source_type: "transcript",
+          source_reference: recordingId,
+          project_id: projectId,
+          case_id: caseId,
+          confidence_score: 0.9, // Default confidence
+          ai_reasoning: "Extracted from meeting transcript by AI.",
+          created_by: options.userId, // The user who initiated the processing
+        };
+
+        const { error: insightError } = await options.supabase
+          .schema(options.schema)
+          .from("ai_task_insights")
+          .insert(insightPayload);
+
+        if (insightError) {
+          console.error(
+            "Failed to create AI task insight:",
+            insightError.message
+          );
+        } else {
+          console.log(`Successfully created AI task insight for: ${item.task}`);
+        }
+      }
     }
 
     // Save decisions
@@ -477,7 +794,6 @@ export class EnhancedMeetingProcessor {
    * Save all enhanced data
    */
   private async saveEnhancedData(
-    recording: any,
     options: EnhancedProcessingOptions,
     result: ProcessingResult
   ): Promise<void> {
@@ -494,6 +810,43 @@ export class EnhancedMeetingProcessor {
       .eq("task_type", options.taskType);
 
     console.log("Enhanced data saved successfully");
+  }
+
+  private async saveMarkDownReport(
+    recording: any,
+    transcriptText: any,
+    analysis: any,
+    supabase: any,
+    schema: any,
+    userId: string
+  ) {
+    const markdown = generateMarkdownReport(
+      recording,
+      transcriptText,
+      analysis
+    );
+
+    // Initialize Azure Blob Storage
+    const gcsService = getGcsService();
+
+    // Upload markdown to Azure
+    const transcriptResult = await gcsService.uploadTranscript(
+      userId,
+      recording.id,
+      markdown
+    );
+
+    // Update recording with transcript URL
+    await supabase
+      .schema(schema)
+      .from("call_recordings")
+      .update({
+        gcs_transcript_url: transcriptResult.blobUrl,
+        gcs_transcript_blob_name: transcriptResult.blobName,
+        status: "processed",
+        processed_at: new Date().toISOString(),
+      })
+      .eq("id", recording.id);
   }
 }
 

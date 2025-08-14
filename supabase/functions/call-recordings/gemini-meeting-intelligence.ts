@@ -47,6 +47,7 @@ export interface MeetingTopic {
 }
 
 export interface MeetingAnalysisResult {
+  caseIdentifier: string;
   participants: MeetingParticipant[];
   actionItems: MeetingActionItem[];
   decisions: MeetingDecision[];
