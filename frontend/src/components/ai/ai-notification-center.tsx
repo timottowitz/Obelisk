@@ -1,8 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useAIInsightsRealtime, useAIInsightOpenListener } from '@/hooks/useAIInsightsRealtime';
-import { useFeature } from '@/lib/feature-flags';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +12,6 @@ import {
   Brain,
   CheckCircle,
   XCircle,
-  Clock,
   Calendar,
   User,
   FileText
@@ -38,30 +35,10 @@ export function AINotificationCenter({ className }: AINotificationCenterProps) {
     useState<AITaskInsightWithDetails | null>(null);
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
 
-  const aiSuggestionsEnabled = useFeature('aiSuggestions');
-  const realtimeEnabled = useFeature('aiSuggestionsRealtime');
-  const bulkReviewEnabled = useFeature('aiSuggestionsBulkReview');
-
   const { data: pendingInsights = [], isLoading } = usePendingAIInsights();
   const reviewMutation = useReviewAITask();
   const createCaseTask = useCreateCaseTask();
 
-  // Enable real-time updates if feature flag is on
-  // if (realtimeEnabled) {
-  //   useAIInsightsRealtime();
-  // }
-
-  // // Listen for external open events
-  // useAIInsightOpenListener((insight) => {
-  //   setSelectedInsight(insight);
-  //   setIsAIPanelOpen(true);
-  //   setIsOpen(false);
-  // });
-
-  // Don't render if feature is disabled
-  if (!aiSuggestionsEnabled) {
-    return null;
-  }
 
   const handleQuickAccept = async (
     insight: AITaskInsightWithDetails,
