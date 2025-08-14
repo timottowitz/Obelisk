@@ -9,11 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { 
-  Bell, 
-  Brain, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Bell,
+  Brain,
+  CheckCircle,
+  XCircle,
   Clock,
   Calendar,
   User,
@@ -25,6 +25,8 @@ import { AISuggestionBadge } from './ai-suggestion-badge';
 import { AISuggestionPanel } from './ai-suggestion-panel';
 import type { AITaskInsightWithDetails } from '@/types/ai-insights';
 import { format } from 'date-fns';
+import { useCreateCaseTask } from '@/hooks/useTasks';
+import { toast } from 'sonner';
 
 interface AINotificationCenterProps {
   className?: string;
@@ -32,42 +34,60 @@ interface AINotificationCenterProps {
 
 export function AINotificationCenter({ className }: AINotificationCenterProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedInsight, setSelectedInsight] = useState<AITaskInsightWithDetails | null>(null);
+  const [selectedInsight, setSelectedInsight] =
+    useState<AITaskInsightWithDetails | null>(null);
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
-  
+
   const aiSuggestionsEnabled = useFeature('aiSuggestions');
   const realtimeEnabled = useFeature('aiSuggestionsRealtime');
   const bulkReviewEnabled = useFeature('aiSuggestionsBulkReview');
-  
+
   const { data: pendingInsights = [], isLoading } = usePendingAIInsights();
   const reviewMutation = useReviewAITask();
-  
+  const createCaseTask = useCreateCaseTask();
+
   // Enable real-time updates if feature flag is on
   // if (realtimeEnabled) {
   //   useAIInsightsRealtime();
   // }
-  
+
   // // Listen for external open events
   // useAIInsightOpenListener((insight) => {
   //   setSelectedInsight(insight);
   //   setIsAIPanelOpen(true);
   //   setIsOpen(false);
   // });
-  
+
   // Don't render if feature is disabled
   if (!aiSuggestionsEnabled) {
     return null;
   }
 
-  const handleQuickAccept = async (insight: AITaskInsightWithDetails, e: React.MouseEvent) => {
+  const handleQuickAccept = async (
+    insight: AITaskInsightWithDetails,
+    e: React.MouseEvent
+  ) => {
     e.stopPropagation();
     try {
-      await reviewMutation.mutateAsync({
-        insight_id: insight.id,
-        decision: 'accept',
-      });
+      if (insight.case_id) {
+        await createCaseTask.mutateAsync({
+          caseId: insight.case_id!,
+          taskData: {
+            name: insight.suggested_title,
+            description: insight.suggested_description,
+            priority: insight.suggested_priority,
+            due_date: insight.suggested_due_date || null,
+            assignee_id: insight.suggested_assignee_id,
+            case_project_id: insight.suggested_case_project_id,
+            ai_generated: true,
+            insight_id: insight.id
+          }
+        });
+      }
+      toast.success('AI suggestion accepted');
     } catch (error) {
       console.error('Failed to accept AI suggestion:', error);
+      toast.error('Failed to accept AI suggestion');
     }
   };
 
@@ -226,7 +246,7 @@ export function AINotificationCenter({ className }: AINotificationCenterProps) {
                           <div className="text-xs text-gray-500">
                             {insight.confidence_score && (
                               <span>
-                                {Math.round(insight.confidence_score * 100)}% confidence
+                                 {Math.round(insight.confidence_score * 100)}% confidence
                               </span>
                             )}
                           </div>
@@ -236,7 +256,7 @@ export function AINotificationCenter({ className }: AINotificationCenterProps) {
                               variant="outline"
                               onClick={(e) => handleQuickReject(insight, e)}
                               disabled={reviewMutation.isPending}
-                              className="h-6 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                              className="h-6 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50 cursor-pointer"
                             >
                               <XCircle className="h-3 w-3 mr-1" />
                               Reject
@@ -245,7 +265,7 @@ export function AINotificationCenter({ className }: AINotificationCenterProps) {
                               size="sm"
                               onClick={(e) => handleQuickAccept(insight, e)}
                               disabled={reviewMutation.isPending}
-                              className="h-6 px-2 text-xs bg-green-600 hover:bg-green-700"
+                              className="h-6 px-2 text-xs bg-green-600 hover:bg-green-700 cursor-pointer"
                             >
                               <CheckCircle className="h-3 w-3 mr-1" />
                               Accept
@@ -302,11 +322,11 @@ export function AIInsightBadge({ className }: AIInsightBadgeProps) {
 
   return (
     <Badge
-      variant="destructive"
-      className={cn(
-        'bg-blue-600 hover:bg-blue-700 text-white',
-        className
-      )}
+    variant="destructive"
+    className={cn(
+      'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer',
+      className
+    )}
     >
       {pendingInsights.length > 99 ? '99+' : pendingInsights.length}
     </Badge>

@@ -7,11 +7,11 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import { Search, X } from 'lucide-react';
+import { Search, X, Lightbulb } from 'lucide-react';
 import TaskModal from './components/task-modal';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Task, UploadTaskData } from '@/types/cases';
+import { Task, TaskCreateData, UploadTaskData } from '@/types/cases';
 import { AlertModal } from '@/components/modal/alert-modal';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import EnhancedCaseTasksTable from './components/enhanced-case-tasks-table';
@@ -23,6 +23,10 @@ import {
 } from '@/hooks/useTasks';
 import { useDebounce } from '@/hooks/use-debounce';
 import queryString from 'query-string';
+import AISuggestionsPanel from './components/ai-suggestions-panel';
+import { useAIInsightsForCase } from '@/hooks/useAIInsights';
+import { AITaskInsight } from '@/types/ai-insights';
+import { Badge } from '@/components/ui/badge';
 
 export default function Tasks({ caseId }: { caseId: string }) {
   const searchParams = useSearchParams();
@@ -35,6 +39,15 @@ export default function Tasks({ caseId }: { caseId: string }) {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isAiSuggestionsOpen, setIsAiSuggestionsOpen] = useState(false);
+  // AI Suggestions State
+  const { data: aiSuggestions, isLoading: isAISuggestionsLoading } =
+    useAIInsightsForCase(caseId);
+
+  const pendingAISuggestionsCount = useMemo(
+    () => (aiSuggestions || []).filter((s) => s.status === 'pending').length,
+    [aiSuggestions]
+  );
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState(
@@ -137,6 +150,24 @@ export default function Tasks({ caseId }: { caseId: string }) {
     [caseId, createCaseTask]
   );
 
+  const handleAcceptSuggestion = useCallback(
+    async (suggestion: AITaskInsight) => {
+      const taskData: TaskCreateData = {
+        name: suggestion.suggested_title,
+        description: suggestion.suggested_description,
+        priority: suggestion.suggested_priority,
+        due_date: suggestion.suggested_due_date,
+        assignee_id: suggestion.suggested_assignee_id,
+        case_project_id: suggestion.suggested_case_project_id,
+        ai_generated: true,
+        insight_id: suggestion.id
+      };
+      await handleCreateTask(taskData);
+      setIsAiSuggestionsOpen(false);
+    },
+    [handleCreateTask]
+  );
+
   const handleUpdateTask = useCallback(
     async (taskData: UploadTaskData) => {
       setIsLoading(true);
@@ -190,18 +221,41 @@ export default function Tasks({ caseId }: { caseId: string }) {
     <div className='flex flex-col gap-4'>
       <div className='flex items-center justify-between'>
         <h3 className='text-sm font-semibold text-gray-900'>Case Tasks</h3>
-        <Button
-          size='lg'
-          variant='outline'
-          className='flex w-fit cursor-pointer items-center text-xs'
-          onClick={() => {
-            setIsOpen(true);
-            setSelectedTask(null);
-          }}
-        >
-          Create A Task
-        </Button>
+        <div className='flex items-center gap-2'>
+          <Button
+            size='lg'
+            variant='outline'
+            className='flex w-fit cursor-pointer items-center gap-2 text-xs'
+            onClick={() => setIsAiSuggestionsOpen(true)}
+          >
+            <Lightbulb className='h-4 w-4' />
+            Suggest Tasks with AI
+            <Badge variant='default' className='ml-2'>
+              {pendingAISuggestionsCount}
+            </Badge>
+          </Button>
+          <Button
+            size='lg'
+            variant='outline'
+            className='flex w-fit cursor-pointer items-center text-xs'
+            onClick={() => {
+              setIsOpen(true);
+              setSelectedTask(null);
+            }}
+          >
+            Create A Task
+          </Button>
+        </div>
       </div>
+
+      {isAiSuggestionsOpen && !isAISuggestionsLoading && (
+        <AISuggestionsPanel
+          suggestions={aiSuggestions || []}
+          isLoading={isAISuggestionsLoading}
+          onAccept={handleAcceptSuggestion}
+          onDismiss={() => setIsAiSuggestionsOpen(false)}
+        />
+      )}
 
       {/* Filters Section */}
       <div className='flex flex-row items-center gap-3 rounded-lg border bg-white p-4'>

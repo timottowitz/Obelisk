@@ -108,7 +108,7 @@ export default class TasksAPI {
 
   static async createCaseTask(caseId: string, taskData: TaskCreateData) {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/cases/${caseId}/tasks`, {
+    const response = await fetch(`${API_BASE_URL}/cases/${caseId}`, {
       method: 'POST',
       headers,
       body: JSON.stringify(taskData)
@@ -223,5 +223,15 @@ export default class TasksAPI {
         role: string;
       }[]
     >(response);
+  }
+
+  static async getAITaskSuggestions(caseId: string) {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_CONFIG.AI_INSIGHTS_BASE_URL}/ai-task-suggester`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ case_id: caseId }),
+    });
+    return handleApiResponse<{ name: string; description: string }[]>(response);
   }
 }

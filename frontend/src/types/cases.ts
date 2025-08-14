@@ -77,11 +77,12 @@ export interface Task {
 }
 export interface UploadTaskData {
   name: string;
-  due_date: string;
-  description: string;
+  due_date: string | null;
+  description?: string;
   assignee_id: string;
   priority: 'high' | 'medium' | 'low';
   case_project_id: string;
+  ai_generated?: boolean;
 }
 
 export interface CaseProject {
@@ -152,12 +153,13 @@ export interface TaskCreateData {
   name: string;
   description?: string;
   priority: 'high' | 'medium' | 'low';
-  due_date?: string;
-  assignee_id?: string;
-  case_project_id?: string; // For case tasks
+  due_date: string | null;
+  assignee_id: string;
+  case_project_id: string; // For case tasks
   project_id?: string; // For general project tasks
   category_id?: string;
   // AI fields (when accepting Foundation AI suggestions)
+  insight_id?: string;
   ai_generated?: boolean;
   foundation_ai_task_id?: string;
   ai_confidence_score?: number;

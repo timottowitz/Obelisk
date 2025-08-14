@@ -115,8 +115,6 @@ app.get("/ai-insights/cases/:caseId", async (c: any) => {
   const userId = c.get("userId");
   const caseId = c.req.param("caseId");
 
-  console.log("caseId", caseId);
-
   try {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
 
@@ -131,6 +129,7 @@ app.get("/ai-insights/cases/:caseId", async (c: any) => {
         `
       )
       .eq("case_id", caseId)
+      .eq("status", "pending")
       .order("created_at", { ascending: false });
 
     if (error) throw error;

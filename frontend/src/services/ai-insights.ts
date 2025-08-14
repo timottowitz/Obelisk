@@ -13,13 +13,13 @@ class AIInsightsService {
   /**
    * Get AI insights for a case
    */
-  async getCaseInsights(caseId: string): Promise<AITaskInsightWithDetails[]> {
+  async getCaseInsights(caseId: string): Promise<AITaskInsight[]> {
     const headers = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/cases/${caseId}`, {
       method: 'GET',
       headers
     });
-    return handleApiResponse<AITaskInsightWithDetails[]>(response);
+    return handleApiResponse<AITaskInsight[]>(response);
   }
 
   /**

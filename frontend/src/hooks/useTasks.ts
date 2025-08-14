@@ -13,7 +13,7 @@ const QUERY_KEYS = {
   aiInsights: ['ai-insights'] as const
 };
 
-// General project tasks (non-case specific)
+// Case-specific tasks
 export const useCaseTasks = (
   caseId: string,
   page: number,
@@ -22,11 +22,84 @@ export const useCaseTasks = (
   priority: string,
   view: string
 ) => {
+  const queryKey = [
+    ...QUERY_KEYS.tasks,
+    caseId,
+    page,
+    search,
+    status,
+    priority,
+    view
+  ];
+
+  // useEffect(() => {
+  //   const setupRealtime = async () => {
+  //     if (!caseId || !session || !organization?.id) {
+  //       return;
+  //     }
+
+  //     const organizationSchema = organization.id.toLowerCase();
+  //     const tableName = 'case_tasks';
+
+  //     const channel = supabase.channel(
+  //       `realtime-${organizationSchema}-${tableName}`
+  //     );
+
+  //     channel
+  //       .on(
+  //         'postgres_changes',
+  //         {
+  //           event: '*',
+  //           schema: organizationSchema,
+  //           table: tableName,
+  //         },
+  //         (payload) => {
+  //           console.log(
+  //             'Real-time change received for case_tasks:',
+  //             payload
+  //           );
+  //           queryClient.invalidateQueries({ queryKey });
+  //         }
+  //       )
+  //       .subscribe((status, error) => {
+  //         if (error) {
+  //           console.error('Subscription error:', error);
+  //           console.error(`Failed to subscribe to case_tasks channel`);
+  //         } else if (status === 'SUBSCRIBED') {
+  //           console.log(
+  //             `Subscribed to case_tasks channel for case ${caseId}`
+  //           );
+  //         } else if (status === 'CHANNEL_ERROR') {
+  //           console.error('Channel error occurred');
+  //         } else if (status === 'TIMED_OUT') {
+  //           console.error('Subscription timed out');
+  //         } else if (status === 'CLOSED') {
+  //           console.log('Channel closed');
+  //         }
+  //       });
+
+  //     return () => {
+  //       console.log(
+  //         `Unsubscribing from case_tasks channel for case ${caseId}`
+  //       );
+  //       supabase.removeChannel(channel);
+  //     };
+  //   };
+
+  //   const cleanupPromise = setupRealtime();
+  //   return () => {
+  //     // Ensure cleanup if setup completed
+  //     Promise.resolve(cleanupPromise).then((cleanup) => {
+  //       // if (typeof cleanup === 'function') cleanup();
+  //     });
+  //   };
+  // }, [caseId, organization?.id, queryKey]);
+
   return useQuery({
-    queryKey: [...QUERY_KEYS.tasks, caseId, page, search, status, priority, view],
+    queryKey,
     queryFn: () =>
       TasksAPI.getCaseTasks(caseId, page, search, status, priority, view),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 5, // 5 minutes
     retry: 2
   });
 };
@@ -64,8 +137,14 @@ export const useCreateCaseTask = () => {
       caseId: string;
       taskData: TaskCreateData;
     }) => TasksAPI.createCaseTask(caseId, taskData),
-    onSuccess: () => {
+    onSuccess: (_, { caseId }) => {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.tasks] });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.aiInsights, 'case', caseId]
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['ai-insights', 'pending']
+      });
     }
   });
 };
