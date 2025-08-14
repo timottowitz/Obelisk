@@ -47,6 +47,7 @@ export interface MeetingTopic {
 }
 
 export interface MeetingAnalysisResult {
+  caseIdentifier: string;
   participants: MeetingParticipant[];
   actionItems: MeetingActionItem[];
   decisions: MeetingDecision[];
@@ -393,6 +394,7 @@ ${fullTranscript}`;
         return `Analyze the meeting transcript provided below. You must respond with ONLY valid JSON in this exact structure (no markdown code blocks, no extra text):
 
 {
+  "caseIdentifier": "Case name or ID if mentioned in the transcript, otherwise null",
   "participants": [
           {
             "speakerLabel": "Speaker A",
@@ -404,7 +406,7 @@ ${fullTranscript}`;
         "actionItems": [
           {
             "task": "Specific actionable task",
-            "assignee": "Person responsible (if mentioned)",
+            "assignee": "Person responsible, in 'Firstname L.' format (e.g., 'John D.') if possible",
             "assigneeSpeakerLabel": "Speaker label of assignee",
             "dueDate": "Due date if mentioned",
             "priority": "low|medium|high|urgent",
