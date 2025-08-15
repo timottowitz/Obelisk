@@ -454,7 +454,7 @@ export function CaseForm({ initialData }: { initialData?: any }) {
                         <Loader2 className='h-3 w-3 animate-spin' />
                         Searching contacts...
                       </div>
-                    ) : claimantContacts && claimantContacts.length > 0 ? (
+                    ) : claimantContacts ? (
                       <div className='max-h-60 overflow-auto py-1'>
                         <div
                           className='flex cursor-pointer items-center gap-2 border-b border-gray-200 px-3 py-3 text-sm'
@@ -548,7 +548,7 @@ export function CaseForm({ initialData }: { initialData?: any }) {
                         <Loader2 className='h-3 w-3 animate-spin' />
                         Searching contacts...
                       </div>
-                    ) : respondentContacts && respondentContacts.length > 0 ? (
+                    ) : respondentContacts ? (
                       <div className='max-h-60 overflow-auto py-1'>
                         {respondentContacts.map((contact, index) => (
                           <div

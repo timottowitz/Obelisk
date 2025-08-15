@@ -4,7 +4,6 @@ import { createClient } from "npm:@supabase/supabase-js";
 import { verifyWebhook } from "npm:@clerk/backend/webhooks";
 import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 import { seedCaseTypes } from "../_shared/default-case-types.ts";
-import { seedTaskCategories } from "../_shared/default-task-categories.ts";
 
 async function runTenantMigrations(schemaName: string) {
   const databaseUrl = Deno.env.get("SUPABASE_DB_URL");
@@ -202,7 +201,6 @@ Deno.serve(async (req) => {
 
       // Seed case types
       await seedCaseTypes(supabase, schemaName.toLowerCase());
-      await seedTaskCategories(supabase, schemaName.toLowerCase());
 
       return new Response(JSON.stringify({ data }), { status: 200 });
     }

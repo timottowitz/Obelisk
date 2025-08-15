@@ -339,8 +339,6 @@ class ContactsSeeder {
       }
     } catch (error) {
       console.error("Error seeding contacts:", error);
-    } finally {
-      await this.client.end();
     }
   }
 

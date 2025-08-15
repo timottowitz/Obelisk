@@ -895,7 +895,7 @@ app.get("/cases", async (c) => {
         if (caseTypeError || !caseType) {
           return c.json({ error: "Case type not found" }, 404);
         }
-        query = query.eq("case_type", caseType.id);
+        query = query.eq("case_type_id", caseType.id);
       }
 
       if (search) {
@@ -1257,20 +1257,20 @@ app.post("/cases", async (c) => {
         phone,
         email,
         status: "inactive",
-        case_type: case_type_id,
+        case_type_id,
         special_notes,
-        filing_fee,
+        filing_fee: filing_fee ? parseFloat(filing_fee as string) : null,
         case_number,
         adr_process,
         applicable_rules,
         track,
-        claim_amount,
+        claim_amount: claim_amount ? parseFloat(claim_amount as string) : null,
         hearing_locale,
         claimant_id,
         respondent_id,
         case_manager,
         initial_task,
-        next_event,
+        next_event: next_event,
         special_instructions,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
