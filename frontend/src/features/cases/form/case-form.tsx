@@ -608,6 +608,7 @@ export function CaseForm({ initialData }: { initialData?: any }) {
                     handleInputChange('next_event', e.target.value)
                   }
                   placeholder='Enter next event date'
+                  required
                 />
               </div>
 
