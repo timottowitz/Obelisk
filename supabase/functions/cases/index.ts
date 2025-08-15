@@ -13,6 +13,7 @@ import {
   seedCaseTypes,
   DEFAULT_CASE_TYPES,
 } from "../_shared/default-case-types.ts";
+import { GoogleCloudStorageService } from "../_shared/google-storage.ts";
 
 console.log("Hello from Cases Functions!");
 
@@ -88,6 +89,23 @@ async function getSupabaseAndOrgInfo(orgId: string, userId: string) {
     member: member.data,
     org: org.data,
   };
+}
+
+function getGcsService(bucketNameOverride?: string) {
+  const gcsKeyRaw = Deno.env.get("GCS_JSON_KEY");
+  const bucketName = bucketNameOverride || Deno.env.get("GCS_BUCKET_NAME");
+  if (!gcsKeyRaw || !bucketName) {
+    throw new Error(
+      "GCS storage not configured. Please set GCS_JSON_KEY and GCS_BUCKET_NAME in environment variables."
+    );
+  }
+  let credentials;
+  try {
+    credentials = JSON.parse(gcsKeyRaw);
+  } catch (e: any) {
+    throw new Error("Invalid GCS_JSON_KEY: " + (e?.message || e));
+  }
+  return new GoogleCloudStorageService({ bucketName, credentials });
 }
 
 // SEEDER ENDPOINTS
@@ -835,7 +853,7 @@ app.get("/cases", async (c) => {
           ? "Litigation"
           : "Solar";
 
-      // Build query for listing cases
+      // Build query for listing cases with contacts joined
       let query = supabase
         .schema(schema)
         .from("cases")
@@ -849,6 +867,16 @@ app.get("/cases", async (c) => {
           description,
           color,
           icon
+        ),
+        claimant:contacts!claimant_id(
+          id,
+          full_name,
+          sort_by_first
+        ),
+        respondent:contacts!respondent_id(
+          id,
+          full_name,
+          sort_by_first
         )
       `,
           { count: "exact" }
@@ -871,17 +899,53 @@ app.get("/cases", async (c) => {
       }
 
       if (search) {
-        query = query.or(
-          `claimant.ilike.%${search}%,case_number.ilike.%${search}%`
-        );
+        // Search by case number or by joining with contacts for names
+        const searchLower = search.toLowerCase();
+
+        // First, get contact IDs that match the search term
+        const { data: matchingContacts } = await supabase
+          .schema(schema)
+          .from("contacts")
+          .select("id")
+          .ilike("full_name", `%${searchLower}%`);
+
+        const contactIds = matchingContacts?.map((c) => c.id) || [];
+
+        if (contactIds.length > 0) {
+          // Search by case number OR claimant_id OR respondent_id
+          query = query.or(
+            `case_number.ilike.%${search}%,claimant_id.in.(${contactIds.join(
+              ","
+            )}),respondent_id.in.(${contactIds.join(
+              ","
+            )}),case_manager.ilike.%${search}%`
+          );
+        } else {
+          // Just search by case number if no matching contacts found
+          query = query.or(
+            `case_number.ilike.%${search}%,case_manager.ilike.%${search}%`
+          );
+        }
       }
 
       if (status) {
         query = query.eq("status", status);
       }
-      // Apply ordering and pagination
-      query = query.order(orderBy, { ascending: orderDirection === "asc" });
-      query = query.range(offset, offset + limit - 1);
+      // For special sorting fields, we need to fetch all data first
+      const needsPostProcessing = [
+        "claimant",
+        "case_number",
+        "status",
+        "respondent",
+        "case_manager",
+        "docs",
+        "tasks",
+      ].includes(orderBy);
+
+      // If we need post-processing, don't apply pagination yet
+      if (!needsPostProcessing) {
+        query = query.range(offset, offset + limit - 1);
+      }
 
       const { data: cases, error, count } = await query;
 
@@ -947,6 +1011,58 @@ app.get("/cases", async (c) => {
         });
       }
 
+      // Apply sorting for special fields after fetching all data
+      if (needsPostProcessing) {
+        detailedCases.sort((a, b) => {
+          let compareValue = 0;
+
+          switch (orderBy) {
+            case "docs":
+              compareValue = a.documents_count - b.documents_count;
+              break;
+            case "tasks":
+              compareValue = a.case_tasks_count - b.case_tasks_count;
+              break;
+            case "status":
+              compareValue = a.status.localeCompare(b.status);
+              break;
+            case "case_number":
+              compareValue = a.case_number.localeCompare(b.case_number);
+              break;
+            case "claimant":
+              compareValue = a.claimant.sort_by_first.localeCompare(
+                b.claimant.sort_by_first
+              );
+              break;
+            case "respondent":
+              compareValue = a.respondent.sort_by_first.localeCompare(
+                b.respondent.sort_by_first
+              );
+              break;
+            case "case_manager":
+              compareValue = a.case_manager.localeCompare(b.case_manager);
+              break;
+            default:
+              compareValue = 0;
+          }
+
+          return orderDirection === "asc" ? compareValue : -compareValue;
+        });
+
+        // Apply pagination after sorting
+        const paginatedCases = detailedCases.slice(offset, offset + limit);
+
+        return c.json(
+          {
+            cases: paginatedCases || [],
+            total: detailedCases.length || 0,
+            limit,
+            offset,
+          },
+          200
+        );
+      }
+
       return c.json(
         {
           cases: detailedCases || [],
@@ -973,7 +1089,7 @@ app.get("/cases/:id", async (c) => {
   try {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
 
-    const { data: case_, error } = await supabase
+    const { data: caseData, error } = await supabase
       .schema(schema)
       .from("cases")
       .select(
@@ -986,17 +1102,31 @@ app.get("/cases/:id", async (c) => {
           description,
           color,
           icon
+        ),
+        claimant:contacts!claimant_id(
+          id,
+          full_name,
+          emails,
+          phones,
+          addresses
+        ),
+        respondent:contacts!respondent_id(
+          id,
+          full_name,
+          emails,
+          phones,
+          addresses
         )
       `
       )
       .eq("id", caseId)
       .single();
 
-    if (error || !case_) {
-      return c.json({ error: "Case not found" }, 404);
+    if (error || !caseData) {
+      return c.json({ error: "Case not found", details: error }, 404);
     }
 
-    return c.json(case_, 200);
+    return c.json(caseData, 200);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -1055,12 +1185,15 @@ app.post("/cases", async (c) => {
   const userId = c.get("userId");
 
   try {
-    const { supabase, schema, user } = await getSupabaseAndOrgInfo(
+    const { supabase, schema, user, member } = await getSupabaseAndOrgInfo(
       orgId,
       userId
     );
 
-    const body = await c.req.json();
+    const formData = await c.req.formData();
+    const body = Object.fromEntries(formData.entries());
+    const documents = formData.getAll("documents");
+
     const {
       full_name,
       phone,
@@ -1074,10 +1207,12 @@ app.post("/cases", async (c) => {
       track,
       claim_amount,
       hearing_locale,
-      claimant,
-      respondent,
       case_manager,
-      access,
+      initial_task,
+      next_event,
+      special_instructions,
+      claimant_id,
+      respondent_id,
     } = body;
 
     if (!full_name) {
@@ -1131,10 +1266,12 @@ app.post("/cases", async (c) => {
         track,
         claim_amount,
         hearing_locale,
-        claimant,
-        respondent,
+        claimant_id,
+        respondent_id,
         case_manager,
-        access,
+        initial_task,
+        next_event,
+        special_instructions,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -1152,10 +1289,25 @@ app.post("/cases", async (c) => {
     await createFoldersFromTemplates(
       supabase,
       schema,
-      case_type_id,
+      case_type_id as string,
       newCase.id,
       user.id
     );
+
+    try {
+      await uploadInitialDocuments(
+        supabase,
+        schema,
+        newCase.id,
+        case_type_id as string,
+        userId,
+        documents,
+        orgId,
+        member
+      );
+    } catch (error: any) {
+      console.error("Failed to upload initial documents:", error);
+    }
 
     // Fetch the created case with case type information
     const { data: caseWithType } = await supabase
@@ -1234,8 +1386,8 @@ app.put("/cases/:id", async (c) => {
       track,
       claim_amount,
       hearing_locale,
-      claimant,
-      respondent,
+      claimant_id,
+      respondent_id,
       case_manager,
       access,
     } = body;
@@ -1311,8 +1463,8 @@ app.put("/cases/:id", async (c) => {
     if (claim_amount !== undefined) updateData.claim_amount = claim_amount;
     if (hearing_locale !== undefined)
       updateData.hearing_locale = hearing_locale;
-    if (claimant !== undefined) updateData.claimant = claimant;
-    if (respondent !== undefined) updateData.respondent = respondent;
+    if (claimant_id !== undefined) updateData.claimant_id = claimant_id;
+    if (respondent_id !== undefined) updateData.respondent_id = respondent_id;
     if (case_manager !== undefined) updateData.case_manager = case_manager;
     if (access !== undefined) updateData.access = access;
 
@@ -1444,12 +1596,21 @@ app.post("/cases/:id/tasks", async (c) => {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
     const body = await c.req.json();
 
-    const { name, description, due_date, assignee_id, priority, category_id } = body;
+    const { name, description, due_date, assignee_id, priority, category_id } =
+      body;
 
     const { data: newTask, error: insertError } = await supabase
       .schema(schema)
       .from("case_tasks")
-      .insert({ case_id, name, description, due_date, assignee_id, priority, category_id })
+      .insert({
+        case_id,
+        name,
+        description,
+        due_date,
+        assignee_id,
+        priority,
+        category_id,
+      })
       .select()
       .single();
 
@@ -1656,6 +1817,178 @@ app.get("/cases/:id/events", async (c) => {
     return c.json({ error: error.message }, 500);
   }
 });
+
+async function uploadInitialDocuments(
+  supabase: any,
+  schema: string,
+  caseId: string,
+  caseTypeId: string,
+  userId: string,
+  documents: any[],
+  orgId: string,
+  member: any
+) {
+  try {
+    // Skip if no documents
+    if (!documents || documents.length === 0) {
+      return;
+    }
+
+    // Create or find Initial Documents folder
+    let initialDocsFolder;
+
+    // First check if Initial Documents folder already exists for this case
+    const { data: existingFolder } = await supabase
+      .schema(schema)
+      .from("storage_folders")
+      .select("*")
+      .eq("case_id", caseId)
+      .eq("name", "Initial Documents")
+      .single();
+
+    const { data: user } = await supabase
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    if (existingFolder) {
+      initialDocsFolder = existingFolder;
+    } else {
+      // Create Initial Documents folder
+      const { data: newFolder, error: folderError } = await supabase
+        .schema(schema)
+        .from("storage_folders")
+        .insert({
+          name: "Initial Documents",
+          path: "/Initial Documents",
+          parent_folder_id: null,
+          created_by: user.id,
+          case_type_id: caseTypeId,
+          case_id: caseId,
+        })
+        .select()
+        .single();
+
+      if (folderError) {
+        console.error(
+          "Failed to create Initial Documents folder:",
+          folderError
+        );
+        throw new Error("Failed to create Initial Documents folder");
+      }
+
+      initialDocsFolder = newFolder;
+    }
+
+    // Initialize Google Cloud Storage
+    const gcsService = getGcsService();
+
+    // Upload each document to Google Cloud Storage and save metadata
+    for (const document of documents) {
+      if (document instanceof File) {
+        try {
+          // Convert File to Uint8Array
+          const buffer = await document.arrayBuffer();
+          const fileData = new Uint8Array(buffer);
+
+          const checksum = await calculateChecksum(fileData);
+          const folderPath = await getFolderPath(
+            supabase,
+            initialDocsFolder.id,
+            schema
+          );
+
+          // Upload to GCS
+          const uploadResult = await gcsService.uploadFile(
+            orgId,
+            userId,
+            folderPath,
+            document.name,
+            fileData,
+            document.type || "application/pdf",
+            {
+              checksum,
+              uploadedBy: user?.id,
+            }
+          );
+
+          // Save file metadata to database
+          const { error: fileError } = await supabase
+            .schema(schema)
+            .from("storage_files")
+            .insert({
+              name: document.name,
+              original_name: document.name,
+              folder_id: initialDocsFolder.id,
+              gcs_blob_name: uploadResult.blobName,
+              gcs_blob_url: uploadResult.blobUrl,
+              mime_type: document.type || "application/pdf",
+              size_bytes: fileData.length,
+              checksum: checksum,
+              uploaded_by: member?.id,
+            })
+            .select()
+            .single();
+
+          if (fileError) {
+            console.error("Failed to save file metadata:", fileError);
+            throw new Error("Failed to save file metadata", fileError);
+          }
+
+          // Create case event for file upload
+          await supabase
+            .schema(schema)
+            .from("case_events")
+            .insert({
+              case_id: caseId,
+              event_type: "file_uploaded",
+              description: `${
+                user?.email || "User"
+              } uploaded initial document: ${document.name}`,
+              date: new Date().toISOString().split("T")[0],
+              time: new Date().toISOString().split("T")[1].split(".")[0],
+            });
+        } catch (fileUploadError: any) {
+          console.error(
+            `Failed to upload document ${document.name}:`,
+            fileUploadError
+          );
+          // Continue with other documents even if one fails
+        }
+      }
+    }
+  } catch (error: any) {
+    console.error("Failed to upload initial documents:", error);
+    // Don't throw error to prevent case creation from failing
+    // Just log the error and continue
+  }
+}
+async function getFolderPath(
+  supabaseClient: any,
+  folderId: string,
+  schema: string
+): Promise<string> {
+  const { data, error } = await supabaseClient
+    .schema(schema)
+    .rpc("get_folder_path", {
+      folder_uuid: folderId,
+    });
+
+  if (error) throw error;
+  return data || "";
+}
+
+async function calculateChecksum(data: Uint8Array): Promise<string> {
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 export default app;
 

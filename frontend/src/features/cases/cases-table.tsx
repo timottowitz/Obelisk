@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronDown, Eye, FileText } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Table,
@@ -13,22 +13,13 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-
-interface Case {
-  id: string;
-  claimant: string;
-  case_number: string;
-  status: string;
-  respondent: string;
-  case_manager: string;
-  case_tasks_count: number;
-  documents_count: number;
-}
+import { Case } from '@/types/cases';
 
 interface CasesTableProps {
   cases: Case[];
   isLoading: boolean;
   onChangeSort: (sort: string) => void;
+  queryParams: any;
 }
 
 const getStatusColor = (status: string) => {
@@ -78,14 +69,15 @@ const tableColumns = [
     sortable: false,
     className: 'w-[8.33%]'
   },
-  { key: 'tasks', label: 'Tasks', sortable: false, className: 'w-[8.33%]' },
-  { key: 'docs', label: 'Docs', sortable: false, className: 'w-[8.33%]' }
+  { key: 'tasks', label: 'Tasks', sortable: true, className: 'w-[8.33%]' },
+  { key: 'docs', label: 'Docs', sortable: true, className: 'w-[8.33%]' }
 ];
 
 export function CasesTable({
   cases,
   isLoading,
-  onChangeSort
+  onChangeSort,
+  queryParams
 }: CasesTableProps) {
   return (
     <div className='overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm'>
@@ -105,7 +97,12 @@ export function CasesTable({
                   onClick={() => column.sortable && onChangeSort(column.key)}
                 >
                   {column.label}
-                  <ChevronDown className='ml-1 h-3 w-3' />
+                  {queryParams.sortBy === column.key &&
+                  queryParams.order === 'desc' ? (
+                    <ChevronUp className='ml-1 h-3 w-3' />
+                  ) : (
+                    <ChevronDown className='ml-1 h-3 w-3' />
+                  )}
                 </div>
               </TableHead>
             ))}
@@ -137,7 +134,7 @@ export function CasesTable({
                     href={`/dashboard/cases/${caseItem.id}`}
                     className='text-sm font-medium text-blue-600 underline hover:text-blue-800'
                   >
-                    {caseItem.claimant}
+                    {caseItem.claimant.full_name}
                   </Link>
                 </TableCell>
 
@@ -160,7 +157,9 @@ export function CasesTable({
                 </TableCell>
 
                 <TableCell className='px-6 py-4'>
-                  <p className='text-sm text-gray-700'>{caseItem.respondent}</p>
+                  <p className='text-sm text-gray-700'>
+                    {caseItem.respondent.full_name}
+                  </p>
                 </TableCell>
 
                 <TableCell className='px-6 py-4'>

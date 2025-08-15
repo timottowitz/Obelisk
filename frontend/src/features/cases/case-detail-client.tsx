@@ -36,9 +36,7 @@ interface CaseDetailClientProps {
   caseId: string;
 }
 
-export default function CaseDetailClient({
-  caseId
-}: CaseDetailClientProps) {
+export default function CaseDetailClient({ caseId }: CaseDetailClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('case-information');
   const {
@@ -98,27 +96,27 @@ export default function CaseDetailClient({
                 <span className='font-medium'>Case Number:</span>
                 <span>{caseData?.case_number}</span>
               </span>
-              
+
               <span className='text-gray-400'>•</span>
-              
+
               <span className='flex items-center gap-1'>
                 <span className='font-medium'>Manager:</span>
                 <span>{caseData?.case_manager}</span>
               </span>
-              
+
               <span className='text-gray-400'>•</span>
-              
+
               <span className='flex items-center gap-1'>
                 <span className='font-medium'>Phone:</span>
                 <span>{caseData?.phone}</span>
               </span>
-              
+
               <span className='text-gray-400'>•</span>
-              
+
               <span className='flex items-center gap-1'>
                 <span className='font-medium'>Email:</span>
-                <a 
-                  href={`mailto:${caseData?.email}`} 
+                <a
+                  href={`mailto:${caseData?.email}`}
                   className='text-blue-600 hover:text-blue-800 hover:underline'
                 >
                   {caseData?.email}
@@ -203,7 +201,7 @@ export default function CaseDetailClient({
             ) : (
               <div className='px-6 py-8'>
                 <TabsContent value='case-information' className='space-y-6'>
-                  <CaseInfo caseData={caseData} />
+                  <CaseInfo caseData={caseData!} />
                 </TabsContent>
 
                 <TabsContent value='tasks' className='space-y-6'>

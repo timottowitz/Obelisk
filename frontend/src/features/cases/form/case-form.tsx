@@ -13,13 +13,18 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, ArrowLeft, Upload, FileText, X } from 'lucide-react';
+import { Loader2, ArrowLeft, Upload, FileText, X, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import dyajs from 'dayjs';
 import { useCasesOperations } from '@/hooks/useCases';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { v1 as uuidv1 } from 'uuid';
+import { useContactTypes, useContactsBySearch } from '@/hooks/useContacts';
+import { useDebounce } from '@/hooks/use-debounce';
+import { Contact } from '@/types/contacts';
+import ContactModal from '@/features/contacts/components/contact-modal';
+import { useCreateContact } from '@/hooks/useContacts';
 
 const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 Bytes';
@@ -33,7 +38,8 @@ export function CaseForm({ initialData }: { initialData?: any }) {
   const { caseTypes: caseTypesData } = useCasesOperations();
   const caseTypes = caseTypesData.data || [];
   const caseTypesLoading = caseTypesData.isLoading;
-
+  const { data: contactTypes, isLoading: contactTypesLoading } =
+    useContactTypes();
   const [formData, setFormData] = useState<{
     full_name: string;
     phone: string;
@@ -43,7 +49,9 @@ export function CaseForm({ initialData }: { initialData?: any }) {
     filing_fee: string;
     case_number: string;
     claimant: string;
+    claimant_id: string;
     respondent: string;
+    respondent_id: string;
     case_manager: string;
     adr_process: string;
     applicable_rules: string;
@@ -53,7 +61,13 @@ export function CaseForm({ initialData }: { initialData?: any }) {
     access: string;
     next_event: string;
     initial_task: string;
-    documents: any[];
+    documents: {
+      id: string;
+      name: string;
+      size: number;
+      type: string;
+      file: File;
+    }[];
   }>({
     full_name: initialData?.full_name || '',
     phone: initialData?.phone || '',
@@ -63,7 +77,9 @@ export function CaseForm({ initialData }: { initialData?: any }) {
     filing_fee: initialData?.filing_fee || '',
     case_number: initialData?.case_number || '',
     claimant: initialData?.claimant || '',
+    claimant_id: initialData?.claimant_id || '',
     respondent: initialData?.respondent || '',
+    respondent_id: initialData?.respondent_id || '',
     case_manager: initialData?.case_manager || '',
     adr_process: initialData?.adr_process || '',
     applicable_rules: initialData?.applicable_rules || '',
@@ -71,7 +87,7 @@ export function CaseForm({ initialData }: { initialData?: any }) {
     claim_amount: initialData?.claim_amount || '',
     hearing_locale: initialData?.hearing_locale || '',
     access: initialData?.access || 'admin_only',
-    next_event: initialData?.next_event || '',
+    next_event: initialData?.next_event || null,
     initial_task: initialData?.initial_task || '',
     documents: initialData?.documents || []
   });
@@ -79,7 +95,19 @@ export function CaseForm({ initialData }: { initialData?: any }) {
   const { createCase, updateCase } = useCasesOperations();
   const router = useRouter();
   const [createLoading, setCreateLoading] = useState(false);
-  // Set default case type ID when case types are loaded
+  const [claimantSearch, setClaimantSearch] = useState('');
+  const [respondentSearch, setRespondentSearch] = useState('');
+  const debouncedClaimantSearch = useDebounce(claimantSearch, 500);
+  const debouncedRespondentSearch = useDebounce(respondentSearch, 500);
+  const [showClaimant, setShowClaimant] = useState(false);
+  const [showRespondent, setShowRespondent] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const { data: claimantContacts, isLoading: claimantLoading } =
+    useContactsBySearch(debouncedClaimantSearch);
+  const { data: respondentContacts, isLoading: respondentLoading } =
+    useContactsBySearch(debouncedRespondentSearch);
+  const createContact = useCreateContact();
+  const [openContactModal, setOpenContactModal] = useState(false);
   useEffect(() => {
     if (caseTypes.length > 0 && !formData.case_type_id && !initialData) {
       setFormData((prev) => ({
@@ -96,6 +124,102 @@ export function CaseForm({ initialData }: { initialData?: any }) {
     [setFormData]
   );
 
+  const handleCreateContact = useCallback(
+    async (formData: any) => {
+      try {
+        await createContact.mutateAsync(formData);
+        toast.success('Contact created successfully');
+        setOpenContactModal(false);
+      } catch (error) {
+        console.error('Error creating contact:', error);
+        toast.error('Error creating contact');
+      }
+    },
+    [createContact]
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent, field: 'claimant' | 'respondent') => {
+      const isClaimant = field === 'claimant';
+      const isOpen = isClaimant ? showClaimant : showRespondent;
+      const contacts = isClaimant ? claimantContacts : respondentContacts;
+      const filteredContacts = contacts?.slice(0, 10) || [];
+
+      if (!isOpen || !filteredContacts.length) return;
+
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setSelectedIndex((prev) =>
+            prev < filteredContacts.length - 1 ? prev + 1 : 0
+          );
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setSelectedIndex((prev) =>
+            prev > 0 ? prev - 1 : filteredContacts.length - 1
+          );
+          break;
+        case 'Enter':
+          e.preventDefault();
+          if (selectedIndex >= 0 && selectedIndex < filteredContacts.length) {
+            const contact = filteredContacts[selectedIndex];
+            handleInputChange(field, contact.full_name);
+            if (isClaimant) {
+              setShowClaimant(false);
+              setClaimantSearch('');
+            } else {
+              setShowRespondent(false);
+              setRespondentSearch('');
+            }
+            setSelectedIndex(-1);
+          }
+          break;
+        case 'Escape':
+          if (isClaimant) {
+            setShowClaimant(false);
+            setClaimantSearch('');
+          } else {
+            setShowRespondent(false);
+            setRespondentSearch('');
+          }
+          setSelectedIndex(-1);
+          break;
+      }
+    },
+    [
+      claimantContacts,
+      respondentContacts,
+      showClaimant,
+      showRespondent,
+      selectedIndex,
+      handleInputChange
+    ]
+  );
+
+  const handleContactSelect = useCallback(
+    (field: 'claimant' | 'respondent', contact: Contact) => {
+      handleInputChange(field, contact.full_name);
+      if (field === 'claimant') {
+        setShowClaimant(false);
+        setClaimantSearch('');
+        setFormData((prev) => ({
+          ...prev,
+          claimant_id: contact.id
+        }));
+      } else {
+        setShowRespondent(false);
+        setRespondentSearch('');
+        setFormData((prev) => ({
+          ...prev,
+          respondent_id: contact.id
+        }));
+      }
+      setSelectedIndex(-1);
+    },
+    [handleInputChange]
+  );
+
   const handleFileUpload = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const files = event.target.files;
@@ -103,7 +227,6 @@ export function CaseForm({ initialData }: { initialData?: any }) {
       //check file size and type
       if (files && files.length > 0) {
         for (const file of Array.from(files)) {
-          console.log(file);
           if (file.size > 10 * 1024 * 1024) {
             toast.error('File size must be less than 10MB');
             return;
@@ -141,7 +264,6 @@ export function CaseForm({ initialData }: { initialData?: any }) {
   const handleSubmit = useCallback(
     async (event: React.FormEvent) => {
       event.preventDefault();
-      console.log('here');
       setCreateLoading(true);
       const case_number =
         dyajs().format('DD-MM') +
@@ -151,17 +273,48 @@ export function CaseForm({ initialData }: { initialData?: any }) {
           .replace(/(\d{4})(\d{4})/, '$1-$2');
 
       try {
+        // Create FormData object to handle file uploads
+        const submitData = new FormData();
+
+        // Add all text fields to FormData
+        submitData.append('full_name', formData.full_name);
+        submitData.append('phone', formData.phone);
+        submitData.append('email', formData.email);
+        submitData.append('case_type_id', formData.case_type_id);
+        submitData.append(
+          'special_instructions',
+          formData.special_instructions
+        );
+        submitData.append('filing_fee', formData.filing_fee);
+        submitData.append('case_number', formData.case_number || case_number);
+        submitData.append('claimant', formData.claimant);
+        submitData.append('claimant_id', formData.claimant_id);
+        submitData.append('respondent', formData.respondent);
+        submitData.append('respondent_id', formData.respondent_id);
+        submitData.append('case_manager', formData.case_manager);
+        submitData.append('adr_process', formData.adr_process);
+        submitData.append('applicable_rules', formData.applicable_rules);
+        submitData.append('track', formData.track);
+        submitData.append('claim_amount', formData.claim_amount);
+        submitData.append('hearing_locale', formData.hearing_locale);
+        submitData.append('access', formData.access);
+        submitData.append('next_event', formData.next_event);
+        submitData.append('initial_task', formData.initial_task);
+
+        // Add files to FormData
+        formData.documents.forEach((doc, index) => {
+          submitData.append(`documents`, doc.file);
+        });
+
         if (initialData) {
           await updateCase.mutateAsync({
             caseId: initialData.id,
-            formData: formData
+            formData: submitData
           });
         } else {
-          await createCase.mutateAsync({
-            ...formData,
-            case_number
-          });
+          await createCase.mutateAsync(submitData);
         }
+
         const type = caseTypes
           .find((type) => type.id === formData.case_type_id)
           ?.display_name.toLowerCase();
@@ -266,22 +419,80 @@ export function CaseForm({ initialData }: { initialData?: any }) {
           </CardHeader>
           <CardContent>
             <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
-              {/* Claimant */}
-              <div className='space-y-2'>
+              <div className='relative space-y-2'>
                 <Label htmlFor='claimant'>
                   Claimant<span className='text-red-500'>*</span>
                 </Label>
                 <Input
                   id='claimant'
                   required
-                  value={formData.claimant}
-                  onChange={(e) =>
-                    handleInputChange('claimant', e.target.value)
+                  value={showClaimant ? claimantSearch : formData.claimant}
+                  onChange={(e) => {
+                    setClaimantSearch(e.target.value);
+                    setSelectedIndex(-1);
+                  }}
+                  onKeyDown={(e) => handleKeyDown(e, 'claimant')}
+                  onFocus={() => {
+                    setShowClaimant(true);
+                    setClaimantSearch(formData.claimant);
+                    setSelectedIndex(-1);
+                  }}
+                  onBlur={() =>
+                    setTimeout(() => {
+                      setShowClaimant(false);
+                      setClaimantSearch('');
+                      setSelectedIndex(-1);
+                    }, 200)
                   }
-                  placeholder='Enter claimant name'
+                  placeholder='Search and select a contact'
+                  autoComplete='off'
                 />
+                {showClaimant && (
+                  <div className='bg-background absolute z-50 -mt-2 w-full rounded-md border shadow-lg'>
+                    {claimantLoading ? (
+                      <div className='text-muted-foreground flex items-center gap-2 px-3 py-3 text-sm'>
+                        <Loader2 className='h-3 w-3 animate-spin' />
+                        Searching contacts...
+                      </div>
+                    ) : claimantContacts && claimantContacts.length > 0 ? (
+                      <div className='max-h-60 overflow-auto py-1'>
+                        <div
+                          className='flex cursor-pointer items-center gap-2 border-b border-gray-200 px-3 py-3 text-sm'
+                          onClick={() => setOpenContactModal(true)}
+                        >
+                          <Plus className='h-4 w-4' />
+                          Add New Contact
+                        </div>
+                        {claimantContacts.map((contact, index) => (
+                          <div
+                            key={contact.id}
+                            className={`cursor-pointer px-3 py-2 text-sm transition-colors ${
+                              index === selectedIndex
+                                ? 'bg-accent text-accent-foreground'
+                                : 'hover:bg-accent/50'
+                            }`}
+                            onClick={() =>
+                              handleContactSelect('claimant', contact)
+                            }
+                          >
+                            <div className='font-medium'>
+                              {contact.full_name}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : claimantSearch.length > 0 ? (
+                      <div className='text-muted-foreground px-3 py-3 text-sm'>
+                        No contacts found for "{claimantSearch}"
+                      </div>
+                    ) : (
+                      <div className='text-muted-foreground px-3 py-3 text-sm'>
+                        Start typing to search contacts
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              {/* Case Number */}
               <div className='space-y-2'>
                 <Label htmlFor='case_number'>Case Number</Label>
                 <Input
@@ -293,20 +504,81 @@ export function CaseForm({ initialData }: { initialData?: any }) {
                   placeholder='Auto-generated if left blank'
                 />
               </div>
-              {/* Respondent */}
-              <div className='space-y-2'>
+              <div className='relative space-y-2'>
                 <Label htmlFor='respondent'>
                   Respondent<span className='text-red-500'>*</span>
                 </Label>
                 <Input
                   id='respondent'
                   required
-                  value={formData.respondent}
-                  onChange={(e) =>
-                    handleInputChange('respondent', e.target.value)
+                  value={
+                    showRespondent ? respondentSearch : formData.respondent
                   }
-                  placeholder='Enter respondent name'
+                  onChange={(e) => {
+                    setRespondentSearch(e.target.value);
+                    setSelectedIndex(-1);
+                  }}
+                  onKeyDown={(e) => handleKeyDown(e, 'respondent')}
+                  onFocus={() => {
+                    setShowRespondent(true);
+                    setRespondentSearch(formData.respondent);
+                    setSelectedIndex(-1);
+                  }}
+                  onBlur={() =>
+                    setTimeout(() => {
+                      setShowRespondent(false);
+                      setRespondentSearch('');
+                      setSelectedIndex(-1);
+                    }, 200)
+                  }
+                  placeholder='Search and select a contact'
+                  autoComplete='off'
                 />
+                {showRespondent && (
+                  <div className='bg-background absolute z-50 -mt-2 w-full rounded-md border shadow-lg'>
+                    <div
+                      className='flex cursor-pointer items-center gap-2 border-b border-gray-200 px-3 py-3 text-sm'
+                      onClick={() => setOpenContactModal(true)}
+                    >
+                      <Plus className='h-4 w-4' />
+                      Add New Contact
+                    </div>
+                    {respondentLoading ? (
+                      <div className='text-muted-foreground flex items-center gap-2 px-3 py-3 text-sm'>
+                        <Loader2 className='h-3 w-3 animate-spin' />
+                        Searching contacts...
+                      </div>
+                    ) : respondentContacts && respondentContacts.length > 0 ? (
+                      <div className='max-h-60 overflow-auto py-1'>
+                        {respondentContacts.map((contact, index) => (
+                          <div
+                            key={contact.id}
+                            className={`cursor-pointer px-3 py-2 text-sm transition-colors ${
+                              index === selectedIndex
+                                ? 'bg-accent text-accent-foreground'
+                                : 'hover:bg-accent/50'
+                            }`}
+                            onClick={() =>
+                              handleContactSelect('respondent', contact)
+                            }
+                          >
+                            <div className='font-medium'>
+                              {contact.full_name}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : respondentSearch.length > 0 ? (
+                      <div className='text-muted-foreground px-3 py-3 text-sm'>
+                        No contacts found for "{respondentSearch}"
+                      </div>
+                    ) : (
+                      <div className='text-muted-foreground px-3 py-3 text-sm'>
+                        Start typing to search contacts
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Case Manager */}
@@ -381,25 +653,6 @@ export function CaseForm({ initialData }: { initialData?: any }) {
                 ) : (
                   <Loader2 className='h-3 w-3 animate-spin' />
                 )}
-              </div>
-
-              {/* Access */}
-              <div className='space-y-2'>
-                <Label htmlFor='access'>
-                  Access<span className='text-red-500'>*</span>
-                </Label>
-                <Select
-                  value={formData.access}
-                  onValueChange={(value) => handleInputChange('access', value)}
-                >
-                  <SelectTrigger className='w-full'>
-                    <SelectValue placeholder='Select access' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='admin_only'>Admin Only</SelectItem>
-                    <SelectItem value='public'>Public</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
 
               {/* Special Instructions */}
@@ -532,7 +785,14 @@ export function CaseForm({ initialData }: { initialData?: any }) {
             </div>
           </CardContent>
         </Card>
-      </form> 
+      </form>
+      <ContactModal
+        open={openContactModal}
+        onOpenChange={setOpenContactModal}
+        onCreate={handleCreateContact}
+        availableTypes={contactTypes || []}
+        selectedContact={null}
+      />
     </>
   );
 }

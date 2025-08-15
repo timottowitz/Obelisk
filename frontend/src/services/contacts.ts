@@ -22,6 +22,15 @@ export default class ContactsAPI {
     return handleApiResponse<{ data: Contact[]; count: number }>(response);
   }
 
+  static async getContactsBySearch(search: string) {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/search?search=${search}`, {
+      method: 'GET',
+      headers
+    });
+    return handleApiResponse<Contact[]>(response);
+  }
+
   static async getContactTypes() {
     const headers = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/types`, {

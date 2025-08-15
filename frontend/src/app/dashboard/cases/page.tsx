@@ -42,7 +42,7 @@ export default function CasesPage() {
   const handleChangeSort = (sort: string) => {
     setQueryParams({
       ...queryParams,
-      sortBy: queryParams.sortBy === sort ? 'claimant' : sort,
+      sortBy: sort,
       order:
         queryParams.sortBy === sort
           ? queryParams.order === 'asc'
@@ -286,6 +286,7 @@ export default function CasesPage() {
           cases={casesData?.cases || []}
           isLoading={casesLoading}
           onChangeSort={handleChangeSort}
+          queryParams={queryParams}
         />
         {/* Table Footer */}
         <div className='text-muted-foreground mt-6 flex items-center justify-between text-sm'>

@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import ContactsAPI from '@/services/contacts';
-import { Contact } from '@/types/contacts';
 
 const QUERY_KEYS = {
   contacts: ['contacts'],
@@ -11,6 +10,13 @@ export function useContacts(page: number, sortBy: string, typeFilter: string, ar
   return useQuery({
     queryKey: [...QUERY_KEYS.contacts, page, sortBy, typeFilter, archived, search],
     queryFn: () => ContactsAPI.getContacts(page, sortBy, typeFilter, archived, search)
+  });
+}
+
+export function useContactsBySearch(search: string) {
+  return useQuery({
+    queryKey: [...QUERY_KEYS.contacts, 'search', search],
+    queryFn: () => ContactsAPI.getContactsBySearch(search)
   });
 }
 
