@@ -46,26 +46,34 @@ export default class CasesAPI {
     return handleApiResponse(response);
   }
 
-  static async createCase(caseData: Case) {
+  static async createCase(caseData: Case | FormData) {
     const headers = await getAuthHeaders();
     const uploadHeaders = createUploadHeaders(headers);
+
+    // Check if caseData is FormData (for file uploads) or regular object
+    const isFormData = caseData instanceof FormData;
+    const body = isFormData ? caseData : JSON.stringify(caseData);
 
     const response = await fetch(`${API_BASE_URL}`, {
       method: 'POST',
       headers: uploadHeaders,
-      body: JSON.stringify(caseData)
+      body: body
     });
     return handleApiResponse(response);
   }
 
-  static async updateCase(caseId: string, caseData: Case) {
+  static async updateCase(caseId: string, caseData: Case | FormData) {
     const headers = await getAuthHeaders();
     const uploadHeaders = createUploadHeaders(headers);
+
+    // Check if caseData is FormData (for file uploads) or regular object
+    const isFormData = caseData instanceof FormData;
+    const body = isFormData ? caseData : JSON.stringify(caseData);
 
     const response = await fetch(`${API_BASE_URL}/${caseId}`, {
       method: 'PUT',
       headers: uploadHeaders,
-      body: JSON.stringify(caseData)
+      body: body
     });
     return handleApiResponse(response);
   }

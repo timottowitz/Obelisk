@@ -9,7 +9,6 @@ import { Hono } from "jsr:@hono/hono";
 import { cors } from "jsr:@hono/hono/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { extractUserAndOrgId } from "../_shared/index.ts";
-import { AzureBlobStorageService } from "../_shared/azure-storage.ts";
 
 const app = new Hono();
 
@@ -53,6 +52,44 @@ app.get("/contacts/types", async (c) => {
   }
 });
 
+//get contact by search for case form
+app.get("/contacts/search", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const { search } = c.req.query();
+  const supabaseClient = await getSupabaseClinet();
+
+  const org = await supabaseClient
+    .schema("private")
+    .from("organizations")
+    .select("*")
+    .eq("clerk_organization_id", orgId)
+    .single();
+
+  const user = await supabaseClient
+    .schema("private")
+    .from("users")
+    .select("*")
+    .eq("clerk_user_id", userId)
+    .single();
+
+  if (!user || !org) {
+    return c.json({ error: "User or organization not found" }, 404);
+  }
+
+  const { data: contacts, error: contactsError } = await supabaseClient
+    .schema(org.data?.schema_name.toLowerCase())
+    .from("contacts")
+    .select("*")
+    .or(`full_name.ilike.%${search}%`);
+
+  if (contactsError) {
+    return c.json({ error: contactsError.message }, 500);
+  }
+
+  return c.json(contacts, 200);
+});
+
 //get all contacts
 app.get("/contacts", async (c) => {
   const userId = c.get("userId");
@@ -83,7 +120,11 @@ app.get("/contacts", async (c) => {
       return c.json({ error: "User or organization not found" }, 404);
     }
 
-    const contacts = await getContacts(supabaseClient, org.data?.schema_name.toLowerCase(), url);
+    const contacts = await getContacts(
+      supabaseClient,
+      org.data?.schema_name.toLowerCase(),
+      url
+    );
     return c.json(contacts, 200);
   } catch (error: any) {
     console.error("getting contacts error", error);
@@ -300,7 +341,7 @@ app.put("/contacts/:contactId/archive", async (c) => {
     const { error: updateError } = await supabaseClient
       .schema("public")
       .from("contacts")
-      .update({ "is_archived": !contact.is_archived })
+      .update({ is_archived: !contact.is_archived })
       .eq("id", contactId);
 
     if (updateError) {
@@ -502,7 +543,7 @@ async function updateContact(
   supabaseClient: any,
   org: any,
   contactId: any,
-  userId: any,
+  userId: any
 ) {
   const avatar = body.get("avatar") as File;
 

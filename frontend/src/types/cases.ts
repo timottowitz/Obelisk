@@ -30,8 +30,30 @@ export interface Case {
   case_types: CaseType;
   special_notes: string;
   filing_fee: string;
-  claimant: string;
-  respondent: string;
+  claimant: {
+    full_name: string;
+    emails: {
+      address: string;
+    }[];
+    phones: {
+      number: string;
+    }[];
+    addresses: {
+      fullAddress: string;
+    }[];
+  };
+  respondent: {
+    full_name: string;
+    emails: {
+      address: string;
+    }[];
+    phones: {
+      number: string;
+    }[];
+    addresses: {
+      fullAddress: string;
+    }[];
+  };
   case_manager: string;
   adr_process: string;
   applicable_rules: string;

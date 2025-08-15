@@ -55,7 +55,7 @@ interface ContactModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreate: (payload: FormData) => void;
-  onUpdate: (contactId: string, payload: FormData) => void;
+  onUpdate?: (contactId: string, payload: FormData) => void;
   availableTypes: ContactType[];
   selectedContact: Contact | null;
 }
@@ -318,7 +318,7 @@ export default function ContactModal({
       )
     );
     if (selectedContact) {
-      onUpdate(selectedContact.id, formData);
+      onUpdate?.(selectedContact.id, formData);
     } else {
       onCreate(formData);
     }
