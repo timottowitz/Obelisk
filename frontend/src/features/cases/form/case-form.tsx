@@ -483,7 +483,7 @@ export function CaseForm({ initialData }: { initialData?: any }) {
                       </div>
                     ) : claimantSearch.length > 0 ? (
                       <div className='text-muted-foreground px-3 py-3 text-sm'>
-                        No contacts found for "{claimantSearch}"
+                        No contacts found for {claimantSearch}
                       </div>
                     ) : (
                       <div className='text-muted-foreground px-3 py-3 text-sm'>
@@ -570,7 +570,7 @@ export function CaseForm({ initialData }: { initialData?: any }) {
                       </div>
                     ) : respondentSearch.length > 0 ? (
                       <div className='text-muted-foreground px-3 py-3 text-sm'>
-                        No contacts found for "{respondentSearch}"
+                        No contacts found for {respondentSearch}
                       </div>
                     ) : (
                       <div className='text-muted-foreground px-3 py-3 text-sm'>
