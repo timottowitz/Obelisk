@@ -7,7 +7,6 @@ import {
   Share2,
   Trash2,
   Play,
-  Pause,
   CheckCircle,
   AlertCircle,
   FileText,
@@ -600,7 +599,7 @@ const FeaturedRecording = ({
                         Copy Transcript
                       </button>
                     </div>
-                    <div className='bg-muted rounded-[var(--radius)] p-6'>
+                    <div className='bg-muted max-h-[400px] overflow-y-auto rounded-[var(--radius)] p-6'>
                       {Array.isArray(recording.transcript_segments) &&
                       recording.transcript_segments.length > 0 ? (
                         <div className='space-y-2'>

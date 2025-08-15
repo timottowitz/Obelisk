@@ -1,32 +1,17 @@
-/**
- * Meeting Data Table
- * Extends existing data table patterns for meeting intelligence
- * Built on top of existing recording table infrastructure
- */
-
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { DataTable } from '@/components/ui/table/data-table';
 import { useDataTable } from '@/hooks/use-data-table';
-import { meetingColumns, MeetingRecording } from './meeting-columns';
-import { MeetingFilters } from './meeting-filters';
+import { meetingColumns } from './meeting-columns';
 import {
   EnhancedCallRecording,
   useCallRecordings
 } from '@/hooks/useCallRecordings';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, Download, Filter } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
+import { Plus, Filter } from 'lucide-react';
 import { ColumnDef } from '@tanstack/react-table';
 import { webScreenRecorder } from '@/services/web-recording';
 import { CallRecordingsAPI } from '@/services/call-recordings-api';
@@ -34,7 +19,7 @@ import {
   RecordingProcessModal,
   RecordingProcessOptions
 } from './RecordingProcessModal';
-import FeaturedRecording from '@/components/featured-recording';
+import FeaturedRecording from '@/features/meetings/components/featured-recording';
 
 interface MeetingDataTableProps {
   meetingType?: 'all' | string; // Made more flexible to support custom meeting types
@@ -44,7 +29,6 @@ export function MeetingDataTable({
   meetingType = 'all'
 }: MeetingDataTableProps) {
   const searchParams = useSearchParams();
-  const router = useRouter();
 
   // Get initial pagination from URL parameters
   const initialPage = parseInt(searchParams.get('page') || '1', 10);
@@ -53,16 +37,10 @@ export function MeetingDataTable({
   // Extend existing call recordings hook to support meeting types
   const {
     recordings: meetings,
-    isLoading,
     error,
     refetch,
     totalCount,
-    pagination,
-    setPagination,
-    sorting,
-    setSorting,
-    filters,
-    setFilters
+    setPagination
   } = useCallRecordings({
     meetingType,
     enhanced: true, // Flag to get enhanced meeting data
@@ -72,7 +50,6 @@ export function MeetingDataTable({
 
   // State for enhanced filters
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedMeetings, setSelectedMeetings] = useState<string[]>([]);
 
   // State for process modal and pending recording
   const [processModalOpen, setProcessModalOpen] = useState(false);
@@ -136,18 +113,6 @@ export function MeetingDataTable({
     });
   }, [searchParams, setPagination]);
 
-  // Handle bulk actions
-  const handleBulkExport = () => {
-    // Implement bulk export functionality
-    console.log('Exporting selected meetings:', selectedMeetings);
-  };
-
-  const handleBulkAnalysis = () => {
-    // Implement bulk re-analysis functionality
-    console.log('Re-analyzing selected meetings:', selectedMeetings);
-  };
-
-  // Add handleStartRecording for new meeting
   const handleStartRecording = async () => {
     try {
       await webScreenRecorder.startRecording({
@@ -190,7 +155,11 @@ export function MeetingDataTable({
           title: opts.title,
           participants: ['Current User'],
           meetingTypeId: opts.meetingTypeId,
-          taskType: opts.taskType as 'all' | 'transcribe' | 'analyze' | undefined
+          taskType: opts.taskType as
+            | 'all'
+            | 'transcribe'
+            | 'analyze'
+            | undefined
         }
       );
       // Process the recording with modal options
@@ -269,28 +238,6 @@ export function MeetingDataTable({
               <Filter className='mr-2 h-4 w-4' />
               Filters
             </Button>
-
-            {/* Bulk Actions */}
-            {selectedMeetings.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant='outline' size='sm'>
-                    Actions ({selectedMeetings.length})
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align='end'>
-                  <DropdownMenuLabel>Bulk Actions</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleBulkExport}>
-                    <Download className='mr-2 h-4 w-4' />
-                    Export Selected
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleBulkAnalysis}>
-                    Re-analyze Selected
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
 
             {/* New Recording Button */}
             <Button onClick={handleStartRecording} size='sm'>
