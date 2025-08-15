@@ -14,8 +14,7 @@ import {
   X,
   Trash2
 } from 'lucide-react';
-import { CallRecording, OrganizationMember } from '@/types/callcaps';
-import { useQuery } from '@tanstack/react-query';
+import { CallRecording } from '@/types/callcaps';
 import { getAuthHeaders } from '@/config/api';
 import { useMembers } from '@/hooks/useMembers';
 import { ShareRecordingDialog } from './share-recording-dialog';
@@ -369,12 +368,15 @@ const RecordingCard = ({
                     variant='ghost'
                     size='icon'
                     className='text-muted-foreground hover:text-foreground hover:bg-muted rounded-[calc(var(--radius)-2px)] p-2'
-                    onClick={e => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
                   >
                     <MoreVertical className='h-4 w-4' />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align='end' onClick={e => e.stopPropagation()}>
+                <DropdownMenuContent
+                  align='end'
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <DropdownMenuItem
                     variant='destructive'
                     disabled={deleting}

@@ -1,18 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import {
-  X,
-  Users,
-  Calendar,
-  AlertCircle,
-  CheckCircle,
-  Building,
-  Link
-} from 'lucide-react';
-import {
-  CallRecording,
-  OrganizationMember,
-  RecordingClip
-} from '@/types/callcaps';
+import React, { useState } from 'react';
+import { X, Users, Calendar, AlertCircle, Building, Link } from 'lucide-react';
+import { CallRecording, RecordingClip } from '@/types/callcaps';
 import { CallRecordingsAPI } from '@/services/call-recordings-api';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
