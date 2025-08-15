@@ -168,8 +168,8 @@ app.get("/tasks/cases/:caseId", async (c) => {
 
       caseDetailedTasks.push({
         ...task,
-        assignee: assignee.email,
-        assigner: assigner.email,
+        assignee: assignee.full_name,
+        assigner: assigner.full_name,
         case_project: caseProject.name,
       });
     }
