@@ -102,11 +102,11 @@ export default function TaskModal({
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
+      e.preventDefault();
       if (!formData.case_project_id) {
         toast.error('Please select a project');
         return;
       }
-      e.preventDefault();
       onSave(formData);
       setFormData({
         name: '',
@@ -352,7 +352,7 @@ export default function TaskModal({
                       {teamMembers?.map((member) => (
                         <SelectItem key={member.userId} value={member.userId}>
                           <div className='flex items-center gap-2'>
-                            <span>{member.email}</span>
+                            <span>{member.fullName}</span>
                             <span className='text-xs text-gray-500'>
                               ({member.role})
                             </span>
