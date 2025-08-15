@@ -507,6 +507,7 @@ async function createContact(
   const emailArray = email ? JSON.parse(email) : [];
   const addressArray = address ? JSON.parse(address) : [];
   const contactTypeIds = JSON.parse(contact_type_ids);
+  const currentTime = new Date().toISOString();
 
   const { data: contact, error: contactError } = await supabaseClient
     .schema(org.data?.schema_name.toLowerCase())
@@ -516,6 +517,7 @@ async function createContact(
       middle_name,
       last_name,
       full_name: fullName,
+      fullname_extended: fullName,
       suffix,
       prefix,
       company,
@@ -525,7 +527,11 @@ async function createContact(
       emails: emailArray,
       addresses: addressArray,
       contact_type_ids: contactTypeIds,
-      tags,
+      tags_v2: tags,
+      group_by_first: first_name[0].toUpperCase(),
+      sort_by_first: `${fullName}_${currentTime}`,
+      group_by_last: last_name[0].toUpperCase(),
+      sort_by_last: `${last_name} ${first_name} ${middle_name}_${currentTime}`,
       picture_url: avatar_storage_url,
     })
     .select();

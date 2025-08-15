@@ -151,7 +151,7 @@ export default function AppSidebar() {
                             style={{ width: '24px', height: '24px' }}
                           />
                         )}
-                        <span>{item.title}</span>
+                        <span className='text-sm'>{item.title}</span>
                         {isOpen ? (
                           <ChevronDown className='ml-auto size-4' />
                         ) : (
