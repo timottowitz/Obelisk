@@ -528,9 +528,9 @@ async function createContact(
       addresses: addressArray,
       contact_type_ids: contactTypeIds,
       tags_v2: tags,
-      group_by_first: first_name[0].toUpperCase(),
+      group_by_first: first_name.split(" ")[0].toUpperCase(),
       sort_by_first: `${fullName}_${currentTime}`,
-      group_by_last: last_name[0].toUpperCase(),
+      group_by_last: last_name.split(" ")[0].toUpperCase(),
       sort_by_last: `${last_name} ${first_name} ${middle_name}_${currentTime}`,
       picture_url: avatar_storage_url,
     })
