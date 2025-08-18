@@ -66,12 +66,16 @@ export function MeetingDataTable({
   }, [meetings]);
 
   // Handler to open detail modal
-  const handleViewDetails = (recording: EnhancedCallRecording) => {
+  const handleViewDetails: (recording: EnhancedCallRecording) => void = (
+    recording
+  ) => {
     setSelectedRecording(recording);
   };
 
   // Handle processing existing recordings
-  const handleProcessRecording = async (recording: EnhancedCallRecording) => {
+  const handleProcessRecording: (
+    recording: EnhancedCallRecording
+  ) => Promise<void> = async recording => {
     try {
       await CallRecordingsAPI.processRecording(recording.id, {
         taskType: 'all'
