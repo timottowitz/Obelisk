@@ -265,12 +265,6 @@ export function CaseForm({ initialData }: { initialData?: any }) {
     async (event: React.FormEvent) => {
       event.preventDefault();
       setCreateLoading(true);
-      const case_number =
-        dyajs().format('DD-MM') +
-        '-' +
-        Math.floor(10000000 + Math.random() * 90000000)
-          .toString()
-          .replace(/(\d{4})(\d{4})/, '$1-$2');
 
       try {
         // Create FormData object to handle file uploads
@@ -286,7 +280,17 @@ export function CaseForm({ initialData }: { initialData?: any }) {
           formData.special_instructions
         );
         submitData.append('filing_fee', formData.filing_fee);
-        submitData.append('case_number', formData.case_number || case_number);
+        if (!formData.case_number) {
+          const case_number =
+            dyajs().format('DD-MM') +
+            '-' +
+            Math.floor(10000000 + Math.random() * 90000000)
+              .toString()
+              .replace(/(\d{4})(\d{4})/, '$1-$2');
+          submitData.append('case_number', case_number);
+        } else {
+          submitData.append('case_number', formData.case_number);
+        }
         submitData.append('claimant', formData.claimant);
         submitData.append('claimant_id', formData.claimant_id);
         submitData.append('respondent', formData.respondent);
