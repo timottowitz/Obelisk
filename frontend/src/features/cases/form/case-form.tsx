@@ -87,7 +87,7 @@ export function CaseForm({ initialData }: { initialData?: any }) {
     claim_amount: initialData?.claim_amount || '',
     hearing_locale: initialData?.hearing_locale || '',
     access: initialData?.access || 'admin_only',
-    next_event: initialData?.next_event || null,
+    next_event: initialData?.next_event || '',
     initial_task: initialData?.initial_task || '',
     documents: initialData?.documents || []
   });
@@ -608,7 +608,6 @@ export function CaseForm({ initialData }: { initialData?: any }) {
                     handleInputChange('next_event', e.target.value)
                   }
                   placeholder='Enter next event date'
-                  required
                 />
               </div>
 

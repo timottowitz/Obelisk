@@ -30,6 +30,7 @@ export interface Case {
   case_types: CaseType;
   special_notes: string;
   filing_fee: string;
+  next_event: string;
   claimant: {
     full_name: string;
     emails: {
