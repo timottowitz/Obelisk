@@ -72,8 +72,16 @@ export const navItems: NavItem[] = [
   },
   {
     title: 'Email',
-    url: '/dashboard/contacts',
+    url: '/dashboard/email',
     icon: 'mail',
+    isActive: false,
+    shortcut: ['e', 'e'],
+    items: []
+  },
+  {
+    title: 'Contacts',
+    url: '/dashboard/contacts',
+    icon: 'user',
     isActive: false,
     shortcut: ['e', 'e'],
     items: []
