@@ -940,6 +940,7 @@ app.get("/cases", async (c) => {
         "case_manager",
         "docs",
         "tasks",
+        "next_event",
       ].includes(orderBy);
 
       // If we need post-processing, don't apply pagination yet
@@ -1041,6 +1042,9 @@ app.get("/cases", async (c) => {
               break;
             case "case_manager":
               compareValue = a.case_manager.localeCompare(b.case_manager);
+              break;
+            case "next_event":
+              compareValue = a.next_event.localeCompare(b.next_event);
               break;
             default:
               compareValue = 0;

@@ -66,7 +66,7 @@ const tableColumns = [
   {
     key: 'next_event',
     label: 'Next Event',
-    sortable: false,
+    sortable: true,
     className: 'w-[8.33%]'
   },
   { key: 'tasks', label: 'Tasks', sortable: true, className: 'w-[8.33%]' },
