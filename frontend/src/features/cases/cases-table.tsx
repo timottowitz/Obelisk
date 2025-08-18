@@ -160,7 +160,9 @@ export function CasesTable({
 
                 <TableCell className='px-6 py-4'>
                   <p className='text-sm text-gray-700'>
-                    {caseItem.respondent.full_name}
+                    {caseItem.respondent.full_name.length > 35
+                      ? caseItem.respondent.full_name.substring(0, 35) + '...'
+                      : caseItem.respondent.full_name}
                   </p>
                 </TableCell>
 
