@@ -1270,7 +1270,7 @@ app.post("/cases", async (c) => {
         respondent_id,
         case_manager,
         initial_task,
-        next_event: next_event,
+        next_event: next_event === '' ? null : next_event,
         special_instructions,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
