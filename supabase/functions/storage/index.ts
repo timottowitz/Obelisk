@@ -585,7 +585,9 @@ app.post("/storage/upload-direct", async (c) => {
       .insert({
         case_id: folderData.case_id,
         event_type: "file_uploaded",
-        description: `${user.data?.email} uploaded file ${file.name || "untitled"}`,
+        description: `${user.data?.email} uploaded file ${
+          file.name || "untitled"
+        }`,
         date: new Date().toISOString().split("T")[0],
         time: new Date().toISOString().split("T")[1].split(".")[0],
       });
@@ -747,7 +749,7 @@ async function handleFileDelete(
   const { error: updateError } = await supabaseClient
     .schema(schema)
     .from("storage_files")
-    .update({ deleted_at: new Date().toISOString() })
+    .delete()
     .eq("id", fileId);
 
   if (updateError) throw updateError;
@@ -818,7 +820,6 @@ async function handleFileList(
     .from("storage_files")
     .select("*")
     .eq("folder_id", folderId)
-    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   if (filesError) throw filesError;
@@ -829,7 +830,6 @@ async function handleFileList(
     .from("storage_folders")
     .select("*")
     .eq("parent_folder_id", folderId)
-    .is("deleted_at", null)
     .order("name");
 
   if (foldersError) throw foldersError;
@@ -856,7 +856,20 @@ async function handleCreateFolder(
   const parentPath = folderId
     ? await getFolderPath(supabaseClient, folderId, schema)
     : "";
-  const newPath = parentPath ? `${parentPath}/${folderName}` : `/${folderName}`;
+  const newPath = parentPath
+    ? `${parentPath.replace(" ", "-").toLowerCase()}/${folderName
+        .replace(" ", "-")
+        .toLowerCase()}`
+    : `/${folderName.replace(" ", "-").toLowerCase()}`;
+
+  const { data: folder, error: folderError } = await supabaseClient
+    .schema(schema)
+    .from("storage_folders")
+    .select("*")
+    .eq("id", folderId)
+    .single();
+
+  if (folderError) throw folderError;
 
   // Create folder record
   const { data: folderRecord, error } = await supabaseClient
@@ -865,6 +878,7 @@ async function handleCreateFolder(
     .insert({
       name: folderName,
       parent_folder_id: folderId,
+      case_id: folder.case_id,
       path: newPath,
       created_by: userId,
     })
@@ -898,27 +912,16 @@ async function handleDeleteFolder(
 ) {
   const { userId, folderId, tenantId, schema } = params;
 
-  const { data: folder, error: folderError } = await supabaseClient
+  const { error: folderError } = await supabaseClient
     .schema(schema)
     .from("storage_folders")
     .select("*")
     .eq("id", folderId)
-    .is("deleted_at", null)
     .single();
 
   if (folderError) throw folderError;
 
-  // Get folder and all subfolders
-  const { data: folders, error: foldersError } = await supabaseClient
-    .schema(schema)
-    .from("storage_folders")
-    .select("*")
-    .or(`name.eq.${folder.name},path.like.${folder.name}%`)
-    .is("deleted_at", null);
-
-  if (foldersError) throw foldersError;
-
-  const folderIds = folders.map((f: any) => f.id);
+  const folderIds = await handleGetFolderIds(supabaseClient, folderId, schema);
 
   // Get all files in these folders
   const { data: files, error: filesError } = await supabaseClient
@@ -926,7 +929,6 @@ async function handleDeleteFolder(
     .from("storage_files")
     .select("*")
     .in("folder_id", folderIds)
-    .is("deleted_at", null);
 
   if (filesError) throw filesError;
 
@@ -934,26 +936,26 @@ async function handleDeleteFolder(
   const { error: deleteFoldersError } = await supabaseClient
     .schema(schema)
     .from("storage_folders")
-    .update({ deleted_at: new Date().toISOString() })
+    .delete()
     .in("id", folderIds);
 
   if (deleteFoldersError) throw deleteFoldersError;
 
-  // Soft delete files
-  const { error: deleteFilesError } = await supabaseClient
-    .schema(schema)
-    .from("storage_files")
-    .update({ deleted_at: new Date().toISOString() })
-    .in(
-      "id",
-      files.map((f: any) => f.id)
-    );
+  if (files.length > 0) {
+    const { error: deleteFilesError } = await supabaseClient
+      .schema(schema)
+      .from("storage_files")
+      .delete()
+      .in(
+        "id",
+        files.map((f: any) => f.id)
+      );
 
-  if (deleteFilesError) throw deleteFilesError;
-
-  // Delete files from GCS
-  for (const file of files) {
-    await gcsService.deleteFile(file.gcs_blob_name);
+    if (deleteFilesError) throw deleteFilesError;
+    // Delete files from GCS
+    for (const file of files) {
+      await gcsService.deleteFile(file.gcs_blob_name);
+    }
   }
 
   // Log activity
@@ -962,13 +964,13 @@ async function handleDeleteFolder(
     action: "delete_folder",
     resourceType: "folder",
     resourceId: folderId,
-    details: { folderCount: folders.length, fileCount: files.length },
+    details: { folderCount: folderIds.length, fileCount: files.length },
     schema,
   });
 
   return {
     success: true,
-    deletedFolders: folders.length,
+    deletedFolders: folderIds.length,
     deletedFiles: files.length,
   };
 }
@@ -1297,7 +1299,6 @@ async function handleGetFolders(
     .select("*")
     .eq("created_by", userId)
     .eq("case_id", caseId)
-    .is("deleted_at", null);
 
   const member = await supabaseClient
     .schema("private")
@@ -1312,7 +1313,6 @@ async function handleGetFolders(
     .from("storage_files")
     .select("*")
     .eq("uploaded_by", member.data?.id)
-    .is("deleted_at", null);
 
   // Build tree structure from flat folder and files data
   const buildFolderTree = (
@@ -1427,6 +1427,37 @@ async function handleGetCaseTypes(
   if (caseTypesError) throw caseTypesError;
 
   return caseTypes;
+}
+
+async function handleGetFolderIds(
+  supabaseClient: any,
+  folderId: string,
+  schema: string
+) {
+  const folderIds: string[] = [];
+
+  const { data: folders, error: foldersError } = await supabaseClient
+    .schema(schema)
+    .from("storage_folders")
+    .select("id")
+    .eq("parent_folder_id", folderId);
+
+  if (foldersError) throw foldersError;
+
+  folderIds.push(folderId);
+
+  if (folders.length > 0) {
+    for (const folder of folders) {
+      const subFolderIds = await handleGetFolderIds(
+        supabaseClient,
+        folder.id,
+        schema
+      );
+      folderIds.push(...subFolderIds);
+    }
+  }
+
+  return folderIds;
 }
 
 export default app;

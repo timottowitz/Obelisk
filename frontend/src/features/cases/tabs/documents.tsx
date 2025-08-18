@@ -258,8 +258,8 @@ export default function Documents({
   }, []);
 
   // Handle create folder
-  const handleCreateFolder = useCallback(async () => {
-    if (!newFolderName.trim()) {
+  const handleCreateFolder = useCallback(async (folderName: string) => {
+    if (!folderName.trim()) {
       toast.error('Please enter a folder name');
       return;
     }
@@ -267,11 +267,11 @@ export default function Documents({
     setIsCreatingFolder(true);
     try {
       await createFolder.mutateAsync({
-        folderName: newFolderName.trim(),
+        folderName: folderName.trim(),
         parentId: selectedParentFolderId
       });
 
-      toast.success(`Folder "${newFolderName}" created successfully`);
+      toast.success(`Folder "${folderName}" created successfully`);
 
       // Expand the parent folder if a parent was selected
       if (selectedParentFolderId !== 'root') {
@@ -332,7 +332,6 @@ export default function Documents({
 
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [isLoadingDownloadUrl, setIsLoadingDownloadUrl] = useState(false);
-  console.log(downloadUrl);
 
   const handleGetDownloadUrl = useCallback(
     async (document: SolarDocumentItem) => {
@@ -511,7 +510,7 @@ export default function Documents({
                     )}
                   </span>
                   {/* Folder delete button */}
-                  {folder.parentId && (
+                  {folder.parent_folder_id && (
                     <span
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1079,7 +1078,6 @@ export default function Documents({
         isOpen={isCreateFolderDialogOpen}
         onClose={() => setIsCreateFolderDialogOpen(false)}
         folderName={newFolderName}
-        onFolderNameChange={setNewFolderName}
         onCreateFolder={handleCreateFolder}
         isLoading={isCreatingFolder}
       />
