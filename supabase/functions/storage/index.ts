@@ -619,19 +619,6 @@ async function handleFileUpload(
   const { userId, folderId, fileName, fileData, mimeType, tenantId, schema } =
     params;
 
-  // Check if user has permission to upload to this folder
-  if (folderId) {
-    const hasPermission = await checkFolderPermission(
-      supabaseClient,
-      userId,
-      folderId,
-      "edit"
-    );
-    if (!hasPermission) {
-      throw new Error("Insufficient permissions to upload to this folder");
-    }
-  }
-
   // Calculate checksum
   const checksum = await calculateChecksum(fileData);
 
@@ -708,17 +695,6 @@ async function handleFileDownload(
     throw new Error("File not found");
   }
 
-  // Check permissions
-  // const hasPermission = await checkFilePermission(
-  //   supabaseClient,
-  //   userId,
-  //   fileId,
-  //   "view"
-  // );
-  // if (!hasPermission) {
-  //   throw new Error("Insufficient permissions to download this file");
-  // }
-
   // Download from GCS
   const fileData = await gcsService.downloadFile(fileRecord.gcs_blob_name);
   // Generate signed URL for direct access
@@ -766,17 +742,6 @@ async function handleFileDelete(
   if (error || !fileRecord) {
     throw new Error("File not found");
   }
-
-  // Check permissions
-  // const hasPermission = await checkFilePermission(
-  //   supabaseClient,
-  //   userId,
-  //   fileId,
-  //   "admin"
-  // );
-  // if (!hasPermission) {
-  //   throw new Error("Insufficient permissions to delete this file");
-  // }
 
   // Soft delete in database
   const { error: updateError } = await supabaseClient
@@ -847,19 +812,6 @@ async function handleFileList(
 ) {
   const { userId, folderId, tenantId, schema } = params;
 
-  // Check folder permissions
-  if (folderId) {
-    const hasPermission = await checkFolderPermission(
-      supabaseClient,
-      userId,
-      folderId,
-      "view"
-    );
-    if (!hasPermission) {
-      throw new Error("Insufficient permissions to access this folder");
-    }
-  }
-
   // Get files in folder
   const { data: files, error: filesError } = await supabaseClient
     .schema(schema)
@@ -898,22 +850,7 @@ async function handleCreateFolder(
     schema: string;
   }
 ) {
-  const { userId, folderId, folderName, tenantId, schema } = params;
-
-  // Check parent folder permissions
-  // if (folderId) {
-  //   const hasPermission = await checkFolderPermission(
-  //     supabaseClient,
-  //     userId,
-  //     folderId,
-  //     "edit"
-  //   );
-  //   if (!hasPermission) {
-  //     throw new Error(
-  //       "Insufficient permissions to create folder in this location"
-  //     );
-  //   }
-  // }
+  const { userId, folderId, folderName, schema } = params;
 
   // Get parent folder path
   const parentPath = folderId
@@ -960,17 +897,6 @@ async function handleDeleteFolder(
   }
 ) {
   const { userId, folderId, tenantId, schema } = params;
-
-  // Check permissions
-  // const hasPermission = await checkFolderPermission(
-  //   supabaseClient,
-  //   userId,
-  //   folderId,
-  //   "admin"
-  // );
-  // if (!hasPermission) {
-  //   throw new Error("Insufficient permissions to delete this folder");
-  // }
 
   const { data: folder, error: folderError } = await supabaseClient
     .schema(schema)
@@ -1061,18 +987,6 @@ async function handleShareResource(
   const { userId, resourceId, resourceType, shareWith, permission, tenantId } =
     params;
 
-  // Check if user has permission to share this resource
-  const hasPermission = await checkResourcePermission(
-    supabaseClient,
-    userId,
-    resourceId,
-    resourceType,
-    "admin"
-  );
-  if (!hasPermission) {
-    throw new Error("Insufficient permissions to share this resource");
-  }
-
   // Get user to share with
   const { data: targetUser, error: userError } = await supabaseClient
     .from("users")
@@ -1124,18 +1038,6 @@ async function handleUnshareResource(
   }
 ) {
   const { userId, resourceId, resourceType, shareWith, tenantId } = params;
-
-  // Check if user has permission to unshare this resource
-  const hasPermission = await checkResourcePermission(
-    supabaseClient,
-    userId,
-    resourceId,
-    resourceType,
-    "admin"
-  );
-  if (!hasPermission) {
-    throw new Error("Insufficient permissions to unshare this resource");
-  }
 
   // Get user to unshare from
   const { data: targetUser, error: userError } = await supabaseClient
@@ -1194,17 +1096,6 @@ async function handleGetMetadata(
     throw new Error("File not found");
   }
 
-  // Check permissions
-  const hasPermission = await checkFilePermission(
-    supabaseClient,
-    userId,
-    fileId,
-    "view"
-  );
-  if (!hasPermission) {
-    throw new Error("Insufficient permissions to access this file");
-  }
-
   return fileRecord;
 }
 
@@ -1233,7 +1124,6 @@ async function checkFolderPermission(
   folderId: string,
   permission: string
 ): Promise<boolean> {
-  console.log("checkFolderPermission", userId, folderId, permission);
   const { data, error } = await supabaseClient.rpc("check_storage_permission", {
     user_uuid: userId,
     resource_type: "folder",
@@ -1334,19 +1224,6 @@ async function handleDirectFileUpload(
     uploadedBy,
     schema,
   } = params;
-
-  // Check if user has permission to upload to this folder
-  // if (folderId) {
-  //   const hasPermission = await checkFolderPermission(
-  //     supabaseClient,
-  //     userId,
-  //     folderId,
-  //     "edit"
-  //   );
-  //   if (!hasPermission) {
-  //     throw new Error("Insufficient permissions to upload to this folder");
-  //   }
-  // }
 
   // Calculate checksum
   const checksum = await calculateChecksum(fileData);

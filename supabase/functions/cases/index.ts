@@ -1014,44 +1014,52 @@ app.get("/cases", async (c) => {
 
       // Apply sorting for special fields after fetching all data
       if (needsPostProcessing) {
-        detailedCases.sort((a, b) => {
-          let compareValue = 0;
+        try {
+          detailedCases.sort((a, b) => {
+            let compareValue = 0;
 
-          switch (orderBy) {
-            case "docs":
-              compareValue = a.documents_count - b.documents_count;
-              break;
-            case "tasks":
-              compareValue = a.case_tasks_count - b.case_tasks_count;
-              break;
-            case "status":
-              compareValue = a.status.localeCompare(b.status);
-              break;
-            case "case_number":
-              compareValue = a.case_number.localeCompare(b.case_number);
-              break;
-            case "claimant":
-              compareValue = a.claimant.sort_by_first.localeCompare(
-                b.claimant.sort_by_first
-              );
-              break;
-            case "respondent":
-              compareValue = a.respondent.sort_by_first.localeCompare(
-                b.respondent.sort_by_first
-              );
-              break;
-            case "case_manager":
-              compareValue = a.case_manager.localeCompare(b.case_manager);
-              break;
-            case "next_event":
-              compareValue = a.next_event.localeCompare(b.next_event);
-              break;
-            default:
-              compareValue = 0;
-          }
+            switch (orderBy) {
+              case "docs":
+                compareValue = a.documents_count - b.documents_count;
+                break;
+              case "tasks":
+                compareValue = a.case_tasks_count - b.case_tasks_count;
+                break;
+              case "status":
+                compareValue = a.status.localeCompare(b.status);
+                break;
+              case "case_number":
+                compareValue = a.case_number.localeCompare(b.case_number);
+                break;
+              case "claimant":
+                compareValue = a.claimant.sort_by_first.localeCompare(
+                  b.claimant.sort_by_first
+                );
+                break;
+              case "respondent":
+                compareValue = a.respondent.sort_by_first.localeCompare(
+                  b.respondent.sort_by_first
+                );
+                break;
+              case "case_manager":
+                compareValue = a.case_manager.localeCompare(b.case_manager);
+                break;
+              case "next_event": {
+                const aNextEvent = a.next_event === null ? "" : a.next_event;
+                const bNextEvent = b.next_event === null ? "" : b.next_event;
+                compareValue = aNextEvent.localeCompare(bNextEvent);
+                break;
+              }
+              default:
+                compareValue = 0;
+            }
 
-          return orderDirection === "asc" ? compareValue : -compareValue;
-        });
+            return orderDirection === "asc" ? compareValue : -compareValue;
+          });
+        } catch (error) {
+          console.error("Failed to sort cases:", error);
+          return c.json({ error: "Failed to sort cases", details: error }, 500);
+        }
 
         // Apply pagination after sorting
         const paginatedCases = detailedCases.slice(offset, offset + limit);
@@ -1274,7 +1282,7 @@ app.post("/cases", async (c) => {
         respondent_id,
         case_manager,
         initial_task,
-        next_event: next_event === '' ? null : next_event,
+        next_event: next_event === "" ? null : next_event,
         special_instructions,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
