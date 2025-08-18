@@ -1,17 +1,17 @@
- 'use client';
+'use client';
 
 import * as React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, PlusCircle } from 'lucide-react';
+import { useCallback, useState } from 'react';
 
 interface CreateFolderModalProps {
   isOpen: boolean;
   onClose: () => void;
   folderName: string;
-  onFolderNameChange: (name: string) => void;
-  onCreateFolder: () => void;
+  onCreateFolder: (name: string) => void;
   isLoading: boolean;
 }
 
@@ -19,10 +19,16 @@ export function CreateFolderModal({
   isOpen,
   onClose,
   folderName,
-  onFolderNameChange,
   onCreateFolder,
   isLoading
 }: CreateFolderModalProps) {
+  const [newFolderName, setNewFolderName] = useState(folderName);
+
+  const handleCreateFolder = useCallback(() => {
+    onCreateFolder(newFolderName);
+    setNewFolderName('');
+  }, [newFolderName, onCreateFolder]);
+
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose}>
       <Dialog.Portal>
@@ -44,8 +50,8 @@ export function CreateFolderModal({
               </label>
               <Input
                 id='folder-name'
-                value={folderName}
-                onChange={(e) => onFolderNameChange(e.target.value)}
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
                 placeholder='Enter folder name...'
                 className='w-full'
               />
@@ -57,15 +63,15 @@ export function CreateFolderModal({
               <Button
                 variant='outline'
                 onClick={() => {
-                  onFolderNameChange('');
+                  setNewFolderName('');
                 }}
               >
                 Cancel
               </Button>
             </Dialog.Close>
             <Button
-              onClick={onCreateFolder}
-              disabled={!folderName.trim() || isLoading}
+              onClick={handleCreateFolder}
+              disabled={!newFolderName.trim() || isLoading}
               className='flex items-center gap-2'
             >
               {isLoading ? (
