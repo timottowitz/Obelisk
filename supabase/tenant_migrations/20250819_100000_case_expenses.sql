@@ -1,5 +1,5 @@
---CREATE CASE INVOICES TABLE
-CREATE TABLE IF NOT EXISTS {{schema_name}}.case_invoices (
+--CREATE CASE EXPENSES TABLE
+CREATE TABLE IF NOT EXISTS {{schema_name}}.case_expenses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     case_id UUID NOT NULL REFERENCES {{schema_name}}.cases(id),
     expense_type_id UUID NOT NULL REFERENCES public.expense_types(id),
@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS {{schema_name}}.case_invoices (
     description TEXT,
     notes TEXT,
     memo TEXT,
-    create_checking_quickbooks BOOLEAN NOT NULL DEFAULT FALSE,
-    create_billing_item BOOLEAN NOT NULL DEFAULT FALSE,
+    create_checking_quickbooks BOOLEAN DEFAULT false,
+    create_billing_item BOOLEAN DEFAULT NULL,
     status VARCHAR(255) NOT NULL DEFAULT 'unknown' CHECK (status IN ('unknown', 'created', 'deleted', 'paid', 'printed', 'void')),
     last_updated_from_quickbooks TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

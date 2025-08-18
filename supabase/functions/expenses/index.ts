@@ -253,7 +253,7 @@ app.post("/expenses/cases/:caseId", async (c) => {
 
     const { data: expense, error: expenseError } = await supabase
       .schema(schema)
-      .from("case_invoices")
+      .from("case_expenses")
       .insert({
         case_id: caseId,
         expense_type_id: expense_type_id,
