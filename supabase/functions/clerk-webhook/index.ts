@@ -276,16 +276,46 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ data }), { status: 200 });
     }
     case "organizationMembership.updated": {
+      console.log("organizationMembership.updated :", event.data);
+      const { data: organization, error: organizationError } = await supabase
+        .schema("private")
+        .from("organizations")
+        .select()
+        .eq("clerk_organization_id", event.data.organization?.id)
+        .single();
+      if (organizationError) {
+        console.error("Error getting organization:", organizationError);
+        return new Response(
+          JSON.stringify({ error: organizationError.message }),
+          {
+            status: 500,
+          },
+        );
+      }
+      console.log("organization :", organization);
+
+
+      const { data: user, error: userError } = await supabase.schema("private")
+        .from("users")
+        .select()
+        .eq("clerk_user_id", event.data.public_user_data?.user_id)
+        .single();
+      if (userError) {
+        console.error("Error getting user:", userError);
+        return new Response(JSON.stringify({ error: userError.message }), {
+          status: 500,
+        });
+      }
+      console.log("user :", user);
+
       const { data, error } = await supabase.schema("private")
         .from("organization_members")
         .update({
-          user_id: event.data.public_user_data?.user_id,
-          organization_id: event.data.organization?.id,
-          role: event.data.role,
+          role: event.data.role === "org:admin" ? "owner" : "client",
           status: "active",
-          joined_at: new Date(event.data.created_at).toISOString(),
         })
-        .eq("id", event.data.id)
+        .eq("user_id", user.id)
+        .eq("organization_id", organization.id)
         .select()
         .single();
       if (error) {
@@ -295,6 +325,52 @@ Deno.serve(async (req) => {
         });
       }
       return new Response(JSON.stringify({ data }), { status: 200 });
+    }
+    case "organizationMembership.deleted": {
+      console.log("organizationMembership.deleted :", event.data);
+      const { data: organization, error: organizationError } = await supabase
+        .schema("private")
+        .from("organizations")
+        .select()
+        .eq("clerk_organization_id", event.data.organization?.id)
+        .single();
+      if (organizationError) {
+        console.error("Error getting organization:", organizationError);
+        return new Response(
+          JSON.stringify({ error: organizationError.message }),
+          {
+            status: 500,
+          },
+        );
+      }
+      console.log("organization :", organization);
+
+      const { data: user, error: userError } = await supabase.schema("private")
+        .from("users")
+        .select()
+        .eq("clerk_user_id", event.data.public_user_data?.user_id)
+        .single();
+      if (userError) {
+        console.error("Error getting user:", userError);
+        return new Response(JSON.stringify({ error: userError.message }), {
+          status: 500,
+        });
+      }
+      console.log("user :", user);
+
+      const { error } = await supabase.schema("private")
+        .from("organization_members")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("organization_id", organization.id)
+      if (error) {
+        console.error("Error deleting organization member:", error);
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 500,
+        });
+      }
+      console.log("organization member deleted");
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
     }
     default: {
       console.log("Unhandled event type:", JSON.stringify(event, null, 2));
