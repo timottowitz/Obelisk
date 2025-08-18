@@ -134,8 +134,8 @@ export function CasesTable({
                     href={`/dashboard/cases/${caseItem.id}`}
                     className='text-sm font-medium text-blue-600 underline hover:text-blue-800'
                   >
-                    {caseItem.claimant.full_name.length > 35
-                      ? caseItem.claimant.full_name.substring(0, 35) + '...'
+                    {caseItem.claimant.full_name.length > 23
+                      ? caseItem.claimant.full_name.substring(0, 23) + '...'
                       : caseItem.claimant.full_name}
                   </Link>
                 </TableCell>
@@ -160,8 +160,8 @@ export function CasesTable({
 
                 <TableCell className='px-6 py-4'>
                   <p className='text-sm text-gray-700'>
-                    {caseItem.respondent.full_name.length > 35
-                      ? caseItem.respondent.full_name.substring(0, 35) + '...'
+                    {caseItem.respondent.full_name.length > 23
+                      ? caseItem.respondent.full_name.substring(0, 23) + '...'
                       : caseItem.respondent.full_name}
                   </p>
                 </TableCell>
