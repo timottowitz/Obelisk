@@ -21,11 +21,13 @@ import {
   ChevronDown,
   ExternalLink
 } from 'lucide-react';
+import InvoiceModal from './components/invoice-modal';
 
-export default function Finances() {
+export default function Finances({ caseId }: { caseId: string }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [activeTab, setActiveTab] = useState('statements');
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
 
   return (
     <div className='space-y-6'>
@@ -81,6 +83,14 @@ export default function Finances() {
           />
         </div>
       </div>
+
+      <Button
+        variant='outline'
+        size='sm'
+        onClick={() => setIsInvoiceModalOpen(true)}
+      >
+        Add Item
+      </Button>
 
       {/* Action Links */}
       <div className='flex items-center space-x-6'>
@@ -152,6 +162,14 @@ export default function Finances() {
           Pay Online
         </Button>
       </div>
+      <InvoiceModal
+        isOpen={isInvoiceModalOpen}
+        onClose={() => setIsInvoiceModalOpen(false)}
+        caseId={caseId}
+        onCreate={(payload) => {
+          console.log('payload', payload);
+        }}
+      />
     </div>
   );
 }

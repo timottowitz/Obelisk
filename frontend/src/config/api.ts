@@ -37,6 +37,10 @@ export const API_CONFIG = {
     ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/recording-clips`
     : 'https://rnmjwdxqtsvsbelcftzg.supabase.co/functions/v1/recording-clips',
 
+  EXPENSES_BASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL
+    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/expenses`
+    : 'https://rnmjwdxqtsvsbelcftzg.supabase.co/functions/v1/expenses',
+
   // Default pagination settings
   DEFAULT_LIMIT: 50,
   DEFAULT_ORDER_BY: 'start_time',

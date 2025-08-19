@@ -228,7 +228,7 @@ export default function CaseDetailClient({ caseId }: CaseDetailClientProps) {
                 </TabsContent>
 
                 <TabsContent value='finances' className='space-y-6'>
-                  <Finances />
+                  <Finances caseId={caseId} />
                 </TabsContent>
 
                 <TabsContent value='view-offer-history' className='space-y-6'>
