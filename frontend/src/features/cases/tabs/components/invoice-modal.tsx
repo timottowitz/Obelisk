@@ -26,7 +26,7 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Loader2, Trash, Upload, UserPlus2 } from 'lucide-react';
+import { Loader2, Plus, Trash, Upload, UserPlus2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/use-debounce';
 import ContactModal from '@/features/contacts/components/contact-modal';
 import { toast } from 'sonner';
@@ -41,6 +41,7 @@ interface InvoiceModalProps {
 
 // Combined form state for performance and simpler updates
 type FormState = {
+  expenseType: string;
   expenseTypeId: string;
   amount: string;
   payeeId: string;
@@ -54,8 +55,13 @@ type FormState = {
   createInQuickBooks: '' | 'yes' | 'no';
   createBillingItem: 'yes' | 'no' | 'unknown';
   attachment: File | null;
-  lastUpdatedFromQuickBooks: string;
   attachmentId: string;
+  lastUpdatedFromQuickBooks: string;
+  copyOfCheck: File | null;
+  copyOfCheckId: string;
+  notifyAdminOfCheckPayment: '';
+  billNo: string;
+  dueDate: string;
 };
 
 export default function InvoiceModal({
@@ -81,6 +87,7 @@ export default function InvoiceModal({
     useContactsBySearch(debouncedSearchTerm);
   const [isOpenContactModal, setIsOpenContactModal] = useState(false);
   const [form, setForm] = useState<FormState>({
+    expenseType: '',
     expenseTypeId: '',
     amount: '',
     payeeId: '',
@@ -95,21 +102,40 @@ export default function InvoiceModal({
     createBillingItem: 'unknown',
     attachment: null,
     attachmentId: '',
-    lastUpdatedFromQuickBooks: ''
+    copyOfCheck: null,
+    copyOfCheckId: '',
+    notifyAdminOfCheckPayment: '',
+    lastUpdatedFromQuickBooks: '',
+    dueDate: '',
+    billNo: ''
   });
 
   useEffect(() => {
     if (expenseTypes) {
-      setForm((p) => ({ ...p, expenseTypeId: expenseTypes[0].id }));
+      setForm((p) => ({
+        ...p,
+        expenseTypeId: expenseTypes[0].id,
+        expenseType: expenseTypes[0].name
+      }));
     }
   }, [expenseTypes]);
+
+  useEffect(() => {
+    if (expenseTypes && form.expenseTypeId) {
+      setForm((p) => ({
+        ...p,
+        expenseType:
+          expenseTypes.find((type) => type.id === p.expenseTypeId)?.name || ''
+      }));
+    }
+  }, [form.expenseTypeId]);
 
   const canSubmit = useMemo(() => {
     return (
       form.expenseTypeId !== '' &&
       form.amount.trim() !== '' &&
       form.createInQuickBooks !== '' &&
-      form.payeeId !== ''
+      (form.expenseType !== 'Soft Costs' ? form.payeeId !== '' : true)
     );
   }, [form.expenseTypeId, form.amount, form.createInQuickBooks, form.payeeId]);
 
@@ -149,11 +175,21 @@ export default function InvoiceModal({
       formData.append('notes', form.notes);
       formData.append('create_checking_quickbooks', form.createInQuickBooks);
       formData.append('create_billing_item', form.createBillingItem);
+      if (form.expenseType === 'Bill') {
+        formData.append('bill_no', form.billNo);
+        formData.append('due_date', form.dueDate);
+      }
       if (form.attachment) {
         formData.append('attachment', form.attachment);
       }
       if (form.attachmentId) {
         formData.append('attachment_id', form.attachmentId);
+      }
+      if (form.copyOfCheck) {
+        formData.append('copy_of_check', form.copyOfCheck);
+      }
+      if (form.copyOfCheckId) {
+        formData.append('copy_of_check_id', form.copyOfCheckId);
       }
       formData.append(
         'last_updated_from_quickbooks',
@@ -331,81 +367,83 @@ export default function InvoiceModal({
                 </div>
 
                 {/* Entity Being Paid */}
-                <div className='space-y-2'>
-                  <Label>
-                    Entity Being Paid <span className='text-red-500'>*</span>
-                  </Label>
-                  <div className='flex gap-2'>
-                    <div className='relative flex-1'>
-                      <Input
-                        placeholder='Search for a Contact'
-                        value={showingContacts ? searchTerm : form.payeeName}
-                        onFocus={() => setShowingContacts(true)}
-                        onBlur={() => {
-                          setTimeout(() => setShowingContacts(false), 150);
-                        }}
-                        className='w-full'
-                        onChange={(e) => {
-                          setSearchTerm(e.target.value);
-                          setShowingContacts(true);
-                        }}
-                      />
-                      {showingContacts && (
-                        <div className='bg-background absolute right-0 left-0 z-50 mt-1 rounded-md border shadow-lg'>
-                          {isTyping || isLoadingContacts ? (
-                            <div className='text-muted-foreground flex items-center gap-2 px-3 py-3 text-sm'>
-                              <Loader2 className='h-3 w-3 animate-spin' />
-                              Searching contacts...
-                            </div>
-                          ) : contacts && contacts.length > 0 ? (
-                            <div className='max-h-60 overflow-auto py-1'>
-                              {contacts.map((contact) => (
-                                <div
-                                  key={contact.id}
-                                  className={`cursor-pointer px-3 py-2 text-sm transition-colors ${
-                                    form.payeeId === contact.id
-                                      ? 'bg-accent text-accent-foreground'
-                                      : 'hover:bg-accent/50'
-                                  }`}
-                                  onClick={() => {
-                                    setForm((p) => ({
-                                      ...p,
-                                      payeeId: contact.id,
-                                      payeeName: contact.full_name
-                                    }));
-                                    setSearchTerm('');
-                                    setShowingContacts(false);
-                                  }}
-                                >
-                                  <div className='font-medium'>
-                                    {contact.full_name}
+                {form.expenseType !== 'Soft Costs' && (
+                  <div className='space-y-2'>
+                    <Label>
+                      Entity Being Paid <span className='text-red-500'>*</span>
+                    </Label>
+                    <div className='flex gap-2'>
+                      <div className='relative flex-1'>
+                        <Input
+                          placeholder='Search for a Contact'
+                          value={showingContacts ? searchTerm : form.payeeName}
+                          onFocus={() => setShowingContacts(true)}
+                          onBlur={() => {
+                            setTimeout(() => setShowingContacts(false), 150);
+                          }}
+                          className='w-full'
+                          onChange={(e) => {
+                            setSearchTerm(e.target.value);
+                            setShowingContacts(true);
+                          }}
+                        />
+                        {showingContacts && (
+                          <div className='bg-background absolute right-0 left-0 z-50 mt-1 rounded-md border shadow-lg'>
+                            {isTyping || isLoadingContacts ? (
+                              <div className='text-muted-foreground flex items-center gap-2 px-3 py-3 text-sm'>
+                                <Loader2 className='h-3 w-3 animate-spin' />
+                                Searching contacts...
+                              </div>
+                            ) : contacts && contacts.length > 0 ? (
+                              <div className='max-h-60 overflow-auto py-1'>
+                                {contacts.map((contact) => (
+                                  <div
+                                    key={contact.id}
+                                    className={`cursor-pointer px-3 py-2 text-sm transition-colors ${
+                                      form.payeeId === contact.id
+                                        ? 'bg-accent text-accent-foreground'
+                                        : 'hover:bg-accent/50'
+                                    }`}
+                                    onClick={() => {
+                                      setForm((p) => ({
+                                        ...p,
+                                        payeeId: contact.id,
+                                        payeeName: contact.full_name
+                                      }));
+                                      setSearchTerm('');
+                                      setShowingContacts(false);
+                                    }}
+                                  >
+                                    <div className='font-medium'>
+                                      {contact.full_name}
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : searchTerm.length > 0 ? (
-                            <div className='text-muted-foreground px-3 py-3 text-sm'>
-                              No contacts found for {searchTerm}
-                            </div>
-                          ) : (
-                            <div className='text-muted-foreground px-3 py-3 text-sm'>
-                              Start typing to search contacts
-                            </div>
-                          )}
-                        </div>
-                      )}
+                                ))}
+                              </div>
+                            ) : searchTerm.length > 0 ? (
+                              <div className='text-muted-foreground px-3 py-3 text-sm'>
+                                No contacts found for {searchTerm}
+                              </div>
+                            ) : (
+                              <div className='text-muted-foreground px-3 py-3 text-sm'>
+                                Start typing to search contacts
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        type='button'
+                        variant='outline'
+                        className='shrink-0'
+                        onClick={() => setIsOpenContactModal(true)}
+                      >
+                        <UserPlus2 className='mr-1' />
+                        Add
+                      </Button>
                     </div>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      className='shrink-0'
-                      onClick={() => setIsOpenContactModal(true)}
-                    >
-                      <UserPlus2 className='mr-1' />
-                      Add
-                    </Button>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Second Row */}
@@ -488,7 +526,7 @@ export default function InvoiceModal({
                   )}
                   {form.attachment && (
                     <div className='flex items-center gap-3'>
-                      <div className='text-green-500 text-sm'>
+                      <div className='text-sm text-green-500'>
                         {form.attachment.name}
                       </div>
                       <Button
@@ -521,10 +559,35 @@ export default function InvoiceModal({
                   />
                 </div>
 
-                {/* Expense Description */}
+                {form.expenseType === 'Bill' && (
+                  <>
+                    <div className='space-y-2'>
+                      <Label>Due Date</Label>
+                      <Input
+                        type='date'
+                        placeholder='mm/dd/yyyy'
+                        value={form.dueDate}
+                        onChange={(e) =>
+                          setForm((p) => ({ ...p, dueDate: e.target.value }))
+                        }
+                      />
+                    </div>
+
+                    <div className='space-y-2'>
+                      <Label>Bill No</Label>
+                      <Input
+                        type='text'
+                        placeholder='Bill No'
+                        value={form.billNo}
+                        onChange={(e) =>
+                          setForm((p) => ({ ...p, billNo: e.target.value }))
+                        }
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
-              {/* Memo */}
               <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
                 <div className='col-span-1 space-y-2'>
                   <Label>Expense Description</Label>
@@ -650,6 +713,79 @@ export default function InvoiceModal({
                   }
                 />
               </div>
+
+              {form.expenseType === 'Check' && (
+                <div className='flex items-center justify-start gap-2 border-t pt-4'>
+                  <div className='space-y-2'>
+                    <Label>Add Docs</Label>
+                    {!form.copyOfCheck && (
+                      <div className='flex items-center gap-3'>
+                        <Select
+                          value={form.copyOfCheckId}
+                          onValueChange={(v) =>
+                            setForm((p) => ({ ...p, copyOfCheckId: v }))
+                          }
+                        >
+                          <SelectTrigger className='w-[300px]'>
+                            <SelectValue placeholder='Select a Document' />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {initialDocuments &&
+                              initialDocuments.length > 0 &&
+                              initialDocuments.map((document) => (
+                                <SelectItem
+                                  key={document.id}
+                                  value={document.id}
+                                >
+                                  {document.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <span className='text-muted-foreground text-sm'>
+                          or
+                        </span>
+                        <Button
+                          type='button'
+                          variant='outline'
+                          className='h-9 w-9 p-0'
+                          onClick={handleFileClick}
+                        >
+                          <Upload />
+                        </Button>
+                        <input
+                          ref={fileInputRef}
+                          type='file'
+                          className='hidden'
+                          onChange={(e) =>
+                            setForm((p) => ({
+                              ...p,
+                              copyOfCheck: e.target.files?.[0] || null
+                            }))
+                          }
+                        />
+                      </div>
+                    )}
+                    {form.copyOfCheck && (
+                      <div className='flex items-center gap-3'>
+                        <div className='text-sm text-green-500'>
+                          {form.copyOfCheck.name}
+                        </div>
+                        <Button
+                          type='button'
+                          variant='outline'
+                          className='h-9 w-9 p-0 text-red-500'
+                          onClick={() =>
+                            setForm((p) => ({ ...p, copyOfCheck: null }))
+                          }
+                        >
+                          <Trash />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Footer Buttons (mirrors header for convenience on long forms) */}
               <div className='flex items-center justify-end gap-2 border-t pt-4'>

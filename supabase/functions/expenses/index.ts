@@ -203,6 +203,7 @@ app.post("/expenses/cases/:caseId", async (c) => {
   const caseId = c.req.param("caseId");
   const body = await c.req.formData();
   const attachment = body.get("attachment") as File;
+  const copyOfCheck = body.get("copy_of_check") as File;
   const {
     expense_type_id,
     amount,
@@ -212,6 +213,9 @@ app.post("/expenses/cases/:caseId", async (c) => {
     invoice_date,
     attachment_id,
     due_date,
+    bill_no,
+    copy_of_check_id,
+    notify_admin_of_check_payment,
     description,
     memo,
     notes,
@@ -237,18 +241,7 @@ app.post("/expenses/cases/:caseId", async (c) => {
       return c.json({ error: caseError.message }, 500);
     }
 
-    const { error: payeeError } = await supabase
-      .schema(schema)
-      .from("contacts")
-      .select("*")
-      .eq("id", payee_id)
-      .single();
-
-    if (payeeError) {
-      return c.json({ error: payeeError.message }, 500);
-    }
-
-    const { error: expenseTypeError } = await supabase
+    const { data: expenseType, error: expenseTypeError } = await supabase
       .schema("public")
       .from("expense_types")
       .select("*")
@@ -259,20 +252,33 @@ app.post("/expenses/cases/:caseId", async (c) => {
       return c.json({ error: expenseTypeError.message }, 500);
     }
 
-    let attachmentId = '';
-    if (attachment_id) {
-      const { data: folder, error: folderError } = await supabase
+    if (expenseType.name !== "Soft Costs") {
+      const { error: payeeError } = await supabase
         .schema(schema)
-        .from("storage_folders")
+        .from("contacts")
         .select("*")
-        .eq("case_id", caseId)
-        .eq("name", "Expenses")
+        .eq("id", payee_id)
         .single();
 
-      if (folderError) {
-        return c.json({ error: folderError.message }, 500);
+      if (payeeError) {
+        return c.json({ error: payeeError.message }, 500);
       }
+    }
 
+    const { data: folder, error: folderError } = await supabase
+      .schema(schema)
+      .from("storage_folders")
+      .select("*")
+      .eq("case_id", caseId)
+      .eq("name", "Expenses")
+      .single();
+
+    if (folderError) {
+      return c.json({ error: folderError.message }, 500);
+    }
+
+    let attachmentId = "";
+    if (attachment_id) {
       const { data: file, error: fileError } = await supabase
         .schema(schema)
         .from("storage_files")
@@ -282,7 +288,7 @@ app.post("/expenses/cases/:caseId", async (c) => {
         .eq("id", attachment_id)
         .select()
         .single();
-        
+
       if (fileError) {
         return c.json({ error: fileError.message }, 500);
       }
@@ -321,25 +327,103 @@ app.post("/expenses/cases/:caseId", async (c) => {
       attachmentId = fileRecord.id;
     }
 
+    let dateOfCheck = null;
+    let checkNumber = null;
+    let copyOfCheckId = null;
+    if (expenseType.name === "Check") {
+      dateOfCheck = new Date().toISOString().split("T")[0];
+      const { data: checkTypeData, error: checkTypeDataError } = await supabase
+        .schema(schema)
+        .from("case_expenses")
+        .select("*")
+        .eq("case_id", caseId)
+        .eq("expense_type_id", expenseType.id);
+
+      if (checkTypeDataError) {
+        return c.json({ error: checkTypeDataError.message }, 500);
+      }
+
+      checkNumber = checkTypeData.length + 1;
+
+      if (copy_of_check_id) {
+        const { data: file, error: fileError } = await supabase
+          .schema(schema)
+          .from("storage_files")
+          .update({
+            folder_id: folder.id,
+          })
+          .eq("id", copy_of_check_id)
+          .select()
+          .single();
+
+        if (fileError) {
+          return c.json({ error: fileError.message }, 500);
+        }
+
+        copyOfCheckId = file.id;
+      }
+      if (copyOfCheck) {
+        const gcsService = getGcsService();
+        const buffer = await copyOfCheck.arrayBuffer();
+        const fileData = new Uint8Array(buffer);
+        const mimeType = copyOfCheck.type;
+        const fileName = copyOfCheck.name;
+        const { data: folder, error: folderError } = await supabase
+          .schema(schema)
+          .from("storage_folders")
+          .select("*")
+          .eq("case_id", caseId)
+          .eq("name", "Expenses")
+          .single();
+
+        if (folderError) {
+          return c.json({ error: folderError.message }, 500);
+        }
+
+        const fileRecord = await uploadAttachment(supabase, gcsService, {
+          userId: user.id,
+          fileName,
+          fileData,
+          mimeType,
+          uploadedBy: member.id,
+          schema,
+          tenantId: orgId,
+          folderId: folder.id,
+        });
+        copyOfCheckId = fileRecord.id;
+      }
+    }
+
     const { data: expense, error: expenseError } = await supabase
       .schema(schema)
       .from("case_expenses")
       .insert({
         case_id: caseId,
-        expense_type_id: expense_type_id,
+        expense_type_id,
         amount: parseFloat(amount as string),
-        payee_id: payee_id,
-        type: type,
-        invoice_number: invoice_number,
-        attachment_id: attachmentId,
+        payee_id: expenseType.name === "Soft Costs" ? null : payee_id,
+        type,
+        invoice_number,
+        bill_no,
+        attachment_id: attachmentId === "" ? null : attachmentId,
         invoice_date: invoice_date === "" ? null : invoice_date,
         due_date: due_date === "" ? null : due_date,
-        description: description,
-        memo: memo,
-        notes: notes,
+        description,
+        memo,
+        notes,
+        date_of_check: dateOfCheck,
+        check_number: checkNumber,
+        copy_of_check_id: copyOfCheckId === "" ? null : copyOfCheckId,
+        notify_admin_of_check_payment,
         create_checking_quickbooks: create_checking_quickbooks === "true",
-        create_billing_item: create_billing_item === "unknown" ? null : create_billing_item === "true",
-        last_update_from_quickbooks: last_update_from_quickbooks === "" ? null : last_update_from_quickbooks,
+        create_billing_item:
+          create_billing_item === "unknown"
+            ? null
+            : create_billing_item === "true",
+        last_update_from_quickbooks:
+          last_update_from_quickbooks === ""
+            ? null
+            : last_update_from_quickbooks,
       })
       .select();
 
