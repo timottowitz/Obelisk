@@ -8,40 +8,9 @@ import {
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FileText } from 'lucide-react';
+import { Expense } from '@/types/expenses';
 
-type ExpenseRow = {
-  createdAt: string;
-  amountDisplay: string;
-  expenseType: string;
-  payee: {
-    name: string;
-    contactPerson?: string;
-    phone?: string;
-    email?: string;
-    addressLine?: string;
-  };
-  invoiceNumber?: string;
-  invoiceAttachment?: { name: string } | null;
-  dateOfInvoice?: string;
-  dueDate?: string;
-  expenseDescription?: string;
-  createInQuickbooks?: 'Yes' | 'No';
-  createBillingItem?: 'Yes' | 'No' | 'Unknown';
-  status?: string;
-  billNo?: string;
-  memo?: string;
-  notes?: string;
-  notifyAdmin?: string;
-  createInQB?: string;
-  dateOfCheck?: string;
-  checkNumber?: string;
-  lastUpdateFromQB?: string;
-  copyOfCheck?: string;
-  createdDate?: string;
-  lastUpdatedFromQuickbooks?: string;
-};
-
-export default function ExpenseTable({ rows }: { rows: ExpenseRow[] }) {
+export default function ExpenseTable({ rows }: { rows: Expense[] }) {
   const totalAmountDisplay = '$82,022.60';
 
   return (
@@ -118,12 +87,12 @@ export default function ExpenseTable({ rows }: { rows: ExpenseRow[] }) {
                 <TableCell>
                   <Checkbox aria-label={`Select row ${idx + 1}`} />
                 </TableCell>
-                <TableCell className='font-medium'>{r.amountDisplay}</TableCell>
-                <TableCell className='truncate'>{r.expenseType}</TableCell>
+                <TableCell className='font-medium'>${r.amount.toFixed(2)}</TableCell>
+                <TableCell className='truncate'>{r.expense_type}</TableCell>
                 <TableCell className='w-auto'>
                   <div className='flex items-start gap-2'>
                     <div className='bg-primary/20 text-primary flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold'>
-                      {r.payee.name
+                      {r.payee?.full_name
                         .split(' ')
                         .map((s) => s[0])
                         .join('')
@@ -131,35 +100,47 @@ export default function ExpenseTable({ rows }: { rows: ExpenseRow[] }) {
                     </div>
                     <div className='leading-5'>
                       <div className='font-medium break-words'>
-                        {r.payee.name}
+                        {r.payee?.full_name}
                       </div>
-                      {r.payee.contactPerson && (
-                        <span className='text-muted-foreground text-xs'>
-                          ({r.payee.contactPerson})
-                        </span>
-                      )}
+                      {r.payee?.phones.map((phone) => (
+                        <div
+                          className='text-primary text-xs break-words'
+                          key={phone.id}
+                        >
+                          {phone.number}
+                        </div>
+                      ))}
+                      {r.payee?.emails.map((email) => (
+                        <div
+                          className='text-primary text-xs break-words'
+                          key={email.id}
+                        >
+                          {email.address}
+                        </div>
+                      ))}
                       <div className='text-primary text-xs break-words'>
-                        {r.payee.phone}
-                      </div>
-                      <div className='text-primary text-xs break-words'>
-                        {r.payee.email}
+                        {r.payee?.emails
+                          .map((email) => email.address)
+                          .join(', ')}
                       </div>
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className='hidden md:table-cell'>{r.expenseType}</TableCell>
-                <TableCell className='hidden lg:table-cell'>
-                  {r.invoiceNumber || '—'}
+                <TableCell className='hidden md:table-cell'>
+                  {r.type || '—'}
                 </TableCell>
                 <TableCell className='hidden lg:table-cell'>
-                  {r.invoiceAttachment ? (
+                  {r.invoice_number || '—'}
+                </TableCell>
+                <TableCell className='hidden lg:table-cell'>
+                  {r.attachment ? (
                     <div className='flex items-center gap-2'>
                       <FileText className='text-destructive h-4 w-4' />
                       <a
                         className='text-primary max-w-[240px] truncate underline-offset-2 hover:underline'
                         href='#'
                       >
-                        {r.invoiceAttachment?.name}
+                        {r.attachment?.name}
                       </a>
                     </div>
                   ) : (
@@ -167,14 +148,14 @@ export default function ExpenseTable({ rows }: { rows: ExpenseRow[] }) {
                   )}
                 </TableCell>
                 <TableCell className='truncate'>
-                  {r.dateOfInvoice || '—'}
+                  {r.invoice_date || '—'}
                 </TableCell>
-                <TableCell className='truncate'>{r.dueDate || '—'}</TableCell>
+                <TableCell className='truncate'>{r.due_date || '—'}</TableCell>
                 <TableCell className='hidden xl:table-cell'>
-                  {r.billNo || '—'}
+                  {r.bill_no || '—'}
                 </TableCell>
                 <TableCell className='hidden min-w-[30ch] leading-5 break-words whitespace-pre-wrap xl:table-cell'>
-                  {r.expenseDescription || '—'}
+                  {r.description || '—'}
                 </TableCell>
                 <TableCell className='hidden min-w-[30ch] leading-5 break-words whitespace-pre-wrap 2xl:table-cell'>
                   {r.memo || '—'}
@@ -183,29 +164,29 @@ export default function ExpenseTable({ rows }: { rows: ExpenseRow[] }) {
                   {r.notes || '—'}
                 </TableCell>
                 <TableCell className='hidden min-w-[30ch] leading-5 break-words whitespace-pre-wrap 2xl:table-cell'>
-                  {r.notifyAdmin || '—'}
+                  {r.notify_admin_of_check_payment ? 'Yes' : 'No'}
                 </TableCell>
                 <TableCell className='hidden xl:table-cell'>
-                  {r.createInQB || '—'}
+                  {r.create_checking_quickbooks ? 'Yes' : 'No'}
                 </TableCell>
                 <TableCell className='hidden xl:table-cell'>
-                  {r.createBillingItem || '—'}
+                  {r.create_billing_item || '—'}
                 </TableCell>
                 <TableCell className='truncate'>{r.status || '—'}</TableCell>
                 <TableCell className='hidden 2xl:table-cell'>
-                  {r.dateOfCheck || '—'}
+                  {r.date_of_check || '—'}
                 </TableCell>
                 <TableCell className='hidden 2xl:table-cell'>
-                  {r.checkNumber || '—'}
+                  {r.check_number || '—'}
                 </TableCell>
                 <TableCell className='hidden break-words lg:table-cell'>
-                  {r.lastUpdateFromQB || '—'}
+                  {r.last_update_from_quickbooks || '—'}
                 </TableCell>
                 <TableCell className='hidden 2xl:table-cell'>
-                  {r.copyOfCheck || '—'}
+                  {r.copy_of_check?.name || '—'}
                 </TableCell>
                 <TableCell className='hidden break-words lg:table-cell'>
-                  {r.createdDate || '—'}
+                  {r.created_at || '—'}
                 </TableCell>
               </TableRow>
             ))}
