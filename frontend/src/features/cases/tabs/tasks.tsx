@@ -220,7 +220,7 @@ export default function Tasks({ caseId }: { caseId: string }) {
   return (
     <div className='flex flex-col gap-4'>
       <div className='flex items-center justify-between'>
-        <h3 className='text-sm font-semibold text-gray-900'>Case Tasks</h3>
+        <h3 className='text-sm font-semibold text-foreground'>Case Tasks</h3>
         <div className='flex items-center gap-2'>
           <Button
             size='lg'
@@ -258,10 +258,10 @@ export default function Tasks({ caseId }: { caseId: string }) {
       )}
 
       {/* Filters Section */}
-      <div className='flex flex-row items-center gap-3 rounded-lg border bg-white p-4'>
+      <div className='flex flex-row items-center gap-3 rounded-lg border border-border bg-white p-4 shadow-sm dark:bg-card'>
         {/* Search Input */}
         <div className='relative'>
-          <Search className='absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400' />
+          <Search className='absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
           <Input
             type='text'
             placeholder='Search tasks by name'
@@ -276,7 +276,7 @@ export default function Tasks({ caseId }: { caseId: string }) {
               onClick={() => {
                 setSearchQuery('');
               }}
-              className='absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600'
+              className='absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:opacity-80'
             >
               <X className='h-4 w-4' />
             </button>
