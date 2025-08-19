@@ -7,15 +7,51 @@ import { Search } from 'lucide-react';
 import InvoiceModal from './components/invoice-modal';
 import ExpenseCard from './components/expense-card';
 import ExpenseTable from './components/expense-table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+
+const mockExpenseItems = [
+  {
+    createdAt: '3/14/2025 at 9:58 AM',
+    amountDisplay: '$1,815.00',
+    expenseType: 'Bill',
+    payee: {
+      name: 'White Horse Group LLC',
+      contactPerson: 'Steve Herrera',
+      phone: '2143940259',
+      email: 'white-horse@sbcglobal.net',
+      addressLine: '1024 Carmody, Mesquite, TX 75149'
+    },
+    invoiceNumber: '2501004',
+    invoiceAttachment: {
+      name: '2025.03.07- Invoice 2501004- Courtroom Setup D...'
+    },
+    dateOfInvoice: '3/7/2025',
+    dueDate: '4/7/2025',
+    expenseDescription:
+      'Court Room Set up, Days in Court and Courtroom Tear Down',
+    createInQuickbooks: 'Yes' as const,
+    createBillingItem: 'No' as const,
+    status: 'Deleted',
+    lastUpdatedFromQuickbooks: '4/1/2025 at 12:57pm (MDT)'
+  }
+];
 export default function Finances({ caseId }: { caseId: string }) {
-  const [searchTerm, setSearchTerm] = useState('');
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
-  const [filterBy, setFilterBy] = useState<
-    'all' | 'bill' | 'soft_costs' | 'credit_card' | 'check'
-  >('all');
-  const [sortBy, setSortBy] = useState<'date' | 'amount' | 'status'>('date');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [view, setView] = useState<'cards' | 'compact'>('cards');
+  const [searchValue, setSearchValue] = useState('');
+
+  const [queryParams, setQueryParams] = useState({
+    filterBy: 'all',
+    filterValue: '',
+    sortBy: 'created_date',
+    sortDir: 'desc'
+  });
 
   return (
     <div className='space-y-6'>
@@ -34,28 +70,63 @@ export default function Finances({ caseId }: { caseId: string }) {
         <div className='flex items-center gap-2'>
           <span className='text-muted-foreground text-sm'>Filter by</span>
           <div className='relative'>
-            <select
-              value={filterBy}
-              onChange={(e) => setFilterBy(e.target.value as any)}
-              className='border-input bg-background rounded-md border px-3 py-2 text-sm'
-              aria-label='Filter by type'
+            <Select
+              value={queryParams.filterBy}
+              onValueChange={(value) =>
+                setQueryParams({ ...queryParams, filterBy: value })
+              }
             >
-              <option value='all'>All</option>
-              <option value='bill'>Bill</option>
-              <option value='credit_card'>Credit Card</option>
-              <option value='check'>Check</option>
-              <option value='soft_costs'>Soft Costs</option>
-            </select>
+              <SelectTrigger>
+                <SelectValue placeholder='Filter by' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>All</SelectItem>
+                <SelectItem value='expense_type'>Expense Type</SelectItem>
+                <SelectItem value='entity_being_paid'>
+                  Entity Being Paid
+                </SelectItem>
+                <SelectItem value='type'>Type</SelectItem>
+                <SelectItem value='invoice_number'>Invoice Number</SelectItem>
+                <SelectItem value='invoice_attachment'>
+                  Invoice Attachment
+                </SelectItem>
+                <SelectItem value='date_of_invoice'>Date of Invoice</SelectItem>
+                <SelectItem value='due_date'>Due Date</SelectItem>
+                <SelectItem value='bill_no'>Bill No</SelectItem>
+                <SelectItem value='expense_description'>
+                  Expense Description
+                </SelectItem>
+                <SelectItem value='memo'>Memo</SelectItem>
+                <SelectItem value='notes'>Notes</SelectItem>
+                <SelectItem value='notify_admin'>Notify Admin</SelectItem>
+                <SelectItem value='create_in_quickbooks'>
+                  Create in Quickbooks
+                </SelectItem>
+                <SelectItem value='create_billing_item'>
+                  Create Billing Item
+                </SelectItem>
+                <SelectItem value='date_of_check'>Date of Check</SelectItem>
+                <SelectItem value='check_number'>Check Number</SelectItem>
+                <SelectItem value='last_updated_from_quickbooks'>
+                  Last Updated from Quickbooks
+                </SelectItem>
+                <SelectItem value='copy_of_check'>Copy of Check</SelectItem>
+                <SelectItem value='status'>Status</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
         {/* Search */}
-        <div className='relative min-w-[220px] max-w-[300px] flex-1'>
-          <Search className='text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2' aria-hidden />
+        <div className='relative max-w-[300px] min-w-[220px] flex-1'>
+          <Search
+            className='text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2'
+            aria-hidden
+          />
           <Input
             placeholder='Filter items'
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
             className='pl-9'
             aria-label='Filter items'
           />
@@ -66,6 +137,12 @@ export default function Finances({ caseId }: { caseId: string }) {
           size='sm'
           className='bg-emerald-600 text-white hover:bg-emerald-700'
           aria-label='Apply filters'
+          onClick={() =>
+            setQueryParams({
+              ...queryParams,
+              filterValue: searchValue
+            })
+          }
         >
           ✓
         </Button>
@@ -74,38 +151,68 @@ export default function Finances({ caseId }: { caseId: string }) {
         <div className='flex items-center gap-2'>
           <span className='text-muted-foreground text-sm'>Sort by</span>
           <div className='relative'>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className='border-input bg-background rounded-md border px-3 py-2 text-sm'
-              aria-label='Sort by'
+            <Select
+              value={queryParams.sortBy}
+              onValueChange={(value) =>
+                setQueryParams({ ...queryParams, sortBy: value })
+              }
             >
-              <option value='date'>Date of Invoice</option>
-              <option value='amount'>Amount</option>
-              <option value='status'>Status</option>
-            </select>
+              <SelectTrigger>
+                <SelectValue placeholder='Sort by' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='created_date'>Created Date</SelectItem>
+                <SelectItem value='expense_type'>Expense Type</SelectItem>
+                <SelectItem value='entity_being_paid'>
+                  Entity Being Paid
+                </SelectItem>
+                <SelectItem value='type'>Type</SelectItem>
+                <SelectItem value='invoice_number'>Invoice Number</SelectItem>
+                <SelectItem value='invoice_attachment'>
+                  Invoice Attachment
+                </SelectItem>
+                <SelectItem value='date_of_invoice'>Date of Invoice</SelectItem>
+                <SelectItem value='due_date'>Due Date</SelectItem>
+                <SelectItem value='bill_no'>Bill No</SelectItem>
+                <SelectItem value='expense_description'>
+                  Expense Description
+                </SelectItem>
+                <SelectItem value='memo'>Memo</SelectItem>
+                <SelectItem value='notes'>Notes</SelectItem>
+                <SelectItem value='notify_admin'>Notify Admin</SelectItem>
+                <SelectItem value='create_in_quickbooks'>
+                  Create in Quickbooks
+                </SelectItem>
+                <SelectItem value='create_billing_item'>
+                  Create Billing Item
+                </SelectItem>
+                <SelectItem value='date_of_check'>Date of Check</SelectItem>
+                <SelectItem value='check_number'>Check Number</SelectItem>
+                <SelectItem value='last_updated_from_quickbooks'>
+                  Last Updated from Quickbooks
+                </SelectItem>
+                <SelectItem value='copy_of_check'>Copy of Check</SelectItem>
+                <SelectItem value='status'>Status</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
         {/* Sort direction toggle */}
         <div className='flex items-center gap-1'>
           <Button
-            variant={sortDir === 'asc' ? 'default' : 'outline'}
+            variant='outline'
             size='icon'
-            onClick={() => setSortDir('asc')}
+            onClick={() =>
+              setQueryParams({
+                ...queryParams,
+                sortDir: queryParams.sortDir === 'asc' ? 'desc' : 'asc'
+              })
+            }
             aria-label='Ascending'
             title='Ascending'
           >
-            A↑
-          </Button>
-          <Button
-            variant={sortDir === 'desc' ? 'default' : 'outline'}
-            size='icon'
-            onClick={() => setSortDir('desc')}
-            aria-label='Descending'
-            title='Descending'
-          >
-            Z↓
+            {queryParams.sortDir === 'asc' ? 'A↑' : 'Z↓'}
           </Button>
         </div>
 
@@ -134,73 +241,20 @@ export default function Finances({ caseId }: { caseId: string }) {
 
       {/* Compact Table View */}
       {view === 'compact' && (
-        <div className='rounded-md border bg-card'>
-          <ExpenseTable />
+        <div className='bg-card rounded-md border'>
+          <ExpenseTable rows={mockExpenseItems} />
         </div>
       )}
 
       {/* Cards View */}
       {view === 'cards' && (
         <div className='space-y-6'>
-          <ExpenseCard
-            createdAt='3/14/2025 at 9:58 AM'
-            amountDisplay='$1,815.00'
-            expenseType='Bill'
-            payee={{
-              name: 'White Horse Group LLC',
-              contactPerson: 'Steve Herrera',
-              phone: '2143940259',
-              email: 'white-horse@sbcglobal.net',
-              addressLine: '1024 Carmody, Mesquite, TX 75149'
-            }}
-            invoiceNumber='2501004'
-            invoiceAttachment={{
-              name: '2025.03.07- Invoice 2501004- Courtroom Setup D...'
-            }}
-            dateOfInvoice='3/7/2025'
-            dueDate='4/7/2025'
-            expenseDescription='Court Room Set up, Days in Court and Courtroom Tear Down'
-            createInQuickbooks='Yes'
-            createBillingItem='No'
-            paymentStatus={{
-              status: 'Deleted',
-              lastUpdatedFromQuickbooks: '4/1/2025 at 12:57pm (MDT)'
-            }}
-          />
-          <ExpenseCard
-            createdAt='3/14/2025 at 9:34 AM'
-            amountDisplay='$3,697.50'
-            expenseType='Bill'
-            payee={{
-              name: 'White Horse Group LLC',
-              contactPerson: 'Steve Herrera',
-              phone: '2143940259',
-              email: 'white-horse@sbcglobal.net',
-              addressLine: '1024 Carmody, Mesquite, TX 75149'
-            }}
-            invoiceNumber='2401325'
-            invoiceAttachment={{
-              name: '2025.03.07- Invoice 2401325-Arbitration Video E...'
-            }}
-            dateOfInvoice='3/7/2025'
-            dueDate='4/7/2025'
-            expenseDescription='Arbitration Video Editing Services'
-            createInQuickbooks='Yes'
-            createBillingItem='No'
-            paymentStatus={{
-              status: 'Deleted',
-              lastUpdatedFromQuickbooks: '4/1/2025 at 12:54pm (MDT)'
-            }}
-          />
+          {mockExpenseItems.map((item) => (
+            <ExpenseCard key={item.createdAt} item={item} />
+          ))}
         </div>
       )}
 
-      {/* Bottom Action Button */}
-      <div className='flex justify-end'>
-        <Button className='bg-red-600 text-white hover:bg-red-700'>
-          Pay Online
-        </Button>
-      </div>
       <InvoiceModal
         isOpen={isInvoiceModalOpen}
         onClose={() => setIsInvoiceModalOpen(false)}

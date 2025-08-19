@@ -246,7 +246,7 @@ export default function InvoiceModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className='bg-card h-[80vh] w-full !max-w-7xl overflow-y-auto border-2 py-10'>
+        <DialogContent className='h-[80vh] w-full !max-w-7xl overflow-y-auto border-2 border-border bg-white py-10 shadow-sm dark:bg-card'>
           <DialogHeader>
             <DialogTitle>Create Expense</DialogTitle>
             <div className='flex items-center justify-between'>
@@ -715,7 +715,7 @@ export default function InvoiceModal({
               </div>
 
               {form.expenseType === 'Check' && (
-                <div className='flex items-center justify-start gap-2 border-t pt-4'>
+                <div className='flex items-center justify-start gap-2 border-t border-border pt-4'>
                   <div className='space-y-2'>
                     <Label>Add Docs</Label>
                     {!form.copyOfCheck && (
@@ -788,7 +788,7 @@ export default function InvoiceModal({
               )}
 
               {/* Footer Buttons (mirrors header for convenience on long forms) */}
-              <div className='flex items-center justify-end gap-2 border-t pt-4'>
+              <div className='flex items-center justify-end gap-2 border-t border-border pt-4'>
                 <Button
                   type='button'
                   variant='outline'

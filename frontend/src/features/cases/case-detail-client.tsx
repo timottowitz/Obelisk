@@ -69,7 +69,7 @@ export default function CaseDetailClient({ caseId }: CaseDetailClientProps) {
               <Upload className='h-4 w-4' />
               <span>Upload New Document</span>
             </Button>
-            <Button className='flex items-center space-x-2'>
+            <Button className='flex items-center space-x-2 bg-red-600 text-white hover:bg-red-700'>
               <FileText className='h-4 w-4' />
               <span>File Additional Claim/Counterclaim</span>
             </Button>
@@ -81,8 +81,8 @@ export default function CaseDetailClient({ caseId }: CaseDetailClientProps) {
       <div className='bg-card px-6 py-6'>
         <div className='flex items-start space-x-4'>
           <div className='flex-shrink-0'>
-            <div className='flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10'>
-              <Scale className='h-6 w-6 text-primary' />
+            <div className='flex h-12 w-12 items-center justify-center rounded-lg bg-red-600/10'>
+              <Scale className='h-6 w-6 text-red-600' />
             </div>
           </div>
 
