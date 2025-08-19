@@ -1,7 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useExpenseTypes, useInitialDocuments } from '@/hooks/useExpenses';
+import {
+  useExpenseTypes,
+  useInitialDocuments,
+  useCreateExpense
+} from '@/hooks/useExpenses';
 import { useContactsBySearch } from '@/hooks/useContacts';
 import { useCreateContact, useContactTypes } from '@/hooks/useContacts';
 import {
@@ -22,7 +26,7 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Loader2, Paperclip, Upload, UserPlus2 } from 'lucide-react';
+import { Loader2, Trash, Upload, UserPlus2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/use-debounce';
 import ContactModal from '@/features/contacts/components/contact-modal';
 import { toast } from 'sonner';
@@ -58,8 +62,7 @@ export default function InvoiceModal({
   isOpen,
   onClose,
   caseId,
-  loading,
-  onCreate
+  loading
 }: InvoiceModalProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -73,6 +76,7 @@ export default function InvoiceModal({
   const { data: contactTypes, isLoading: isLoadingContactTypes } =
     useContactTypes();
   const createContact = useCreateContact();
+  const createExpense = useCreateExpense();
   const { data: contacts, isLoading: isLoadingContacts } =
     useContactsBySearch(debouncedSearchTerm);
   const [isOpenContactModal, setIsOpenContactModal] = useState(false);
@@ -128,7 +132,7 @@ export default function InvoiceModal({
   );
 
   const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
+    async (e: React.FormEvent) => {
       e.preventDefault();
       if (!canSubmit) return;
 
@@ -151,7 +155,37 @@ export default function InvoiceModal({
       if (form.attachmentId) {
         formData.append('attachment_id', form.attachmentId);
       }
-      console.log(Object.fromEntries(formData));
+      formData.append(
+        'last_updated_from_quickbooks',
+        form.lastUpdatedFromQuickBooks
+      );
+
+      try {
+        await createExpense.mutateAsync({ caseId, payload: formData });
+        toast.success('Expense created successfully');
+        setForm({
+          ...form,
+          expenseTypeId: '',
+          amount: '',
+          payeeId: '',
+          payeeName: '',
+          type: 'unknown',
+          invoiceNumber: '',
+          invoiceDate: '',
+          expenseDescription: '',
+          memo: '',
+          notes: '',
+          createInQuickBooks: '',
+          createBillingItem: 'unknown',
+          attachment: null,
+          attachmentId: '',
+          lastUpdatedFromQuickBooks: ''
+        });
+        onClose();
+      } catch (error) {
+        console.error('Error creating expense:', error);
+        toast.error('Error creating expense');
+      }
     },
     [
       caseId,
@@ -408,48 +442,67 @@ export default function InvoiceModal({
 
                 {/* Invoice Attachment */}
                 <div className='space-y-2'>
-                  <Label>invoice Attachment</Label>
-                  <div className='flex items-center gap-3'>
-                    <Select
-                      value={form.attachmentId}
-                      onValueChange={(v) =>
-                        setForm((p) => ({ ...p, attachmentId: v }))
-                      }
-                    >
-                      <SelectTrigger className='w-[300px]'>
-                        <SelectValue placeholder='Select a Document' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {initialDocuments &&
-                          initialDocuments.length > 0 &&
-                          initialDocuments.map((document) => (
-                            <SelectItem key={document.id} value={document.id}>
-                              {document.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    <span className='text-muted-foreground text-sm'>or</span>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      className='h-9 w-9 p-0'
-                      onClick={handleFileClick}
-                    >
-                      <Upload />
-                    </Button>
-                    <input
-                      ref={fileInputRef}
-                      type='file'
-                      className='hidden'
-                      onChange={(e) =>
-                        setForm((p) => ({
-                          ...p,
-                          attachment: e.target.files?.[0] || null
-                        }))
-                      }
-                    />
-                  </div>
+                  <Label>Invoice Attachment</Label>
+                  {!form.attachment && (
+                    <div className='flex items-center gap-3'>
+                      <Select
+                        value={form.attachmentId}
+                        onValueChange={(v) =>
+                          setForm((p) => ({ ...p, attachmentId: v }))
+                        }
+                      >
+                        <SelectTrigger className='w-[300px]'>
+                          <SelectValue placeholder='Select a Document' />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {initialDocuments &&
+                            initialDocuments.length > 0 &&
+                            initialDocuments.map((document) => (
+                              <SelectItem key={document.id} value={document.id}>
+                                {document.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <span className='text-muted-foreground text-sm'>or</span>
+                      <Button
+                        type='button'
+                        variant='outline'
+                        className='h-9 w-9 p-0'
+                        onClick={handleFileClick}
+                      >
+                        <Upload />
+                      </Button>
+                      <input
+                        ref={fileInputRef}
+                        type='file'
+                        className='hidden'
+                        onChange={(e) =>
+                          setForm((p) => ({
+                            ...p,
+                            attachment: e.target.files?.[0] || null
+                          }))
+                        }
+                      />
+                    </div>
+                  )}
+                  {form.attachment && (
+                    <div className='flex items-center gap-3'>
+                      <div className='text-green-500 text-sm'>
+                        {form.attachment.name}
+                      </div>
+                      <Button
+                        type='button'
+                        variant='outline'
+                        className='h-9 w-9 p-0 text-red-500'
+                        onClick={() =>
+                          setForm((p) => ({ ...p, attachment: null }))
+                        }
+                      >
+                        <Trash />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -575,9 +628,9 @@ export default function InvoiceModal({
                 </div>
                 <div className='text-muted-foreground col-span-1 text-sm'>
                   Selecting <span className='font-semibold'>YES</span> will
-                  create an billing item in Filevine&apos;s native Time & Billing
-                  section, allowing you to recover the expense on the next
-                  invoice to this client.
+                  create an billing item in Filevine&apos;s native Time &
+                  Billing section, allowing you to recover the expense on the
+                  next invoice to this client.
                 </div>
               </div>
               {/* Payment Status */}
