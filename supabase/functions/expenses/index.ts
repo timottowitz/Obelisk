@@ -156,6 +156,46 @@ app.post("/expenses/types", async (c) => {
   }
 });
 
+//get initial documents for expense
+app.get("/expenses/cases/:caseId/initial-documents", async (c) => {
+  const userId = c.get("userId");
+  const orgId = c.get("orgId");
+  const caseId = c.req.param("caseId");
+
+  try {
+    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
+
+    const { data: folder, error: folderError } = await supabase
+      .schema(schema)
+      .from("storage_folders")
+      .select("*")
+      .eq("case_id", caseId)
+      .eq("name", "Initial Documents")
+      .single();
+
+    if (folderError) {
+      return c.json({ error: folderError.message }, 500);
+    }
+    if (folder.id) {
+      const { data: initialDocuments, error: initialDocumentsError } =
+        await supabase
+          .schema(schema)
+          .from("storage_files")
+          .select("*")
+          .eq("folder_id", folder.id);
+
+      if (initialDocumentsError) {
+        return c.json({ error: initialDocumentsError.message }, 500);
+      }
+      return c.json(initialDocuments, 200);
+    }
+    return c.json([], 200);
+  } catch (error: any) {
+    console.error("getting initial documents error", error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
 //create expense
 app.post("/expenses/cases/:caseId", async (c) => {
   const userId = c.get("userId");
@@ -219,7 +259,37 @@ app.post("/expenses/cases/:caseId", async (c) => {
       return c.json({ error: expenseTypeError.message }, 500);
     }
 
-    let attachmentId = attachment_id;
+    let attachmentId = '';
+    if (attachment_id) {
+      const { data: folder, error: folderError } = await supabase
+        .schema(schema)
+        .from("storage_folders")
+        .select("*")
+        .eq("case_id", caseId)
+        .eq("name", "Expenses")
+        .single();
+
+      if (folderError) {
+        return c.json({ error: folderError.message }, 500);
+      }
+
+      const { data: file, error: fileError } = await supabase
+        .schema(schema)
+        .from("storage_files")
+        .update({
+          folder_id: folder.id,
+        })
+        .eq("id", attachment_id)
+        .select()
+        .single();
+        
+      if (fileError) {
+        return c.json({ error: fileError.message }, 500);
+      }
+
+      attachmentId = file.id;
+    }
+
     if (attachment) {
       const gcsService = getGcsService();
       const buffer = await attachment.arrayBuffer();
@@ -233,10 +303,10 @@ app.post("/expenses/cases/:caseId", async (c) => {
         .eq("case_id", caseId)
         .eq("name", "Expenses")
         .single();
-        
-        if (folderError) {
-          return c.json({ error: folderError.message }, 500);
-        }
+
+      if (folderError) {
+        return c.json({ error: folderError.message }, 500);
+      }
 
       const fileRecord = await uploadAttachment(supabase, gcsService, {
         userId: user.id,
@@ -300,8 +370,16 @@ async function uploadAttachment(
     folderId: string;
   }
 ) {
-  const { userId, fileName, fileData, mimeType, uploadedBy, schema, tenantId, folderId } =
-    params;
+  const {
+    userId,
+    fileName,
+    fileData,
+    mimeType,
+    uploadedBy,
+    schema,
+    tenantId,
+    folderId,
+  } = params;
 
   const checksum = await calculateChecksum(fileData);
 
