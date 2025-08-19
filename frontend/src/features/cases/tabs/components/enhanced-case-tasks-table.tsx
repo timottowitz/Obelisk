@@ -84,7 +84,7 @@ function TaskRow({
     return {
       status: 'future',
       text: `Due ${due.toLocaleDateString()}`,
-      class: 'text-gray-600'
+      class: 'text-muted-foreground'
     };
   };
 
@@ -97,7 +97,7 @@ function TaskRow({
       case 'low':
         return 'bg-green-100 text-green-800 border-green-200';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-muted text-foreground border-border';
     }
   };
 
@@ -110,7 +110,7 @@ function TaskRow({
   const hasAIInsights = taskAIInsights.length > 0;
 
   return (
-    <TableRow className='transition-colors hover:bg-gray-50'>
+    <TableRow className='transition-colors hover:bg-muted/40 dark:hover:bg-muted/20'>
       {/* Task Name & Status */}
       <TableCell className='max-w-xs'>
         <div className='flex items-start space-x-3'>
@@ -118,12 +118,12 @@ function TaskRow({
             {task.is_completed ? (
               <CheckCircle2 className='h-4 w-4 text-green-600' />
             ) : (
-              <Circle className='h-4 w-4 text-gray-400' />
+              <Circle className='h-4 w-4 text-muted-foreground' />
             )}
           </div>
           <div className='min-w-0 flex-1'>
             <div className='flex items-center space-x-2'>
-              <p className='truncate font-medium text-gray-900'>{task.name}</p>
+              <p className='truncate font-medium text-foreground'>{task.name}</p>
               {/* AI Indicators */}
               {taskAIInsights.length > 0 && (
                 <div className='flex items-center gap-1'>
@@ -169,10 +169,10 @@ function TaskRow({
       {/* Assignee */}
       <TableCell>
         <div className='flex items-center space-x-2'>
-          <div className='flex h-8 w-8 items-center justify-center rounded-full bg-gray-200'>
-            <User className='h-4 w-4 text-gray-600' />
+          <div className='flex h-8 w-8 items-center justify-center rounded-full bg-muted'>
+            <User className='h-4 w-4 text-muted-foreground' />
           </div>
-          <span className='text-sm text-gray-900'>
+          <span className='text-sm text-foreground'>
             {task.assignee || 'Unassigned'}
           </span>
         </div>
@@ -182,7 +182,7 @@ function TaskRow({
       <TableCell>
         {task.due_date ? (
           <div className='flex items-center space-x-2'>
-            <Calendar className='h-4 w-4 text-gray-400' />
+            <Calendar className='h-4 w-4 text-muted-foreground' />
             <span className={cn('text-sm', dueDateStatus?.class)}>
               {dueDateStatus?.text}
             </span>
@@ -191,7 +191,7 @@ function TaskRow({
             )}
           </div>
         ) : (
-          <span className='text-sm text-gray-400'>No due date</span>
+          <span className='text-sm text-muted-foreground'>No due date</span>
         )}
       </TableCell>
 
@@ -229,7 +229,7 @@ function TaskRow({
             variant='ghost'
             size='sm'
             onClick={() => onDeleteTask(task)}
-            className='h-8 w-8 p-0 text-red-600 hover:text-red-700'
+            className='h-8 w-8 p-0 text-destructive hover:text-destructive'
           >
             <Trash2 className='h-4 w-4' />
           </Button>
@@ -245,8 +245,8 @@ function LoadingRow({ showSelection }: { showSelection?: boolean }) {
       <TableCell colSpan={showSelection ? 7 : 6}>
         <div className='flex items-center justify-center py-8'>
           <div className='flex items-center space-x-2'>
-            <div className='h-4 w-4 animate-spin rounded-full border-b-2 border-blue-600'></div>
-            <span className='text-sm text-gray-500'>Loading tasks...</span>
+            <div className='h-4 w-4 animate-spin rounded-full border-b-2 border-primary'></div>
+            <span className='text-sm text-muted-foreground'>Loading tasks...</span>
           </div>
         </div>
       </TableCell>
@@ -259,13 +259,13 @@ function EmptyState({ showSelection }: { showSelection?: boolean }) {
     <TableRow>
       <TableCell colSpan={showSelection ? 7 : 6}>
         <div className='flex flex-col items-center justify-center py-12'>
-          <div className='rounded-full bg-gray-100 p-3'>
-            <CheckCircle2 className='h-6 w-6 text-gray-400' />
+          <div className='rounded-full bg-muted p-3'>
+            <CheckCircle2 className='h-6 w-6 text-muted-foreground' />
           </div>
-          <h3 className='mt-4 text-sm font-medium text-gray-900'>
+          <h3 className='mt-4 text-sm font-medium text-foreground'>
             No tasks yet
           </h3>
-          <p className='mt-2 text-sm text-gray-500'>
+          <p className='mt-2 text-sm text-muted-foreground'>
             Get started by creating your first task for this case.
           </p>
         </div>
@@ -325,27 +325,27 @@ export default function EnhancedCaseTasksTable({
     <>
       <div className='space-y-4'>
         {/* Table */}
-        <div className='rounded-lg border border-gray-200 bg-white shadow-sm'>
+        <div className='rounded-lg border border-border bg-white shadow-sm dark:bg-card'>
           <Table>
             <TableHeader>
-              <TableRow className='bg-gray-50/50'>
+              <TableRow className='bg-muted/60 text-foreground'>
                 {showSelectionColumn && <TableHead className='w-8'></TableHead>}
-                <TableHead className='font-semibold text-gray-900'>
+                <TableHead className='font-semibold'>
                   Task
                 </TableHead>
-                <TableHead className='font-semibold text-gray-900'>
+                <TableHead className='font-semibold'>
                   Priority
                 </TableHead>
-                <TableHead className='font-semibold text-gray-900'>
+                <TableHead className='font-semibold'>
                   Assignee
                 </TableHead>
-                <TableHead className='font-semibold text-gray-900'>
+                <TableHead className='font-semibold'>
                   Due Date
                 </TableHead>
-                <TableHead className='font-semibold text-gray-900'>
+                <TableHead className='font-semibold'>
                   Status
                 </TableHead>
-                <TableHead className='w-20 font-semibold text-gray-900'>
+                <TableHead className='w-20 font-semibold'>
                   Actions
                 </TableHead>
               </TableRow>
@@ -375,7 +375,7 @@ export default function EnhancedCaseTasksTable({
         {/* Pagination */}
         {totalPages > 1 && (
           <div className='flex items-center justify-between'>
-            <p className='text-sm text-gray-700'>
+            <p className='text-sm text-muted-foreground'>
               Showing {(currentPage - 1) * 5 + 1}-
               {Math.min(currentPage * 5, count)} of {count} tasks
             </p>
@@ -395,7 +395,7 @@ export default function EnhancedCaseTasksTable({
                 {pageNumbers.map((page, index) => (
                   <PaginationItem key={index}>
                     {page === '...' ? (
-                      <span className='cursor-pointer px-3 py-2 text-sm text-gray-500'>
+                      <span className='cursor-pointer px-3 py-2 text-sm text-muted-foreground'>
                         ...
                       </span>
                     ) : (

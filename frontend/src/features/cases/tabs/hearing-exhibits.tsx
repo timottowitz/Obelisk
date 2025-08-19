@@ -31,8 +31,7 @@ import {
   Plus,
   Minus,
   Save,
-  Expand,
-  ChevronDown
+  Expand
 } from 'lucide-react';
 
 export default function Finances() {
@@ -44,7 +43,7 @@ export default function Finances() {
     <div className='space-y-6'>
       {/* Header Section */}
       <div className='flex items-center justify-between'>
-        <h1 className='text-2xl font-bold tracking-tight'>Hearing Exhibits</h1>
+        <h1 className='text-2xl font-bold tracking-tight text-foreground'>Hearing Exhibits</h1>
         <Button>
           <Plus className='mr-2 h-4 w-4' />
           Add New Exhibits
@@ -52,7 +51,7 @@ export default function Finances() {
       </div>
 
       {/* Search and Filter Bar */}
-      <div className='flex items-center space-x-4'>
+      <div className='flex items-center space-x-4 rounded-md border border-border bg-white p-4 shadow-sm dark:bg-card'>
         <div className='relative max-w-md flex-1'>
           <Search className='text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2' />
           <Input
@@ -88,7 +87,7 @@ export default function Finances() {
       </div>
 
       {/* Action Bar (Toolbar) */}
-      <div className='flex items-center space-x-2'>
+      <div className='flex items-center space-x-2 rounded-md border border-border bg-white p-2 shadow-sm dark:bg-card'>
         <Button variant='outline' size='sm'>
           <RefreshCw className='mr-2 h-4 w-4' />
           Refresh
@@ -96,7 +95,7 @@ export default function Finances() {
         <Button
           variant='outline'
           size='sm'
-          className='text-red-600 hover:text-red-700'
+          className='text-destructive hover:text-destructive'
         >
           <Trash2 className='mr-2 h-4 w-4' />
           Delete
@@ -127,7 +126,7 @@ export default function Finances() {
       </div>
 
       {/* Data Table */}
-      <div className='rounded-md border bg-white'>
+      <div className='rounded-md border border-border bg-white shadow-sm dark:bg-card'>
         <Table>
           <TableHeader>
             <TableRow className='bg-muted/50'>
