@@ -196,6 +196,377 @@ app.get("/expenses/cases/:caseId/initial-documents", async (c) => {
   }
 });
 
+//get expenses for a case
+app.get("/expenses/cases/:caseId", async (c) => {
+  const userId = c.get("userId");
+  const orgId = c.get("orgId");
+  const caseId = c.req.param("caseId");
+  const url = new URL(c.req.url);
+  const page = parseInt(url.searchParams.get("page") || "1");
+  const limit = parseInt(url.searchParams.get("limit") || "5");
+  const filterBy = url.searchParams.get("filterBy") || "all";
+  const filterValue = url.searchParams.get("filterValue") || "";
+  const sortBy = url.searchParams.get("sortBy") || "created_date";
+  const sortDir = url.searchParams.get("sortDir") || "desc";
+
+  try {
+    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
+
+    const {
+      data: expenses,
+      error: expensesError,
+      count,
+    } = await supabase
+      .schema(schema)
+      .from("case_expenses")
+      .select("*", { count: "exact" })
+      .eq("case_id", caseId)
+      .order("created_at", { ascending: sortDir === "asc" });
+
+    if (expensesError) {
+      return c.json({ error: expensesError.message }, 500);
+    }
+
+    for (const expense of expenses) {
+      const { data: expenseType, error: expenseTypeError } = await supabase
+        .schema("public")
+        .from("expense_types")
+        .select("*")
+        .eq("id", expense.expense_type_id)
+        .single();
+      if (expenseTypeError) {
+        return c.json({ error: expenseTypeError.message }, 500);
+      }
+      expense.expense_type = expenseType.name;
+
+      if (expense.payee_id) {
+        const { data: payee, error: payeeError } = await supabase
+          .schema(schema)
+          .from("contacts")
+          .select("id, full_name, emails, phones, addresses")
+          .eq("id", expense.payee_id)
+          .single();
+        if (payeeError) {
+          return c.json({ error: payeeError.message }, 500);
+        }
+        expense.payee = payee;
+      } else {
+        expense.payee = null;
+      }
+
+      if (expense.attachment_id) {
+        const { data: attachment, error: attachmentError } = await supabase
+          .schema(schema)
+          .from("storage_files")
+          .select("name")
+          .eq("id", expense.attachment_id)
+          .single();
+        if (attachmentError) {
+          return c.json({ error: attachmentError.message }, 500);
+        }
+        expense.attachment = attachment;
+      } else {
+        expense.attachment = null;
+      }
+
+      if (expense.copy_of_check_id) {
+        const { data: copyOfCheck, error: copyOfCheckError } = await supabase
+          .schema(schema)
+          .from("storage_files")
+          .select("name")
+          .eq("id", expense.copy_of_check_id)
+          .single();
+        if (copyOfCheckError) {
+          return c.json({ error: copyOfCheckError.message }, 500);
+        }
+        expense.copy_of_check = copyOfCheck;
+      } else {
+        expense.copy_of_check = null;
+      }
+    }
+
+    let filteredExpenses = expenses;
+
+    if (filterBy !== "all" && filterValue !== "") {
+      switch (filterBy) {
+        case "expense_type":
+          filteredExpenses = expenses.filter(
+            (expense: any) => expense.expense_type === filterValue
+          );
+          break;
+        case "payee":
+          filteredExpenses = filteredExpenses.filter((expense: any) =>
+            expense.payee
+              ? expense.payee.full_name
+                  .toLowerCase()
+                  .includes(filterValue.toLowerCase())
+              : false
+          );
+          break;
+        case "type":
+          filteredExpenses = filteredExpenses.filter(
+            (expense: any) => expense.type === filterValue
+          );
+          break;
+        case "invoice_number":
+          filteredExpenses = filteredExpenses.filter((expense: any) =>
+            expense.invoice_number.includes(filterValue)
+          );
+          break;
+        case "attachment":
+          filteredExpenses = filteredExpenses.filter((expense: any) =>
+            expense.attachment
+              ? expense.attachment.name.includes(filterValue)
+              : false
+          );
+          break;
+        case "invoice_date":
+          filteredExpenses = filteredExpenses.filter((expense: any) =>
+            expense.invoice_date
+              ? expense.invoice_date.includes(filterValue)
+              : false
+          );
+          break;
+        case "due_date":
+          filteredExpenses = filteredExpenses.filter((expense: any) =>
+            expense.due_date ? expense.due_date.includes(filterValue) : false
+          );
+          break;
+        case "bill_no":
+          filteredExpenses = filteredExpenses.filter((expense: any) =>
+            expense.bill_no.includes(filterValue)
+          );
+          break;
+        case "description":
+          filteredExpenses = filteredExpenses.filter((expense: any) =>
+            expense.description.includes(filterValue)
+          );
+          break;
+        case "memo":
+          filteredExpenses = filteredExpenses.filter((expense: any) =>
+            expense.memo.includes(filterValue)
+          );
+          break;
+        case "notes":
+          filteredExpenses = filteredExpenses.filter((expense: any) =>
+            expense.notes.includes(filterValue)
+          );
+          break;
+        case "notify_admin":
+          filteredExpenses = filteredExpenses.filter(
+            (expense: any) =>
+              expense.notify_admin_of_check_payment === filterValue
+          );
+          break;
+        case "create_in_quickbooks":
+          filteredExpenses = filteredExpenses.filter(
+            (expense: any) =>
+              expense.create_checking_quickbooks === (filterValue === "true")
+          );
+          break;
+        case "create_billing_item":
+          filteredExpenses = filteredExpenses.filter(
+            (expense: any) =>
+              expense.create_billing_item === (filterValue === "true")
+          );
+          break;
+        case "date_of_check":
+          filteredExpenses = filteredExpenses.filter((expense: any) =>
+            expense.date_of_check
+              ? expense.date_of_check.includes(filterValue)
+              : false
+          );
+          break;
+        case "check_number":
+          filteredExpenses = filteredExpenses.filter((expense: any) =>
+            expense.check_number.includes(filterValue)
+          );
+          break;
+        case "last_update_from_quickbooks":
+          filteredExpenses = filteredExpenses.filter((expense: any) =>
+            expense.last_update_from_quickbooks.includes(filterValue)
+          );
+          break;
+        case "copy_of_check":
+          filteredExpenses = filteredExpenses.filter((expense: any) =>
+            expense.copy_of_check
+              ? expense.copy_of_check.name.includes(filterValue)
+              : false
+          );
+          break;
+        case "status":
+          filteredExpenses = filteredExpenses.filter(
+            (expense: any) => expense.status === filterValue
+          );
+          break;
+        default:
+          break;
+      }
+    }
+
+    if (sortBy !== "created_date") {
+      try {
+        filteredExpenses.sort((a: any, b: any) => {
+          let compareValue = 0;
+          switch (sortBy) {
+            case "amount":
+              compareValue = a.amount - b.amount;
+              break;
+            case "expense_type":
+              compareValue = a.expense_type.localeCompare(b.expense_type);
+              break;
+            case "payee":
+              compareValue =
+                a.payee && b.payee
+                  ? a.payee.full_name.localeCompare(b.payee.full_name)
+                  : a.payee
+                  ? -1
+                  : b.payee
+                  ? 1
+                  : 0;
+              break;
+            case "type":
+              compareValue = a.type.localeCompare(b.type);
+              break;
+            case "invoice_number":
+              compareValue =
+                a.invoice_number && b.invoice_number
+                  ? a.invoice_number.localeCompare(b.invoice_number)
+                  : a.invoice_number
+                  ? -1
+                  : b.invoice_number
+                  ? 1
+                  : 0;
+              break;
+            case "attachment":
+              compareValue =
+                a.attachment && b.attachment
+                  ? a.attachment.name.localeCompare(b.attachment.name)
+                  : a.attachment
+                  ? -1
+                  : b.attachment
+                  ? 1
+                  : 0;
+              break;
+            case "invoice_date":
+              compareValue =
+                a.invoice_date && b.invoice_date
+                  ? a.invoice_date.localeCompare(b.invoice_date)
+                  : a.invoice_date
+                  ? -1
+                  : b.invoice_date
+                  ? 1
+                  : 0;
+              break;
+            case "due_date":
+              compareValue =
+                a.due_date && b.due_date
+                  ? a.due_date.localeCompare(b.due_date)
+                  : a.due_date
+                  ? -1
+                  : b.due_date
+                  ? 1
+                  : 0;
+              break;
+            case "bill_no":
+              compareValue =
+                a.bill_no && b.bill_no
+                  ? a.bill_no.localeCompare(b.bill_no)
+                  : a.bill_no
+                  ? -1
+                  : b.bill_no
+                  ? 1
+                  : 0;
+              break;
+            case "description":
+              compareValue = a.description.localeCompare(b.description);
+              break;
+            case "memo":
+              break;
+            case "notes":
+              compareValue = a.notes.localeCompare(b.notes);
+              break;
+            case "create_in_quickbooks":
+              compareValue = a.create_checking_quickbooks
+                ? 1
+                : b.create_checking_quickbooks
+                ? -1
+                : 0;
+              break;
+            case "create_billing_item":
+              compareValue = a.create_billing_item
+                ? 1
+                : b.create_billing_item
+                ? -1
+                : 0;
+              break;
+            case "date_of_check":
+              compareValue =
+                a.date_of_check && b.date_of_check
+                  ? a.date_of_check.localeCompare(b.date_of_check)
+                  : a.date_of_check
+                  ? -1
+                  : b.date_of_check
+                  ? 1
+                  : 0;
+              break;
+            case "check_number":
+              compareValue =
+                a.check_number && b.check_number
+                  ? a.check_number - b.check_number
+                  : a.check_number
+                  ? -1
+                  : b.check_number
+                  ? 1
+                  : 0;
+              break;
+            case "last_update_from_quickbooks":
+              compareValue =
+                a.last_update_from_quickbooks && b.last_update_from_quickbooks
+                  ? a.last_update_from_quickbooks.localeCompare(
+                      b.last_update_from_quickbooks
+                    )
+                  : a.last_update_from_quickbooks
+                  ? -1
+                  : b.last_update_from_quickbooks
+                  ? 1
+                  : 0;
+              break;
+            case "status":
+              compareValue = a.status.localeCompare(b.status);
+              break;
+            default:
+              compareValue = a.created_at.localeCompare(b.created_at);
+              break;
+          }
+          return compareValue * (sortDir === "asc" ? -1 : 1);
+        });
+      } catch (error: any) {
+        console.error("sorting expenses error", error);
+        return c.json({ error: error.message }, 500);
+      }
+    }
+
+    const paginatedExpenses = filteredExpenses.slice(
+      (page - 1) * limit,
+      page * limit
+    );
+
+    return c.json(
+      {
+        data: paginatedExpenses,
+        total: count,
+        limit,
+        page,
+      },
+      200
+    );
+  } catch (error: any) {
+    console.error("getting expenses error", error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
 //create expense
 app.post("/expenses/cases/:caseId", async (c) => {
   const userId = c.get("userId");

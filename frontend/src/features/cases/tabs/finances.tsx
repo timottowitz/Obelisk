@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import InvoiceModal from './components/invoice-modal';
 import ExpenseCard from './components/expense-card';
 import ExpenseTable from './components/expense-table';
+import { useExpenses } from '@/hooks/useExpenses';
 import {
   Select,
   SelectContent,
@@ -14,44 +16,43 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import { Expense } from '@/types/expenses';
 
-const mockExpenseItems = [
-  {
-    createdAt: '3/14/2025 at 9:58 AM',
-    amountDisplay: '$1,815.00',
-    expenseType: 'Bill',
-    payee: {
-      name: 'White Horse Group LLC',
-      contactPerson: 'Steve Herrera',
-      phone: '2143940259',
-      email: 'white-horse@sbcglobal.net',
-      addressLine: '1024 Carmody, Mesquite, TX 75149'
-    },
-    invoiceNumber: '2501004',
-    invoiceAttachment: {
-      name: '2025.03.07- Invoice 2501004- Courtroom Setup D...'
-    },
-    dateOfInvoice: '3/7/2025',
-    dueDate: '4/7/2025',
-    expenseDescription:
-      'Court Room Set up, Days in Court and Courtroom Tear Down',
-    createInQuickbooks: 'Yes' as const,
-    createBillingItem: 'No' as const,
-    status: 'Deleted',
-    lastUpdatedFromQuickbooks: '4/1/2025 at 12:57pm (MDT)'
-  }
-];
 export default function Finances({ caseId }: { caseId: string }) {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [view, setView] = useState<'cards' | 'compact'>('cards');
   const [searchValue, setSearchValue] = useState('');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [filterBy, setFilterBy] = useState(
+    searchParams.get('filterBy') || 'all'
+  );
 
   const [queryParams, setQueryParams] = useState({
-    filterBy: 'all',
-    filterValue: '',
-    sortBy: 'created_date',
-    sortDir: 'desc'
+    filterBy: searchParams.get('filterBy') || 'all',
+    filterValue: searchParams.get('filterValue') || '',
+    sortBy: searchParams.get('sortBy') || 'created_date',
+    sortDir: searchParams.get('sortDir') || 'desc'
   });
+
+  const { data: expenses, isLoading } = useExpenses(
+    caseId,
+    queryParams.filterBy,
+    queryParams.filterValue,
+    queryParams.sortBy,
+    queryParams.sortDir
+  );
+
+  useEffect(() => {
+    router.push(
+      `?filterBy=${queryParams.filterBy}&filterValue=${queryParams.filterValue}&sortBy=${queryParams.sortBy}&sortDir=${queryParams.sortDir}`
+    );
+  }, [
+    queryParams.filterBy,
+    queryParams.filterValue,
+    queryParams.sortBy,
+    queryParams.sortDir
+  ]);
 
   return (
     <div className='space-y-6'>
@@ -71,10 +72,8 @@ export default function Finances({ caseId }: { caseId: string }) {
           <span className='text-muted-foreground text-sm'>Filter by</span>
           <div className='relative'>
             <Select
-              value={queryParams.filterBy}
-              onValueChange={(value) =>
-                setQueryParams({ ...queryParams, filterBy: value })
-              }
+              value={filterBy}
+              onValueChange={(value) => setFilterBy(value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder='Filter by' />
@@ -82,20 +81,14 @@ export default function Finances({ caseId }: { caseId: string }) {
               <SelectContent>
                 <SelectItem value='all'>All</SelectItem>
                 <SelectItem value='expense_type'>Expense Type</SelectItem>
-                <SelectItem value='entity_being_paid'>
-                  Entity Being Paid
-                </SelectItem>
+                <SelectItem value='payee'>Entity Being Paid</SelectItem>
                 <SelectItem value='type'>Type</SelectItem>
                 <SelectItem value='invoice_number'>Invoice Number</SelectItem>
-                <SelectItem value='invoice_attachment'>
-                  Invoice Attachment
-                </SelectItem>
-                <SelectItem value='date_of_invoice'>Date of Invoice</SelectItem>
+                <SelectItem value='attachment'>Invoice Attachment</SelectItem>
+                <SelectItem value='invoice_date'>Date of Invoice</SelectItem>
                 <SelectItem value='due_date'>Due Date</SelectItem>
                 <SelectItem value='bill_no'>Bill No</SelectItem>
-                <SelectItem value='expense_description'>
-                  Expense Description
-                </SelectItem>
+                <SelectItem value='description'>Expense Description</SelectItem>
                 <SelectItem value='memo'>Memo</SelectItem>
                 <SelectItem value='notes'>Notes</SelectItem>
                 <SelectItem value='notify_admin'>Notify Admin</SelectItem>
@@ -130,6 +123,16 @@ export default function Finances({ caseId }: { caseId: string }) {
             className='pl-9'
             aria-label='Filter items'
           />
+          <X
+            className='absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 cursor-pointer'
+            onClick={() => {
+              setSearchValue('');
+              setQueryParams({
+                ...queryParams,
+                filterValue: ''
+              });
+            }}
+          />
         </div>
 
         {/* Apply */}
@@ -140,7 +143,8 @@ export default function Finances({ caseId }: { caseId: string }) {
           onClick={() =>
             setQueryParams({
               ...queryParams,
-              filterValue: searchValue
+              filterValue: searchValue,
+              filterBy: filterBy
             })
           }
         >
@@ -163,36 +167,29 @@ export default function Finances({ caseId }: { caseId: string }) {
               <SelectContent>
                 <SelectItem value='created_date'>Created Date</SelectItem>
                 <SelectItem value='expense_type'>Expense Type</SelectItem>
-                <SelectItem value='entity_being_paid'>
-                  Entity Being Paid
-                </SelectItem>
+                <SelectItem value='payee'>Entity Being Paid</SelectItem>
+                <SelectItem value='amount'>Amount</SelectItem>
                 <SelectItem value='type'>Type</SelectItem>
                 <SelectItem value='invoice_number'>Invoice Number</SelectItem>
-                <SelectItem value='invoice_attachment'>
-                  Invoice Attachment
-                </SelectItem>
-                <SelectItem value='date_of_invoice'>Date of Invoice</SelectItem>
+                <SelectItem value='attachment'>Invoice Attachment</SelectItem>
+                <SelectItem value='invoice_date'>Date of Invoice</SelectItem>
                 <SelectItem value='due_date'>Due Date</SelectItem>
                 <SelectItem value='bill_no'>Bill No</SelectItem>
-                <SelectItem value='expense_description'>
-                  Expense Description
-                </SelectItem>
+                <SelectItem value='description'>Expense Description</SelectItem>
                 <SelectItem value='memo'>Memo</SelectItem>
                 <SelectItem value='notes'>Notes</SelectItem>
-                <SelectItem value='notify_admin'>Notify Admin</SelectItem>
                 <SelectItem value='create_in_quickbooks'>
                   Create in Quickbooks
                 </SelectItem>
                 <SelectItem value='create_billing_item'>
                   Create Billing Item
                 </SelectItem>
+                <SelectItem value='status'>Status</SelectItem>
                 <SelectItem value='date_of_check'>Date of Check</SelectItem>
                 <SelectItem value='check_number'>Check Number</SelectItem>
-                <SelectItem value='last_updated_from_quickbooks'>
+                <SelectItem value='last_update_from_quickbooks'>
                   Last Updated from Quickbooks
                 </SelectItem>
-                <SelectItem value='copy_of_check'>Copy of Check</SelectItem>
-                <SelectItem value='status'>Status</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -211,6 +208,7 @@ export default function Finances({ caseId }: { caseId: string }) {
             }
             aria-label='Ascending'
             title='Ascending'
+            className='cursor-pointer'
           >
             {queryParams.sortDir === 'asc' ? 'A↑' : 'Z↓'}
           </Button>
@@ -224,6 +222,7 @@ export default function Finances({ caseId }: { caseId: string }) {
             onClick={() => setView('cards')}
             aria-label='Cards view'
             title='Cards view'
+            className='cursor-pointer'
           >
             ▢
           </Button>
@@ -233,6 +232,7 @@ export default function Finances({ caseId }: { caseId: string }) {
             onClick={() => setView('compact')}
             aria-label='Compact view'
             title='Compact view'
+            className='cursor-pointer'
           >
             ≡
           </Button>
@@ -242,16 +242,23 @@ export default function Finances({ caseId }: { caseId: string }) {
       {/* Compact Table View */}
       {view === 'compact' && (
         <div className='bg-card rounded-md border'>
-          <ExpenseTable rows={mockExpenseItems} />
+          <ExpenseTable rows={expenses?.data || []} />
+        </div>
+      )}
+
+      {isLoading && (
+        <div className='flex h-full animate-pulse items-center justify-center'>
+          Loading...
         </div>
       )}
 
       {/* Cards View */}
       {view === 'cards' && (
         <div className='space-y-6'>
-          {mockExpenseItems.map((item) => (
-            <ExpenseCard key={item.createdAt} item={item} />
-          ))}
+          {expenses &&
+            expenses?.data.map((item: Expense) => (
+              <ExpenseCard key={item.id} item={item} />
+            ))}
         </div>
       )}
 

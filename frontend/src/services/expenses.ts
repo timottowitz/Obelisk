@@ -27,6 +27,29 @@ export class ExpensesService {
     return handleApiResponse<InitialDocument[]>(response);
   }
 
+  static async getExpenses(
+    caseId: string,
+    filterBy: string,
+    filterValue: string,
+    sortBy: string,
+    sortDir: string
+  ) {
+    const headers = await getAuthHeaders();
+    const response = await fetch(
+      `${BASE_URL}/cases/${caseId}?filterBy=${filterBy}&filterValue=${filterValue}&sortBy=${sortBy}&sortDir=${sortDir}`,
+      {
+        method: 'GET',
+        headers
+      }
+    );
+    return handleApiResponse<{
+      data: Expense[];
+      total: number;
+      limit: number;
+      page: number;
+    }>(response);
+  }
+
   static async createExpense(caseId: string, payload: FormData) {
     const headers = await getAuthHeaders();
     const uploadHeaders: Record<string, string> = {};

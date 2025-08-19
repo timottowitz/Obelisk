@@ -11,13 +11,51 @@ export interface InitialDocument {
 export interface Expense {
   id: string;
   case_id: string;
-  name: string;
-  expense_type_id: string;
+  expense_type: string;
   amount: number;
-  payee_id: string;
-  payee_name: string;
+  payee: {
+    id: string;
+    full_name: string;
+    phones: {
+      id: string;
+      number: string;
+      phoneLabel: {
+        icon: string;
+        name: string;
+      };
+    }[];
+    emails: {
+      id: string;
+      address: string;
+    }[];
+    addresses: {
+      id: string;
+      fullAddress: string;
+      addressLabel: string;
+    }[];
+  } | null;
+  attachment: {
+    name: string;
+  } | null;
+  copy_of_check: {
+    name: string;
+  } | null;
+  status: string;
   type: string;
-  invoice_number: string;
-  invoice_date: string;
-  expense_description: string;
+  invoice_number: string | null;
+  invoice_date: string | null;
+  due_date: string | null;
+  description: string | null;
+  memo: string | null;
+  notes: string | null;
+  create_checking_quickbooks: boolean;
+  create_billing_item: string | null;
+  last_update_from_quickbooks: string | null;
+  bill_no: string | null;
+  date_of_check: string | null;
+  check_number: string | null;
+  copy_of_check_id: string | null;
+  notify_admin_of_check_payment: boolean | null;
+  created_at: string;
+  updated_at: string;
 }
