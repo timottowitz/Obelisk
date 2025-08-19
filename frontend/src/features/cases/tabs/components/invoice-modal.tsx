@@ -575,7 +575,7 @@ export default function InvoiceModal({
                 </div>
                 <div className='text-muted-foreground col-span-1 text-sm'>
                   Selecting <span className='font-semibold'>YES</span> will
-                  create an billing item in Filevine's native Time & Billing
+                  create an billing item in Filevine&apos;s native Time & Billing
                   section, allowing you to recover the expense on the next
                   invoice to this client.
                 </div>
