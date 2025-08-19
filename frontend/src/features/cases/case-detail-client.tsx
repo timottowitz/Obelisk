@@ -46,13 +46,13 @@ export default function CaseDetailClient({ caseId }: CaseDetailClientProps) {
   } = useGetCase(caseId);
 
   return (
-    <div className='h-[calc(100vh-4rem)] overflow-y-auto bg-gray-50'>
+    <div className='h-[calc(100vh-4rem)] overflow-y-auto bg-background'>
       {/* Header */}
-      <div className='border-b border-gray-200 bg-white px-6 py-4'>
+      <div className='border-b border bg-card px-6 py-4'>
         <div className='flex items-center justify-between'>
           <div className='flex items-center space-x-4'>
             <div
-              className='flex cursor-pointer items-center space-x-2 text-gray-600 transition-colors hover:text-gray-900'
+              className='flex cursor-pointer items-center space-x-2 text-muted-foreground transition-colors hover:text-foreground'
               onClick={() =>
                 router.push(
                   `/dashboard/cases?type=${caseData?.case_types.display_name.toLowerCase()}`
@@ -69,7 +69,7 @@ export default function CaseDetailClient({ caseId }: CaseDetailClientProps) {
               <Upload className='h-4 w-4' />
               <span>Upload New Document</span>
             </Button>
-            <Button className='flex items-center space-x-2 bg-red-600 hover:bg-red-700'>
+            <Button className='flex items-center space-x-2 bg-red-600 text-white hover:bg-red-700'>
               <FileText className='h-4 w-4' />
               <span>File Additional Claim/Counterclaim</span>
             </Button>
@@ -78,46 +78,46 @@ export default function CaseDetailClient({ caseId }: CaseDetailClientProps) {
       </div>
 
       {/* Case Information Header */}
-      <div className='bg-white px-6 py-6'>
+      <div className='bg-card px-6 py-6'>
         <div className='flex items-start space-x-4'>
           <div className='flex-shrink-0'>
-            <div className='flex h-12 w-12 items-center justify-center rounded-lg bg-red-100'>
+            <div className='flex h-12 w-12 items-center justify-center rounded-lg bg-red-600/10'>
               <Scale className='h-6 w-6 text-red-600' />
             </div>
           </div>
 
           <div className='flex-1'>
-            <h2 className='mb-2 text-2xl font-bold text-gray-900'>
+            <h2 className='mb-2 text-2xl font-bold text-foreground'>
               {caseData?.full_name}
             </h2>
 
-            <div className='flex flex-wrap items-center gap-x-3 text-sm text-gray-600'>
+            <div className='flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground'>
               <span className='flex items-center gap-1'>
                 <span className='font-medium'>Case Number:</span>
                 <span>{caseData?.case_number}</span>
               </span>
 
-              <span className='text-gray-400'>•</span>
+              <span className='text-muted-foreground'>•</span>
 
               <span className='flex items-center gap-1'>
                 <span className='font-medium'>Manager:</span>
                 <span>{caseData?.case_manager}</span>
               </span>
 
-              <span className='text-gray-400'>•</span>
+              <span className='text-muted-foreground'>•</span>
 
               <span className='flex items-center gap-1'>
                 <span className='font-medium'>Phone:</span>
                 <span>{caseData?.phone}</span>
               </span>
 
-              <span className='text-gray-400'>•</span>
+              <span className='text-muted-foreground'>•</span>
 
               <span className='flex items-center gap-1'>
                 <span className='font-medium'>Email:</span>
                 <a
                   href={`mailto:${caseData?.email}`}
-                  className='text-blue-600 hover:text-blue-800 hover:underline'
+                  className='text-primary hover:text-primary/80 hover:underline'
                 >
                   {caseData?.email}
                 </a>
@@ -128,7 +128,7 @@ export default function CaseDetailClient({ caseId }: CaseDetailClientProps) {
       </div>
 
       {/* Navigation Tabs */}
-      <div className='w-full border-b border-gray-200 bg-transparent'>
+      <div className='w-full border-b border bg-transparent'>
         <div className='px-6'>
           <Tabs
             value={activeTab}
