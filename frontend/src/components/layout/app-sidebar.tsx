@@ -210,7 +210,7 @@ export default function AppSidebar() {
           <SidebarMenu>
             {footerItems.map((item) => {
               const Icon = item.icon ? Icons[item.icon] : Icons.logo;
-              const isActive = pathname === item.url;
+              const isActive = pathname.includes(item.url);
               return (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton

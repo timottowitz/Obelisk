@@ -2,30 +2,16 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Edit,
-  Folder,
-  Gavel,
-  FileText,
-  Briefcase,
-  Scale,
-  Trash
-} from 'lucide-react';
+import { Folder, Gavel, FileText, Briefcase, Scale } from 'lucide-react';
 import { CaseType } from '@/types/cases';
 import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface CaseTypeCardProps {
   caseType: CaseType;
-  onSelectDelete: (caseType: CaseType) => void;
-  onSelectEdit: (caseType: CaseType) => void;
 }
 
-export function CaseTypeCard({
-  caseType,
-  onSelectDelete,
-  onSelectEdit
-}: CaseTypeCardProps) {
+export function CaseTypeCard({ caseType }: CaseTypeCardProps) {
   const router = useRouter();
   const getIconComponent = useCallback((iconName: string) => {
     const icons: { [key: string]: any } = {
@@ -57,24 +43,6 @@ export function CaseTypeCard({
             <div>
               <CardTitle className='text-lg'>{caseType.display_name}</CardTitle>
             </div>
-          </div>
-          <div className='flex items-center gap-2'>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => onSelectEdit(caseType)}
-              className='cursor-pointer'
-            >
-              <Edit className='h-4 w-4' />
-            </Button>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => onSelectDelete(caseType)}
-              className='cursor-pointer'
-            >
-              <Trash className='h-4 w-4 text-red-500' />
-            </Button>
           </div>
         </div>
       </CardHeader>

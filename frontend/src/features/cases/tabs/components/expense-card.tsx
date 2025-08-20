@@ -1,16 +1,121 @@
-import { FileText, Phone, Mail, MapPin } from 'lucide-react';
+import {
+  FileText,
+  Phone,
+  Mail,
+  MapPin,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  Cloud
+} from 'lucide-react';
 import { Expense } from '@/types/expenses';
-import { memo } from 'react';
+import { memo, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { QuickbooksService } from '@/services/quickbooks';
+import { toast } from 'sonner';
+import dayjs from 'dayjs';
 
 function ExpenseCard({ item }: { item: Expense }) {
+  const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState(
+    item.qb_sync_status || 'not_synced'
+  );
+
+  const handleSyncToQuickBooks = async () => {
+    setSyncing(true);
+    try {
+      const result = await QuickbooksService.syncExpense(item.id);
+      if (result.success) {
+        setSyncStatus('synced');
+        toast.success(
+          `Expense synced as ${result.entity_type} (ID: ${result.qb_id})`
+        );
+      }
+    } catch (error) {
+      setSyncStatus('error');
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Failed to sync expense to QuickBooks'
+      );
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const getSyncStatusBadge = () => {
+    if (syncing) {
+      return (
+        <Badge variant='secondary' className='gap-1'>
+          <Loader2 className='h-3 w-3 animate-spin' />
+          Syncing...
+        </Badge>
+      );
+    }
+
+    switch (syncStatus) {
+      case 'synced':
+        return (
+          <Badge variant='default' className='gap-1 bg-green-600'>
+            <CheckCircle className='h-3 w-3' />
+            Synced to QB
+          </Badge>
+        );
+      case 'error':
+        return (
+          <Badge variant='destructive' className='gap-1'>
+            <XCircle className='h-3 w-3' />
+            Sync Error
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant='outline' className='gap-1'>
+            <Cloud className='h-3 w-3' />
+            Not Synced
+          </Badge>
+        );
+    }
+  };
+
   return (
     <div className='border-border dark:bg-card rounded-md border bg-white shadow-sm'>
       <div className='border-border bg-muted/40 flex items-center justify-between border-b px-4 py-2 dark:bg-transparent'>
-        <div className='text-muted-foreground text-xs'>
-          Created: {item.created_at}
+        <div className='flex items-center gap-4'>
+          <div className='text-muted-foreground text-xs'>
+            Created: {dayjs(item.created_at).format('MM/DD/YYYY')} at{' '}
+            {dayjs(item.created_at).format('hh:mm A')}
+          </div>
+          {getSyncStatusBadge()}
         </div>
-        <div className='text-foreground text-right text-lg font-semibold'>
-          ${item.amount.toFixed(2)}
+        <div className='flex items-center gap-4'>
+          {syncStatus !== 'synced' &&
+            item.create_checking_quickbooks &&
+            item.payee_id && (
+              <Button
+                size='sm'
+                variant='outline'
+                onClick={handleSyncToQuickBooks}
+                disabled={syncing}
+                className='cursor-pointer bg-green-600 hover:bg-green-700'
+              >
+                {syncing ? (
+                  <>
+                    <Loader2 className='mr-2 h-3 w-3 animate-spin' />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <Cloud className='mr-2 h-3 w-3' />
+                    Sync to QuickBooks
+                  </>
+                )}
+              </Button>
+            )}
+          <div className='text-foreground text-right text-lg font-semibold'>
+            ${item.amount.toLocaleString()}
+          </div>
         </div>
       </div>
 
@@ -76,11 +181,15 @@ function ExpenseCard({ item }: { item: Expense }) {
           </div>
           <div>
             <div className='text-muted-foreground text-xs'>Date of Invoice</div>
-            <div className='text-sm'>{item.invoice_date || '-'}</div>
+            <div className='text-sm'>
+              {item.invoice_date ? dayjs(item.invoice_date).format('MM/DD/YYYY') : '-'}
+            </div>
           </div>
           <div>
             <div className='text-muted-foreground text-xs'>Due Date</div>
-            <div className='text-sm'>{item.due_date || '-'}</div>
+            <div className='text-sm'>
+              {item.due_date ? dayjs(item.due_date).format('MM/DD/YYYY') : '-'}
+            </div>
           </div>
         </div>
 
@@ -114,7 +223,9 @@ function ExpenseCard({ item }: { item: Expense }) {
         <div className='space-y-4'>
           <div>
             <div className='text-muted-foreground text-xs'>Date of Check</div>
-            <div className='text-sm'>{item.date_of_check || '-'}</div>
+            <div className='text-sm'>
+              {item.date_of_check ? dayjs(item.date_of_check).format('MM/DD/YYYY') : '-'}
+            </div>
           </div>
           <div>
             <div className='text-muted-foreground text-xs'>Check Number</div>

@@ -32,11 +32,12 @@ export class ExpensesService {
     filterBy: string,
     filterValue: string,
     sortBy: string,
-    sortDir: string
+    sortDir: string,
+    page: number
   ) {
     const headers = await getAuthHeaders();
     const response = await fetch(
-      `${BASE_URL}/cases/${caseId}?filterBy=${filterBy}&filterValue=${filterValue}&sortBy=${sortBy}&sortDir=${sortDir}`,
+      `${BASE_URL}/cases/${caseId}?filterBy=${filterBy}&filterValue=${filterValue}&sortBy=${sortBy}&sortDir=${sortDir}&page=${page}`,
       {
         method: 'GET',
         headers
@@ -47,6 +48,7 @@ export class ExpensesService {
       total: number;
       limit: number;
       page: number;
+      totalAmount: number;
     }>(response);
   }
 

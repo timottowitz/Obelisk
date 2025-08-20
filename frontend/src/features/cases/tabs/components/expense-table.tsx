@@ -9,9 +9,16 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { FileText } from 'lucide-react';
 import { Expense } from '@/types/expenses';
+import dayjs from 'dayjs';
 
-export default function ExpenseTable({ rows }: { rows: Expense[] }) {
-  const totalAmountDisplay = '$82,022.60';
+export default function ExpenseTable({
+  rows,
+  totalAmount
+}: {
+  rows: Expense[];
+  totalAmount: number;
+}) {
+  const totalAmountDisplay = `$${totalAmount.toLocaleString()}`;
 
   return (
     <div className='space-y-2'>
@@ -87,7 +94,9 @@ export default function ExpenseTable({ rows }: { rows: Expense[] }) {
                 <TableCell>
                   <Checkbox aria-label={`Select row ${idx + 1}`} />
                 </TableCell>
-                <TableCell className='font-medium'>${r.amount.toFixed(2)}</TableCell>
+                <TableCell className='font-medium'>
+                  ${r.amount.toLocaleString()}
+                </TableCell>
                 <TableCell className='truncate'>{r.expense_type}</TableCell>
                 <TableCell className='w-auto'>
                   <div className='flex items-start gap-2'>
@@ -148,9 +157,11 @@ export default function ExpenseTable({ rows }: { rows: Expense[] }) {
                   )}
                 </TableCell>
                 <TableCell className='truncate'>
-                  {r.invoice_date || '—'}
+                  {dayjs(r.invoice_date).format('MM/DD/YYYY') || '—'}
                 </TableCell>
-                <TableCell className='truncate'>{r.due_date || '—'}</TableCell>
+                <TableCell className='truncate'>
+                  {dayjs(r.due_date).format('MM/DD/YYYY') || '—'}
+                </TableCell>
                 <TableCell className='hidden xl:table-cell'>
                   {r.bill_no || '—'}
                 </TableCell>
@@ -174,7 +185,7 @@ export default function ExpenseTable({ rows }: { rows: Expense[] }) {
                 </TableCell>
                 <TableCell className='truncate'>{r.status || '—'}</TableCell>
                 <TableCell className='hidden 2xl:table-cell'>
-                  {r.date_of_check || '—'}
+                  {dayjs(r.date_of_check).format('MM/DD/YYYY') || '—'}
                 </TableCell>
                 <TableCell className='hidden 2xl:table-cell'>
                   {r.check_number || '—'}
@@ -186,7 +197,7 @@ export default function ExpenseTable({ rows }: { rows: Expense[] }) {
                   {r.copy_of_check?.name || '—'}
                 </TableCell>
                 <TableCell className='hidden break-words lg:table-cell'>
-                  {r.created_at || '—'}
+                  {dayjs(r.created_at).format('MM/DD/YYYY hh:mm A') || '—'}
                 </TableCell>
               </TableRow>
             ))}

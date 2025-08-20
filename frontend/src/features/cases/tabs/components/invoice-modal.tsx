@@ -31,6 +31,32 @@ import { useDebounce } from '@/hooks/use-debounce';
 import ContactModal from '@/features/contacts/components/contact-modal';
 import { toast } from 'sonner';
 
+const DEFAULT_COST_TYPES = [
+  "Arbitrator's Fees",
+  "Attorney's Fees",
+  'Certified Crash Report',
+  'Court Filing Fee',
+  'Demand Letter Drafting',
+  'Deposition Transcript',
+  'Expert Fee',
+  'Flight',
+  'Focus Group/Mock Trial',
+  'Gas',
+  'Hotel',
+  'Investigation',
+  'Mailing Service',
+  'Meal',
+  'Mediator Fees',
+  'Mefical Record',
+  'Medical Report',
+  'Notary',
+  'Open Records',
+  'Phone Conferencing',
+  'Postage',
+  'Service of Process',
+  'Taxi/Uber'
+];
+
 interface InvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -134,7 +160,9 @@ export default function InvoiceModal({
     return (
       form.expenseTypeId !== '' &&
       form.amount.trim() !== '' &&
-      form.createInQuickBooks !== '' &&
+      (form.expenseType !== 'Soft Costs'
+        ? form.createInQuickBooks !== ''
+        : true) &&
       (form.expenseType !== 'Soft Costs' ? form.payeeId !== '' : true)
     );
   }, [form.expenseTypeId, form.amount, form.createInQuickBooks, form.payeeId]);
@@ -246,7 +274,7 @@ export default function InvoiceModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className='h-[80vh] w-full !max-w-7xl overflow-y-auto border-2 border-border bg-white py-10 shadow-sm dark:bg-card'>
+        <DialogContent className='border-border dark:bg-card h-[80vh] w-full !max-w-7xl overflow-y-auto border-2 bg-white py-10 shadow-sm'>
           <DialogHeader>
             <DialogTitle>Create Expense</DialogTitle>
             <div className='flex items-center justify-between'>
@@ -459,9 +487,11 @@ export default function InvoiceModal({
                       <SelectValue placeholder='Unknown' />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value='unknown'>Unknown</SelectItem>
-                      <SelectItem value='service'>Service</SelectItem>
-                      <SelectItem value='product'>Product</SelectItem>
+                      {DEFAULT_COST_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -623,99 +653,105 @@ export default function InvoiceModal({
               </div>
 
               {/* Toggles */}
-              <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
-                <div className='col-span-1 space-y-2'>
-                  <Label>
-                    Create expense in QuickBooks?
-                    <span className='text-red-500'>*</span>
-                  </Label>
-                  <ToggleGroup
-                    type='single'
-                    value={form.createInQuickBooks}
-                    onValueChange={(v) =>
-                      setForm((p) => ({
-                        ...p,
-                        createInQuickBooks: (v as any) || ''
-                      }))
-                    }
-                    className='border-input border'
-                  >
-                    <ToggleGroupItem value='yes' className='px-6'>
-                      Yes
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value='no' className='px-6'>
-                      No
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
-                <div className='col-span-1 space-y-2'>
-                  <div className='text-muted-foreground text-sm'>
-                    Selecting <span className='font-semibold'>NO</span> &
-                    clicking the <span className='font-semibold'>Create</span>{' '}
-                    button &gt; this expense{' '}
-                    <span className='font-semibold'>WILL NOT</span> be sent to
-                    QuickBooks.
+              {form.expenseType !== 'Soft Costs' && (
+                <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
+                  <div className='col-span-1 space-y-2'>
+                    <Label>
+                      Create expense in QuickBooks?
+                      <span className='text-red-500'>*</span>
+                    </Label>
+                    <ToggleGroup
+                      type='single'
+                      value={form.createInQuickBooks}
+                      onValueChange={(v) =>
+                        setForm((p) => ({
+                          ...p,
+                          createInQuickBooks: (v as any) || ''
+                        }))
+                      }
+                      className='border-input border'
+                    >
+                      <ToggleGroupItem value='yes' className='px-6'>
+                        Yes
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value='no' className='px-6'>
+                        No
+                      </ToggleGroupItem>
+                    </ToggleGroup>
                   </div>
-                  <div className='text-muted-foreground text-sm'>
-                    Selecting <span className='font-semibold'>YES</span> &
-                    clicking the <span className='font-semibold'>Create</span>{' '}
-                    button &gt; this expense will be{' '}
-                    <span className='font-semibold'>SENT</span> to QuickBooks.
+                  <div className='col-span-1 space-y-2'>
+                    <div className='text-muted-foreground text-sm'>
+                      Selecting <span className='font-semibold'>NO</span> &
+                      clicking the <span className='font-semibold'>Create</span>{' '}
+                      button &gt; this expense{' '}
+                      <span className='font-semibold'>WILL NOT</span> be sent to
+                      QuickBooks.
+                    </div>
+                    <div className='text-muted-foreground text-sm'>
+                      Selecting <span className='font-semibold'>YES</span> &
+                      clicking the <span className='font-semibold'>Create</span>{' '}
+                      button &gt; this expense will be{' '}
+                      <span className='font-semibold'>SENT</span> to QuickBooks.
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
-                <div className='col-span-1 space-y-2'>
-                  <Label>Create Billing Item?</Label>
-                  <ToggleGroup
-                    type='single'
-                    value={form.createBillingItem}
-                    onValueChange={(v) =>
-                      setForm((p) => ({
-                        ...p,
-                        createBillingItem: (v as any) || 'unknown'
-                      }))
-                    }
-                    className='border-input border'
-                  >
-                    <ToggleGroupItem value='yes' className='p-4'>
-                      Yes
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value='no' className='p-4'>
-                      No
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value='unknown' className='p-4'>
-                      Unknown
-                    </ToggleGroupItem>
-                  </ToggleGroup>
+              )}
+              {form.expenseType !== 'Soft Costs' && (
+                <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
+                  <div className='col-span-1 space-y-2'>
+                    <Label>Create Billing Item?</Label>
+                    <ToggleGroup
+                      type='single'
+                      value={form.createBillingItem}
+                      onValueChange={(v) =>
+                        setForm((p) => ({
+                          ...p,
+                          createBillingItem: (v as any) || 'unknown'
+                        }))
+                      }
+                      className='border-input border'
+                    >
+                      <ToggleGroupItem value='yes' className='p-4'>
+                        Yes
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value='no' className='p-4'>
+                        No
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value='unknown' className='p-4'>
+                        Unknown
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+                  <div className='text-muted-foreground col-span-1 text-sm'>
+                    Selecting <span className='font-semibold'>YES</span> will
+                    create an billing item in Filevine&apos;s native Time &
+                    Billing section, allowing you to recover the expense on the
+                    next invoice to this client.
+                  </div>
                 </div>
-                <div className='text-muted-foreground col-span-1 text-sm'>
-                  Selecting <span className='font-semibold'>YES</span> will
-                  create an billing item in Filevine&apos;s native Time &
-                  Billing section, allowing you to recover the expense on the
-                  next invoice to this client.
-                </div>
-              </div>
+              )}
               {/* Payment Status */}
-              <div className='border-t pt-4'>
-                <Label className='mb-2 text-sm'>
-                  Last Updated From QuickBooks
-                </Label>
-                <Input
-                  type='text'
-                  placeholder='Last Updated From QuickBooks'
-                  value={form.lastUpdatedFromQuickBooks}
-                  onChange={(e) =>
-                    setForm((p) => ({
-                      ...p,
-                      lastUpdatedFromQuickBooks: e.target.value
-                    }))
-                  }
-                />
-              </div>
+              {form.expenseType !== 'Soft Costs' && (
+                <div className='border-t pt-4'>
+                  <Label className='mb-2 text-sm'>
+                    Last Updated From QuickBooks
+                  </Label>
+                  <Input
+                    type='text'
+                    placeholder='Last Updated From QuickBooks'
+                    value={form.lastUpdatedFromQuickBooks}
+                    onChange={(e) =>
+                      setForm((p) => ({
+                        ...p,
+                        lastUpdatedFromQuickBooks: e.target.value
+                      }))
+                    }
+                  />
+                </div>
+              )}
 
               {form.expenseType === 'Check' && (
-                <div className='flex items-center justify-start gap-2 border-t border-border pt-4'>
+                <div className='border-border flex items-center justify-start gap-2 border-t pt-4'>
                   <div className='space-y-2'>
                     <Label>Add Docs</Label>
                     {!form.copyOfCheck && (
@@ -788,7 +824,7 @@ export default function InvoiceModal({
               )}
 
               {/* Footer Buttons (mirrors header for convenience on long forms) */}
-              <div className='flex items-center justify-end gap-2 border-t border-border pt-4'>
+              <div className='border-border flex items-center justify-end gap-2 border-t pt-4'>
                 <Button
                   type='button'
                   variant='outline'

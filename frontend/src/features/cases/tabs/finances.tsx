@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,15 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Expense } from '@/types/expenses';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious
+} from '@/components/ui/pagination';
+import { cn } from '@/lib/utils';
 
 export default function Finances({ caseId }: { caseId: string }) {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
@@ -32,7 +41,8 @@ export default function Finances({ caseId }: { caseId: string }) {
     filterBy: searchParams.get('filterBy') || 'all',
     filterValue: searchParams.get('filterValue') || '',
     sortBy: searchParams.get('sortBy') || 'created_date',
-    sortDir: searchParams.get('sortDir') || 'desc'
+    sortDir: searchParams.get('sortDir') || 'desc',
+    page: Number(searchParams.get('page')) || 1
   });
 
   const { data: expenses, isLoading } = useExpenses(
@@ -40,13 +50,56 @@ export default function Finances({ caseId }: { caseId: string }) {
     queryParams.filterBy,
     queryParams.filterValue,
     queryParams.sortBy,
-    queryParams.sortDir
+    queryParams.sortDir,
+    queryParams.page
   );
 
+  const totalPages = Math.ceil((expenses?.total || 0) / 5);
+  const totalAmount = expenses?.totalAmount || 0;
+
+  const pageNumbers = useMemo(() => {
+    const pages: (number | string)[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (queryParams.page <= 4) {
+        for (let i = 1; i <= 5; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (queryParams.page >= totalPages - 3) {
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('...');
+        for (let i = queryParams.page - 1; i <= queryParams.page + 1; i++)
+          pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      }
+    }
+    return pages;
+  }, [totalPages, queryParams.page]);
   useEffect(() => {
     router.push(
-      `?filterBy=${queryParams.filterBy}&filterValue=${queryParams.filterValue}&sortBy=${queryParams.sortBy}&sortDir=${queryParams.sortDir}`
+      `?filterBy=${queryParams.filterBy}&filterValue=${queryParams.filterValue}&sortBy=${queryParams.sortBy}&sortDir=${queryParams.sortDir}&page=${queryParams.page}`
     );
+  }, [
+    queryParams.filterBy,
+    queryParams.filterValue,
+    queryParams.sortBy,
+    queryParams.sortDir,
+    queryParams.page
+  ]);
+
+  useEffect(() => {
+    setQueryParams({
+      ...queryParams,
+      page: 1
+    });
   }, [
     queryParams.filterBy,
     queryParams.filterValue,
@@ -61,7 +114,7 @@ export default function Finances({ caseId }: { caseId: string }) {
         <Button
           size='sm'
           onClick={() => setIsInvoiceModalOpen(true)}
-          className='bg-emerald-600 text-white hover:bg-emerald-700'
+          className='cursor-pointer bg-emerald-600 text-white hover:bg-emerald-700'
           aria-label='Add an item'
         >
           + Add an Item
@@ -138,7 +191,7 @@ export default function Finances({ caseId }: { caseId: string }) {
         {/* Apply */}
         <Button
           size='sm'
-          className='bg-emerald-600 text-white hover:bg-emerald-700'
+          className='cursor-pointer bg-emerald-600 text-white hover:bg-emerald-700'
           aria-label='Apply filters'
           onClick={() =>
             setQueryParams({
@@ -239,26 +292,94 @@ export default function Finances({ caseId }: { caseId: string }) {
         </div>
       </div>
 
-      {/* Compact Table View */}
-      {view === 'compact' && (
-        <div className='bg-card rounded-md border'>
-          <ExpenseTable rows={expenses?.data || []} />
-        </div>
-      )}
-
       {isLoading && (
         <div className='flex h-full animate-pulse items-center justify-center'>
           Loading...
         </div>
       )}
 
+      {/* Compact Table View */}
+      {view === 'compact' && (
+        <div className='bg-card rounded-md border'>
+          <ExpenseTable rows={expenses?.data || []} totalAmount={totalAmount} />
+        </div>
+      )}
+
       {/* Cards View */}
       {view === 'cards' && (
-        <div className='space-y-6'>
+        <div className='space-y-2'>
+          <p className='text-foreground pb-0 text-right text-lg font-semibold'>
+            ${totalAmount.toLocaleString()}
+          </p>
           {expenses &&
             expenses?.data.map((item: Expense) => (
               <ExpenseCard key={item.id} item={item} />
             ))}
+        </div>
+      )}
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className='flex items-center justify-between'>
+          <p className='text-muted-foreground text-sm'>
+            Showing {(queryParams.page - 1) * 5 + 1}-
+            {Math.min(queryParams.page * 5, expenses?.total || 0)} of{' '}
+            {expenses?.total || 0} tasks
+          </p>
+
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() =>
+                    setQueryParams({
+                      ...queryParams,
+                      page: Math.max(1, queryParams.page - 1)
+                    })
+                  }
+                  className={cn(
+                    'cursor-pointer rounded-lg px-3 transition-all duration-200',
+                    queryParams.page === 1 && 'pointer-events-none opacity-50'
+                  )}
+                />
+              </PaginationItem>
+
+              {pageNumbers.map((page, index) => (
+                <PaginationItem key={index}>
+                  {page === '...' ? (
+                    <span className='text-muted-foreground cursor-pointer px-3 py-2 text-sm'>
+                      ...
+                    </span>
+                  ) : (
+                    <PaginationLink
+                      onClick={() =>
+                        setQueryParams({ ...queryParams, page: Number(page) })
+                      }
+                      isActive={queryParams.page === Number(page)}
+                      className='cursor-pointer rounded-lg px-3 transition-all duration-200'
+                    >
+                      {page}
+                    </PaginationLink>
+                  )}
+                </PaginationItem>
+              ))}
+
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() =>
+                    setQueryParams({
+                      ...queryParams,
+                      page: Math.min(totalPages, queryParams.page + 1)
+                    })
+                  }
+                  className={cn(
+                    'cursor-pointer rounded-lg px-3 transition-all duration-200',
+                    queryParams.page === totalPages &&
+                      'pointer-events-none opacity-50'
+                  )}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       )}
 

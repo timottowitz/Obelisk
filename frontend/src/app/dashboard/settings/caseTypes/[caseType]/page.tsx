@@ -1,4 +1,6 @@
 import { ManageFolderTemplates } from '@/features/settings/manage-folder-templates';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
 
 export default async function CaseTypePage(props: {
   params: Promise<{ caseType: string }>;
