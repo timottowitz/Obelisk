@@ -55,6 +55,7 @@ export default function Finances({ caseId }: { caseId: string }) {
   );
 
   const totalPages = Math.ceil((expenses?.total || 0) / 5);
+  const totalAmount = expenses?.totalAmount || 0;
 
   const pageNumbers = useMemo(() => {
     const pages: (number | string)[] = [];
@@ -113,7 +114,7 @@ export default function Finances({ caseId }: { caseId: string }) {
         <Button
           size='sm'
           onClick={() => setIsInvoiceModalOpen(true)}
-          className='bg-emerald-600 text-white hover:bg-emerald-700'
+          className='cursor-pointer bg-emerald-600 text-white hover:bg-emerald-700'
           aria-label='Add an item'
         >
           + Add an Item
@@ -190,7 +191,7 @@ export default function Finances({ caseId }: { caseId: string }) {
         {/* Apply */}
         <Button
           size='sm'
-          className='bg-emerald-600 text-white hover:bg-emerald-700'
+          className='cursor-pointer bg-emerald-600 text-white hover:bg-emerald-700'
           aria-label='Apply filters'
           onClick={() =>
             setQueryParams({
@@ -300,20 +301,22 @@ export default function Finances({ caseId }: { caseId: string }) {
       {/* Compact Table View */}
       {view === 'compact' && (
         <div className='bg-card rounded-md border'>
-          <ExpenseTable rows={expenses?.data || []} />
+          <ExpenseTable rows={expenses?.data || []} totalAmount={totalAmount} />
         </div>
       )}
 
       {/* Cards View */}
       {view === 'cards' && (
-        <div className='space-y-6'>
+        <div className='space-y-2'>
+          <p className='text-foreground pb-0 text-right text-lg font-semibold'>
+            ${totalAmount.toLocaleString()}
+          </p>
           {expenses &&
             expenses?.data.map((item: Expense) => (
               <ExpenseCard key={item.id} item={item} />
             ))}
         </div>
       )}
-
       {/* Pagination */}
       {totalPages > 1 && (
         <div className='flex items-center justify-between'>

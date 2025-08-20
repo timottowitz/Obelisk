@@ -227,6 +227,8 @@ app.get("/expenses/cases/:caseId", async (c) => {
       return c.json({ error: expensesError.message }, 500);
     }
 
+    let totalAmount = 0;
+
     for (const expense of expenses) {
       const { data: expenseType, error: expenseTypeError } = await supabase
         .schema("public")
@@ -283,6 +285,8 @@ app.get("/expenses/cases/:caseId", async (c) => {
       } else {
         expense.copy_of_check = null;
       }
+
+      totalAmount += expense.amount;
     }
 
     let filteredExpenses = expenses;
@@ -558,6 +562,7 @@ app.get("/expenses/cases/:caseId", async (c) => {
         total: count,
         limit,
         page,
+        totalAmount,
       },
       200
     );

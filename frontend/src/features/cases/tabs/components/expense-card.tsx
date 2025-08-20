@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { quickbooksService } from '@/services/quickbooks-service';
 import { toast } from 'sonner';
+import dayjs from 'dayjs';
 
 function ExpenseCard({ item }: { item: Expense }) {
   const [syncing, setSyncing] = useState(false);
@@ -83,7 +84,8 @@ function ExpenseCard({ item }: { item: Expense }) {
       <div className='border-border bg-muted/40 flex items-center justify-between border-b px-4 py-2 dark:bg-transparent'>
         <div className='flex items-center gap-4'>
           <div className='text-muted-foreground text-xs'>
-            Created: {item.created_at}
+            Created: {dayjs(item.created_at).format('MM/DD/YYYY')} at{' '}
+            {dayjs(item.created_at).format('hh:mm A')}
           </div>
           {getSyncStatusBadge()}
         </div>
@@ -110,7 +112,7 @@ function ExpenseCard({ item }: { item: Expense }) {
             </Button>
           )}
           <div className='text-foreground text-right text-lg font-semibold'>
-            ${item.amount.toFixed(2)}
+            ${item.amount.toLocaleString()}
           </div>
         </div>
       </div>
@@ -177,11 +179,15 @@ function ExpenseCard({ item }: { item: Expense }) {
           </div>
           <div>
             <div className='text-muted-foreground text-xs'>Date of Invoice</div>
-            <div className='text-sm'>{item.invoice_date || '-'}</div>
+            <div className='text-sm'>
+              {dayjs(item.invoice_date).format('MM/DD/YYYY') || '-'}
+            </div>
           </div>
           <div>
             <div className='text-muted-foreground text-xs'>Due Date</div>
-            <div className='text-sm'>{item.due_date || '-'}</div>
+            <div className='text-sm'>
+              {dayjs(item.due_date).format('MM/DD/YYYY') || '-'}
+            </div>
           </div>
         </div>
 
@@ -215,7 +221,9 @@ function ExpenseCard({ item }: { item: Expense }) {
         <div className='space-y-4'>
           <div>
             <div className='text-muted-foreground text-xs'>Date of Check</div>
-            <div className='text-sm'>{item.date_of_check || '-'}</div>
+            <div className='text-sm'>
+              {dayjs(item.date_of_check).format('MM/DD/YYYY') || '-'}
+            </div>
           </div>
           <div>
             <div className='text-muted-foreground text-xs'>Check Number</div>

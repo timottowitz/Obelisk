@@ -48,6 +48,7 @@ export class ExpensesService {
       total: number;
       limit: number;
       page: number;
+      totalAmount: number;
     }>(response);
   }
 
