@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -23,6 +23,7 @@ import { useOrganization } from '@clerk/nextjs';
 import { quickbooksService } from '@/services/quickbooks-service';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 interface QuickBooksStatus {
   connected: boolean;
@@ -40,12 +41,44 @@ export default function IntegrationsPage() {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const handledRef = useRef(false);
 
   useEffect(() => {
     if (organization) {
       fetchQuickBooksStatus();
     }
   }, [organization]);
+
+  useEffect(() => {
+    const code = searchParams.get('code');
+    const state = searchParams.get('state');
+    const realmId = searchParams.get('realmId');
+    const error = searchParams.get('error') || '';
+    if (handledRef.current) return;
+    if (code && state && realmId && error === '') {
+      handledRef.current = true;
+      handleCallback(code, state, realmId, error);
+    }
+  }, [searchParams, router]);
+
+  const handleCallback = async (
+    code: string,
+    state: string,
+    realmId: string,
+    error: string
+  ) => {
+    try {
+      await quickbooksService.getCallbackUrl(code, state, realmId, error);
+      toast.success('Successfully connected to QuickBooks.');
+      fetchQuickBooksStatus();
+      router.push('/dashboard/settings/integrations/quickbooks');
+    } catch (error) {
+      console.error('Failed to get callback URL:', error);
+      toast.error('Failed to connect to QuickBooks. Please try again.');
+    }
+  };
 
   const fetchQuickBooksStatus = async () => {
     try {
@@ -131,22 +164,14 @@ export default function IntegrationsPage() {
 
   return (
     <div className='space-y-6 p-8'>
-      <div className='flex items-center justify-between'>
-        <Button
-          onClick={() => window.history.back()}
-          className='cursor-pointer'
-        >
-          <ArrowLeft className='mr-2 h-4 w-4' />
-          Back to Integrations
-        </Button>
-        <Button asChild className='cursor-pointer' variant='destructive'>
-        <Link href='/dashboard/settings/integrations/quickbooks/mappings'>
-            Go to mappings
-          </Link>
-        </Button>
-      </div>
-      <div>
-        <h1 className='text-3xl font-bold tracking-tight'>QuickBooks Integrations</h1>
+      <Button onClick={() => window.history.back()} className='cursor-pointer'>
+        <ArrowLeft className='mr-2 h-4 w-4' />
+        Back to Integrations
+      </Button>
+      <div className='mb-4'>
+        <h1 className='text-3xl font-bold tracking-tight'>
+          QuickBooks Integrations
+        </h1>
         <p className='text-muted-foreground'>
           Connect your account with external services to automate workflows.
         </p>
@@ -259,7 +284,7 @@ export default function IntegrationsPage() {
               <Button
                 onClick={handleConnect}
                 disabled={connecting}
-                className='w-full'
+                className='w-full cursor-pointer'
               >
                 {connecting ? (
                   <>

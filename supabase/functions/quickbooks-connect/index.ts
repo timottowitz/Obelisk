@@ -20,14 +20,12 @@ app.use("/quickbooks-connect/*", extractUserAndOrgId);
 
 const QUICKBOOKS_CLIENT_ID = Deno.env.get("QUICKBOOKS_CLIENT_ID")!;
 const QUICKBOOKS_CLIENT_SECRET = Deno.env.get("QUICKBOOKS_CLIENT_SECRET")!;
-const QUICKBOOKS_REDIRECT_URI = Deno.env.get("QUICKBOOKS_REDIRECT_URI")!;
+const QUICKBOOKS_REDIRECT_URI =
+  "http://localhost:3001/dashboard/settings/integrations/quickbooks";
 const QUICKBOOKS_ENVIRONMENT =
   Deno.env.get("QUICKBOOKS_ENVIRONMENT") || "sandbox";
 
-const QUICKBOOKS_AUTH_URL =
-  QUICKBOOKS_ENVIRONMENT === "production"
-    ? "https://appcenter.intuit.com/connect/oauth2"
-    : "https://sandbox.appcenter.intuit.com/connect/oauth2";
+const QUICKBOOKS_AUTH_URL = "https://appcenter.intuit.com/connect/oauth2";
 
 const QUICKBOOKS_TOKEN_URL =
   "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
@@ -102,7 +100,7 @@ app.get("/quickbooks-connect/connect", extractUserAndOrgId, async (c) => {
   // Store state temporarily in database for verification
 
   // Store state in a temporary table (you might want to add this to migrations)
-  await supabase
+  const { data, error } = await supabase
     .schema("private")
     .from("oauth_states")
     .insert({
@@ -110,7 +108,16 @@ app.get("/quickbooks-connect/connect", extractUserAndOrgId, async (c) => {
       org_id: org.id,
       user_id: user.id,
       expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes
-    });
+    })
+    .select()
+    .single();
+
+  console.log(data, error);
+
+  if (error || !data) {
+    console.error("Failed to store state:", error);
+    return c.json({ error: "Failed to store state" }, 500);
+  }
 
   // Build authorization URL
   const params = new URLSearchParams({
@@ -145,6 +152,7 @@ app.get("/quickbooks-connect/callback", async (c) => {
     orgId,
     userId
   );
+
   // Verify state token
   const { data: stateData, error: stateError } = await supabase
     .schema("private")
@@ -166,11 +174,11 @@ app.get("/quickbooks-connect/callback", async (c) => {
     .eq("state", state);
 
   // Exchange authorization code for tokens
-  const tokenBody = new URLSearchParams({
+  const tokenBody = {
     grant_type: "authorization_code",
     code: code as string,
     redirect_uri: QUICKBOOKS_REDIRECT_URI,
-  });
+  };
 
   const authHeader = btoa(
     `${QUICKBOOKS_CLIENT_ID}:${QUICKBOOKS_CLIENT_SECRET}`
@@ -183,7 +191,7 @@ app.get("/quickbooks-connect/callback", async (c) => {
       "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
     },
-    body: tokenBody.toString(),
+    body: new URLSearchParams(tokenBody).toString(),
   });
 
   if (!tokenResponse.ok) {
@@ -220,9 +228,12 @@ app.get("/quickbooks-connect/callback", async (c) => {
   }
 
   // Return success with redirect URL for frontend
-  const frontendUrl = Deno.env.get("FRONTEND_URL") || "http://localhost:3000";
-  return c.redirect(
-    `${frontendUrl}/settings/integrations/quickbooks?connected=true`
+  return c.json(
+    {
+      success: true,
+      message: "Successfully connected to QuickBooks",
+    },
+    200
   );
 });
 
@@ -231,10 +242,7 @@ app.post("/quickbooks-connect/refresh", extractUserAndOrgId, async (c) => {
   const userId = c.get("userId");
   const orgId = c.get("orgId");
 
-  const { supabase, schema, user, member, org } = await getSupabaseAndOrgInfo(
-    orgId,
-    userId
-  );
+  const { supabase, org } = await getSupabaseAndOrgInfo(orgId, userId);
 
   if (!userId || !orgId) {
     return c.json({ error: "Unauthorized" }, 401);
@@ -245,7 +253,7 @@ app.post("/quickbooks-connect/refresh", extractUserAndOrgId, async (c) => {
     .schema("private")
     .from("quickbooks_connections")
     .select("*")
-    .eq("org_id", orgId)
+    .eq("org_id", org.id)
     .single();
 
   if (fetchError || !connection) {
@@ -291,7 +299,7 @@ app.post("/quickbooks-connect/refresh", extractUserAndOrgId, async (c) => {
       refresh_token: tokenData.refresh_token,
       token_expiry: tokenExpiry.toISOString(),
     })
-    .eq("org_id", orgId);
+    .eq("org_id", org.id);
 
   if (updateError) {
     console.error("Failed to update tokens:", updateError);
@@ -309,10 +317,7 @@ app.delete("/quickbooks-connect/disconnect", extractUserAndOrgId, async (c) => {
   const userId = c.get("userId");
   const orgId = c.get("orgId");
 
-  const { supabase, schema, user, member, org } = await getSupabaseAndOrgInfo(
-    orgId,
-    userId
-  );
+  const { supabase, org } = await getSupabaseAndOrgInfo(orgId, userId);
 
   if (!userId || !orgId) {
     return c.json({ error: "Unauthorized" }, 401);
@@ -322,7 +327,7 @@ app.delete("/quickbooks-connect/disconnect", extractUserAndOrgId, async (c) => {
     .schema("private")
     .from("quickbooks_connections")
     .delete()
-    .eq("org_id", orgId);
+    .eq("org_id", org.id);
 
   if (error) {
     console.error("Failed to disconnect QuickBooks:", error);
@@ -337,20 +342,16 @@ app.get("/quickbooks-connect/status", extractUserAndOrgId, async (c) => {
   const userId = c.get("userId");
   const orgId = c.get("orgId");
 
-  const { supabase, schema, user, member, org } = await getSupabaseAndOrgInfo(
-    orgId,
-    userId
-  );
-
   if (!userId || !orgId) {
     return c.json({ error: "Unauthorized" }, 401);
   }
+  const { supabase, org } = await getSupabaseAndOrgInfo(orgId, userId);
 
   const { data: connection, error } = await supabase
     .schema("private")
     .from("quickbooks_connections")
     .select("realm_id, token_expiry, is_sandbox")
-    .eq("org_id", orgId)
+    .eq("org_id", org.id)
     .single();
 
   if (error || !connection) {

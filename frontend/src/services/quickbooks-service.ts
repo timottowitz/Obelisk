@@ -56,6 +56,22 @@ export const quickbooksService = {
     );
     return handleApiResponse<{ authUrl: string }>(response);
   },
+
+  getCallbackUrl: async (
+    code: string,
+    state: string,
+    realmId: string,
+    error: string
+  ) => {
+    const response = await fetch(
+      `${API_CONFIG.QUICKBOOKS_CONNECT_BASE_URL}/callback?code=${code}&state=${state}&realmId=${realmId}&error=${error}`,
+      {
+        method: 'GET',
+        headers: await getAuthHeaders()
+      }
+    );
+    return handleApiResponse(response);
+  },
   getStatus: async () => {
     const response = await fetch(
       `${API_CONFIG.QUICKBOOKS_CONNECT_BASE_URL}/status`,
