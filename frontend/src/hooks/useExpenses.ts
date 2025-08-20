@@ -21,10 +21,10 @@ export const useInitialDocuments = (caseId: string) => {
   });
 };
 
-export const useExpenses = (caseId: string, filterBy: string, filterValue: string, sortBy: string, sortDir: string) => {
+export const useExpenses = (caseId: string, filterBy: string, filterValue: string, sortBy: string, sortDir: string, page: number) => {
   return useQuery({
-    queryKey: [...QUERY_KEYS.expenses, caseId, filterBy, filterValue, sortBy, sortDir],
-    queryFn: () => ExpensesService.getExpenses(caseId, filterBy, filterValue, sortBy, sortDir)
+    queryKey: [...QUERY_KEYS.expenses, caseId, filterBy, filterValue, sortBy, sortDir, page],
+    queryFn: () => ExpensesService.getExpenses(caseId, filterBy, filterValue, sortBy, sortDir, page)
   });
 };
 
