@@ -98,7 +98,7 @@ function ExpenseCard({ item }: { item: Expense }) {
                 variant='outline'
                 onClick={handleSyncToQuickBooks}
                 disabled={syncing}
-                className='cursor-pointer bg-green-600 hover:bg-green-700'
+                className='cursor-pointer bg-green-600 hover:bg-green-700 text-white'
               >
                 {syncing ? (
                   <>

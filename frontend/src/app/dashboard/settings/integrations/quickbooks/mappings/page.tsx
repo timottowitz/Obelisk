@@ -268,7 +268,7 @@ export default function QuickBooksMappingsPage() {
                       <TableCell className='font-medium'>
                         {mapping.cost_type}
                         {DEFAULT_COST_TYPES.includes(mapping.cost_type) && (
-                          <Badge variant='secondary' className='ml-2'>
+                          <Badge variant='secondary' className='ml-2 bg-primary text-white'>
                             Default
                           </Badge>
                         )}
@@ -335,7 +335,11 @@ export default function QuickBooksMappingsPage() {
             </div>
 
             <div className='flex justify-end'>
-              <Button onClick={handleSaveMappings} disabled={saving}>
+              <Button
+                onClick={handleSaveMappings}
+                disabled={saving}
+                className='cursor-pointer'
+              >
                 {saving ? (
                   <>
                     <Loader2 className='mr-2 h-4 w-4 animate-spin' />

@@ -21,7 +21,7 @@ app.use("/quickbooks-connect/*", extractUserAndOrgId);
 const QUICKBOOKS_CLIENT_ID = Deno.env.get("QUICKBOOKS_CLIENT_ID")!;
 const QUICKBOOKS_CLIENT_SECRET = Deno.env.get("QUICKBOOKS_CLIENT_SECRET")!;
 const QUICKBOOKS_REDIRECT_URI =
-  "http://localhost:3001/dashboard/settings/integrations/quickbooks";
+  "http://localhost:3000/dashboard/settings/integrations/quickbooks";
 const QUICKBOOKS_ENVIRONMENT =
   Deno.env.get("QUICKBOOKS_ENVIRONMENT") || "sandbox";
 
