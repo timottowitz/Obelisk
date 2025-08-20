@@ -142,7 +142,7 @@ export const practiceAreaItems: NavItem[] = [
 export const footerItems: NavItem[] = [
   {
     title: 'Settings',
-    url: '/dashboard/settings/caseTypes',
+    url: '/dashboard/settings',
     icon: 'settings',
     isActive: false,
     shortcut: ['s', 's'],
