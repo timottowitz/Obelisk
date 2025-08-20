@@ -216,7 +216,7 @@ export default function QuickBooksMappingsPage() {
         <Alert>
           <AlertCircle className='h-4 w-4' />
           <AlertDescription>
-            No QuickBooks accounts found. Please ensure you're connected to
+            No QuickBooks accounts found. Please ensure you&apos;re connected to
             QuickBooks and have accounts set up.
           </AlertDescription>
         </Alert>
