@@ -12,7 +12,7 @@ import { Expense } from '@/types/expenses';
 import { memo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { quickbooksService } from '@/services/quickbooks-service';
+import { QuickbooksService } from '@/services/quickbooks';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
 
@@ -25,7 +25,7 @@ function ExpenseCard({ item }: { item: Expense }) {
   const handleSyncToQuickBooks = async () => {
     setSyncing(true);
     try {
-      const result = await quickbooksService.syncExpense(item.id);
+      const result = await QuickbooksService.syncExpense(item.id);
       if (result.success) {
         setSyncStatus('synced');
         toast.success(
@@ -90,27 +90,29 @@ function ExpenseCard({ item }: { item: Expense }) {
           {getSyncStatusBadge()}
         </div>
         <div className='flex items-center gap-4'>
-          {syncStatus !== 'synced' && item.create_checking_quickbooks && (
-            <Button
-              size='sm'
-              variant='outline'
-              onClick={handleSyncToQuickBooks}
-              disabled={syncing}
-              className='cursor-pointer bg-green-600 hover:bg-green-700'
-            >
-              {syncing ? (
-                <>
-                  <Loader2 className='mr-2 h-3 w-3 animate-spin' />
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  <Cloud className='mr-2 h-3 w-3' />
-                  Sync to QuickBooks
-                </>
-              )}
-            </Button>
-          )}
+          {syncStatus !== 'synced' &&
+            item.create_checking_quickbooks &&
+            item.payee_id && (
+              <Button
+                size='sm'
+                variant='outline'
+                onClick={handleSyncToQuickBooks}
+                disabled={syncing}
+                className='cursor-pointer bg-green-600 hover:bg-green-700'
+              >
+                {syncing ? (
+                  <>
+                    <Loader2 className='mr-2 h-3 w-3 animate-spin' />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <Cloud className='mr-2 h-3 w-3' />
+                    Sync to QuickBooks
+                  </>
+                )}
+              </Button>
+            )}
           <div className='text-foreground text-right text-lg font-semibold'>
             ${item.amount.toLocaleString()}
           </div>
@@ -180,13 +182,13 @@ function ExpenseCard({ item }: { item: Expense }) {
           <div>
             <div className='text-muted-foreground text-xs'>Date of Invoice</div>
             <div className='text-sm'>
-              {dayjs(item.invoice_date).format('MM/DD/YYYY') || '-'}
+              {item.invoice_date ? dayjs(item.invoice_date).format('MM/DD/YYYY') : '-'}
             </div>
           </div>
           <div>
             <div className='text-muted-foreground text-xs'>Due Date</div>
             <div className='text-sm'>
-              {dayjs(item.due_date).format('MM/DD/YYYY') || '-'}
+              {item.due_date ? dayjs(item.due_date).format('MM/DD/YYYY') : '-'}
             </div>
           </div>
         </div>
@@ -222,7 +224,7 @@ function ExpenseCard({ item }: { item: Expense }) {
           <div>
             <div className='text-muted-foreground text-xs'>Date of Check</div>
             <div className='text-sm'>
-              {dayjs(item.date_of_check).format('MM/DD/YYYY') || '-'}
+              {item.date_of_check ? dayjs(item.date_of_check).format('MM/DD/YYYY') : '-'}
             </div>
           </div>
           <div>

@@ -1,57 +1,14 @@
 import { API_CONFIG, getAuthHeaders, handleApiResponse } from '@/config/api';
+import { AccountMapping, QuickBooksAccount, QuickBooksClass } from '@/types/quickbooks';
 
-// export interface QuickBooksStatus {
-//   connected: boolean;
-//   realm_id?: string;
-//   is_sandbox?: boolean;
-//   expired?: boolean;
-//   expires_at?: string;
-// }
-
-// export interface QuickBooksAccount {
-//   id: string;
-//   name: string;
-//   account_type: string;
-//   account_sub_type?: string;
-//   active: boolean;
-// }
-
-// export interface QuickBooksClass {
-//   id: string;
-//   name: string;
-//   active: boolean;
-//   parent_ref?: { value: string };
-// }
-
-export interface AccountMapping {
-  cost_type: string;
-  qb_account_id?: string;
-  qb_account_name?: string;
-  qb_class_id?: string;
-  qb_class_name?: string;
-}
-
-// export interface FinanceSyncResult {
-//   success: boolean;
-//   qb_id?: string;
-//   entity_type?: string;
-//   error?: string;
-// }
-
-// export interface CustomerSyncResult {
-//   success: boolean;
-//   qb_customer_id?: string;
-//   qb_sub_customer_id?: string;
-//   error?: string;
-// }
-
-export const quickbooksService = {
+export const QuickbooksService = {
   getAuthUrl: async () => {
+    const headers = await getAuthHeaders();
     const response = await fetch(
       `${API_CONFIG.QUICKBOOKS_CONNECT_BASE_URL}/connect`,
       {
         method: 'GET',
-        headers: await getAuthHeaders()
+        headers
       }
     );
     return handleApiResponse<{ authUrl: string }>(response);
@@ -63,51 +20,56 @@ export const quickbooksService = {
     realmId: string,
     error: string
   ) => {
+    const headers = await getAuthHeaders();
     const response = await fetch(
       `${API_CONFIG.QUICKBOOKS_CONNECT_BASE_URL}/callback?code=${code}&state=${state}&realmId=${realmId}&error=${error}`,
       {
         method: 'GET',
-        headers: await getAuthHeaders()
+        headers
       }
     );
     return handleApiResponse(response);
   },
   getStatus: async () => {
+    const headers = await getAuthHeaders();
     const response = await fetch(
       `${API_CONFIG.QUICKBOOKS_CONNECT_BASE_URL}/status`,
       {
         method: 'GET',
-        headers: await getAuthHeaders()
+        headers
       }
     );
     return handleApiResponse(response);
   },
   refreshToken: async () => {
+    const headers = await getAuthHeaders();
     const response = await fetch(
       `${API_CONFIG.QUICKBOOKS_CONNECT_BASE_URL}/refresh`,
       {
         method: 'POST',
-        headers: await getAuthHeaders()
+        headers
       }
     );
     return handleApiResponse(response);
   },
   disconnect: async () => {
+    const headers = await getAuthHeaders();
     const response = await fetch(
       `${API_CONFIG.QUICKBOOKS_CONNECT_BASE_URL}/disconnect`,
       {
         method: 'DELETE',
-        headers: await getAuthHeaders()
+        headers
       }
     );
     return handleApiResponse(response);
   },
   syncExpense: async (expenseId: string) => {
+    const headers = await getAuthHeaders();
     const response = await fetch(
       `${API_CONFIG.QUICKBOOKS_SYNC_BASE_URL}/expense/${expenseId}`,
       {
         method: 'POST',
-        headers: await getAuthHeaders()
+        headers
       }
     );
     return handleApiResponse<{
@@ -117,52 +79,57 @@ export const quickbooksService = {
     }>(response);
   },
   syncExpenseBatch: async (expenseIds: string[]) => {
+    const headers = await getAuthHeaders();
     const response = await fetch(
       `${API_CONFIG.QUICKBOOKS_SYNC_BASE_URL}/expense/batch`,
       {
         method: 'POST',
-        headers: await getAuthHeaders(),
+        headers,
         body: JSON.stringify({ expenseIds })
       }
     );
     return handleApiResponse(response);
   },
   syncCustomer: async (caseId: string) => {
+    const headers = await getAuthHeaders();
     const response = await fetch(
       `${API_CONFIG.QUICKBOOKS_SYNC_BASE_URL}/customer/${caseId}`,
       {
         method: 'POST',
-        headers: await getAuthHeaders()
+        headers
       }
     );
     return handleApiResponse(response);
   },
   getAccounts: async () => {
+    const headers = await getAuthHeaders();
     const response = await fetch(
       `${API_CONFIG.QUICKBOOKS_SYNC_BASE_URL}/accounts`,
       {
         method: 'GET',
-        headers: await getAuthHeaders()
+        headers
       }
     );
-    return handleApiResponse(response);
+    return handleApiResponse<{ accounts: QuickBooksAccount[] }>(response);
   },
   getClasses: async () => {
+    const headers = await getAuthHeaders();
     const response = await fetch(
       `${API_CONFIG.QUICKBOOKS_SYNC_BASE_URL}/classes`,
       {
         method: 'GET',
-        headers: await getAuthHeaders()
+        headers
       }
     );
-    return handleApiResponse(response);
+    return handleApiResponse<{ classes: QuickBooksClass[] }>(response);
   },
   saveMapping: async (mapping: AccountMapping) => {
+    const headers = await getAuthHeaders();
     const response = await fetch(
-      `${API_CONFIG.QUICKBOOKS_SYNC_BASE_URL}/mapping`,
+      `${API_CONFIG.QUICKBOOKS_SYNC_BASE_URL}/save-mapping`,
       {
         method: 'POST',
-        headers: await getAuthHeaders(),
+        headers,
         body: JSON.stringify(mapping)
       }
     );

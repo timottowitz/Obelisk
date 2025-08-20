@@ -20,7 +20,7 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { useOrganization } from '@clerk/nextjs';
-import { quickbooksService } from '@/services/quickbooks-service';
+import { QuickbooksService } from '@/services/quickbooks';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -70,7 +70,7 @@ export default function IntegrationsPage() {
     error: string
   ) => {
     try {
-      await quickbooksService.getCallbackUrl(code, state, realmId, error);
+      await QuickbooksService.getCallbackUrl(code, state, realmId, error);
       toast.success('Successfully connected to QuickBooks.');
       fetchQuickBooksStatus();
       router.push('/dashboard/settings/integrations/quickbooks');
@@ -82,7 +82,7 @@ export default function IntegrationsPage() {
 
   const fetchQuickBooksStatus = async () => {
     try {
-      const response = await quickbooksService.getStatus();
+      const response = await QuickbooksService.getStatus();
       setQbStatus(response as QuickBooksStatus);
     } catch (error) {
       console.error('Failed to fetch QuickBooks status:', error);
@@ -94,7 +94,7 @@ export default function IntegrationsPage() {
   const handleConnect = async () => {
     setConnecting(true);
     try {
-      const response = await quickbooksService.getAuthUrl();
+      const response = await QuickbooksService.getAuthUrl();
       if (response.authUrl) {
         window.location.href = response.authUrl;
       }
@@ -109,7 +109,7 @@ export default function IntegrationsPage() {
   const handleDisconnect = async () => {
     setDisconnecting(true);
     try {
-      await quickbooksService.disconnect();
+      await QuickbooksService.disconnect();
       setQbStatus({ connected: false });
       toast.success('Successfully disconnected from QuickBooks.');
     } catch (error) {
@@ -122,7 +122,7 @@ export default function IntegrationsPage() {
 
   const handleRefreshToken = async () => {
     try {
-      await quickbooksService.refreshToken();
+      await QuickbooksService.refreshToken();
       await fetchQuickBooksStatus();
       toast.success('Successfully refreshed QuickBooks access token.');
     } catch (error) {

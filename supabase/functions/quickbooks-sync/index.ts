@@ -82,11 +82,11 @@ app.post("/quickbooks-sync/expense/:expenseId", async (c) => {
   const orgId = c.get("orgId");
   const expenseId = c.req.param("expenseId");
 
-  const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
+  const { supabase, schema, org } = await getSupabaseAndOrgInfo(orgId, userId);
 
   try {
     // Initialize QuickBooks client
-    const qbClient = new QuickBooksClient(orgId, schema);
+    const qbClient = new QuickBooksClient(org.id, schema);
     await qbClient.initialize();
 
     // Get expense record
@@ -123,10 +123,14 @@ app.post("/quickbooks-sync/expense/:expenseId", async (c) => {
     if (mappingError || !mapping) {
       return c.json(
         {
-          error: `No QuickBooks account mapping found for cost type: ${expense.expense_type}`,
+          error: `No QuickBooks account mapping found for cost type: ${expense.type}`,
         },
         400
       );
+    }
+
+    if (!expense.payee_id) {
+      return c.json({ error: "Payee not found" }, 404);
     }
 
     // Check if vendor exists or create one
@@ -134,7 +138,7 @@ app.post("/quickbooks-sync/expense/:expenseId", async (c) => {
     if (expense.payee_id) {
       const { data: payee, error: payeeError } = await supabase
         .schema(schema)
-        .from("payees")
+        .from("contacts")
         .select("*")
         .eq("id", expense.payee_id)
         .single();
@@ -177,7 +181,7 @@ app.post("/quickbooks-sync/expense/:expenseId", async (c) => {
       // Create Bill
       const bill = {
         VendorRef: { value: vendorId },
-        TxnDate: expense.incurred_date,
+        TxnDate: expense.invoice_date,
         Line: [
           {
             DetailType: "AccountBasedExpenseLineDetail",
@@ -202,7 +206,7 @@ app.post("/quickbooks-sync/expense/:expenseId", async (c) => {
       const purchase = {
         PaymentType: "Cash",
         AccountRef: { value: "4" }, // Default to operating account, should be configurable
-        TxnDate: expense.incurred_date,
+        TxnDate: expense.invoice_date,
         Line: [
           {
             DetailType: "AccountBasedExpenseLineDetail",
@@ -237,7 +241,7 @@ app.post("/quickbooks-sync/expense/:expenseId", async (c) => {
       .schema(schema)
       .from("case_expenses")
       .update({
-        status: "synced",
+        qb_sync_status: "synced",
         qb_id: qbId,
         qb_last_sync_at: new Date().toISOString(),
         qb_sync_error: null,
@@ -277,14 +281,14 @@ app.post("/quickbooks-sync/expense/batch", async (c) => {
   const orgId = c.get("orgId");
   const { expenseIds } = await c.req.json();
 
-  const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
+  const { schema, org } = await getSupabaseAndOrgInfo(orgId, userId);
 
   if (!Array.isArray(expenseIds) || expenseIds.length === 0) {
     return c.json({ error: "Invalid expense IDs" }, 400);
   }
 
   const results = [];
-  const qbClient = new QuickBooksClient(orgId, schema);
+  const qbClient = new QuickBooksClient(org.id, schema);
   await qbClient.initialize();
 
   for (const expenseId of expenseIds) {
@@ -318,17 +322,14 @@ app.post("/quickbooks-sync/customer/:caseId", async (c) => {
   const orgId = c.get("orgId");
   const caseId = c.req.param("caseId");
 
-  const { supabase, schema, user, member, org } = await getSupabaseAndOrgInfo(
-    orgId,
-    userId
-  );
+  const { supabase, schema, org } = await getSupabaseAndOrgInfo(orgId, userId);
 
   if (!userId || !orgId) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
   try {
-    const qbClient = new QuickBooksClient(orgId, schema);
+    const qbClient = new QuickBooksClient(org.id, schema);
     await qbClient.initialize();
 
     // Get case details
@@ -426,17 +427,14 @@ app.get("/quickbooks-sync/accounts", async (c) => {
   const userId = c.get("userId");
   const orgId = c.get("orgId");
 
-  const { supabase, schema, user, member, org } = await getSupabaseAndOrgInfo(
-    orgId,
-    userId
-  );
+  const { schema, org } = await getSupabaseAndOrgInfo(orgId, userId);
 
   if (!userId || !orgId) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
   try {
-    const qbClient = new QuickBooksClient(orgId, schema);
+    const qbClient = new QuickBooksClient(org.id, schema);
     await qbClient.initialize();
 
     const accounts = await qbClient.getAccounts();
@@ -455,17 +453,14 @@ app.get("/quickbooks-sync/classes", async (c) => {
   const userId = c.get("userId");
   const orgId = c.get("orgId");
 
-  const { supabase, schema, user, member, org } = await getSupabaseAndOrgInfo(
-    orgId,
-    userId
-  );
+  const { schema, org } = await getSupabaseAndOrgInfo(orgId, userId);
 
   if (!userId || !orgId) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
   try {
-    const qbClient = new QuickBooksClient(orgId, schema);
+    const qbClient = new QuickBooksClient(org.id, schema);
     await qbClient.initialize();
 
     const classes = await qbClient.getClasses();
@@ -485,14 +480,11 @@ app.post("/quickbooks-sync/save-mapping", async (c) => {
   const orgId = c.get("orgId");
   const mapping = await c.req.json();
 
-  const { supabase, schema, user, member, org } = await getSupabaseAndOrgInfo(
-    orgId,
-    userId
-  );
-
   if (!userId || !orgId) {
     return c.json({ error: "Unauthorized" }, 401);
   }
+
+  const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
 
   const { error } = await supabase
     .schema(schema)

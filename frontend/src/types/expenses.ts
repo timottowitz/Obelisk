@@ -13,6 +13,7 @@ export interface Expense {
   case_id: string;
   expense_type: string;
   amount: number;
+  payee_id: string;
   payee: {
     id: string;
     full_name: string;

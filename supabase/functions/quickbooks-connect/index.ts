@@ -89,10 +89,7 @@ app.get("/quickbooks-connect/connect", extractUserAndOrgId, async (c) => {
   const userId = c.get("userId");
   const orgId = c.get("orgId");
 
-  const { supabase, schema, user, member, org } = await getSupabaseAndOrgInfo(
-    orgId,
-    userId
-  );
+  const { supabase, user, org } = await getSupabaseAndOrgInfo(orgId, userId);
 
   // Generate CSRF state token
   const state = crypto.randomUUID();
@@ -148,10 +145,7 @@ app.get("/quickbooks-connect/callback", async (c) => {
     return c.json({ error: "Missing required parameters" }, 400);
   }
 
-  const { supabase, schema, user, member, org } = await getSupabaseAndOrgInfo(
-    orgId,
-    userId
-  );
+  const { supabase } = await getSupabaseAndOrgInfo(orgId, userId);
 
   // Verify state token
   const { data: stateData, error: stateError } = await supabase
