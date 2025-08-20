@@ -40,7 +40,8 @@ import { toast } from 'sonner';
 import {
   useQuickbooksClasses,
   useQuickbooksAccounts,
-  useQuickbooksSaveMapping
+  useQuickbooksSaveMapping,
+  useQuickbooksMappings
 } from '@/hooks/useQuickbooks';
 import { AccountMapping } from '@/types/quickbooks';
 
@@ -74,24 +75,40 @@ export default function QuickBooksMappingsPage() {
   const { data: classes, isLoading: isLoadingClasses } = useQuickbooksClasses();
   const { data: accounts, isLoading: isLoadingAccounts } =
     useQuickbooksAccounts();
+  const { data: savedMappings, isLoading: isLoadingMappings } = useQuickbooksMappings();
   const [saving, setSaving] = useState(false);
   const [mappings, setMappings] = useState<AccountMapping[]>([]);
   const [newCostType, setNewCostType] = useState('');
   const saveMapping = useQuickbooksSaveMapping();
 
   useEffect(() => {
-    if (accounts && classes) {
-      setMappings(
-        DEFAULT_COST_TYPES.map((costType) => ({
-          cost_type: costType,
-          qb_account_id: '',
-          qb_account_name: '',
-          qb_class_id: '',
-          qb_class_name: ''
-        }))
+    if (accounts && classes && savedMappings) {
+      // Create a map of saved mappings for quick lookup
+      const savedMappingsMap = new Map(
+        savedMappings.mappings.map((m: AccountMapping) => [m.cost_type, m])
       );
+
+      // Combine DEFAULT_COST_TYPES with any additional saved cost types
+      const allCostTypes = new Set([
+        ...DEFAULT_COST_TYPES,
+        ...savedMappings.mappings.map((m: AccountMapping) => m.cost_type)
+      ]);
+
+      // Create mappings with saved data where available
+      const initialMappings = Array.from(allCostTypes).map((costType) => {
+        const saved = savedMappingsMap.get(costType);
+        return {
+          cost_type: costType,
+          qb_account_id: saved?.qb_account_id || '',
+          qb_account_name: saved?.qb_account_name || '',
+          qb_class_id: saved?.qb_class_id || '',
+          qb_class_name: saved?.qb_class_name || ''
+        };
+      });
+
+      setMappings(initialMappings);
     }
-  }, [accounts, classes]);
+  }, [accounts, classes, savedMappings]);
 
   const handleAccountChange = (costType: string, accountId: string) => {
     const account = accounts?.accounts.find((a: any) => a.Id === accountId);
@@ -165,7 +182,7 @@ export default function QuickBooksMappingsPage() {
     }
   };
 
-  if (isLoadingClasses || isLoadingAccounts) {
+  if (isLoadingClasses || isLoadingAccounts || isLoadingMappings) {
     return (
       <div className='flex min-h-[400px] items-center justify-center'>
         <Loader2 className='h-8 w-8 animate-spin' />

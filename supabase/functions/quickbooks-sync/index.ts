@@ -474,6 +474,31 @@ app.get("/quickbooks-sync/classes", async (c) => {
   }
 });
 
+// Get existing account mappings
+app.get("/quickbooks-sync/mappings", async (c) => {
+  const userId = c.get("userId");
+  const orgId = c.get("orgId");
+
+  if (!userId || !orgId) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
+
+  const { data, error } = await supabase
+    .schema(schema)
+    .from("qb_account_mappings")
+    .select("*")
+    .eq("org_id", orgId);
+
+  if (error) {
+    console.error("Failed to fetch mappings:", error);
+    return c.json({ error: "Failed to fetch mappings" }, 500);
+  }
+
+  return c.json({ mappings: data || [] });
+});
+
 // Save account mapping
 app.post("/quickbooks-sync/save-mapping", async (c) => {
   const userId = c.get("userId");

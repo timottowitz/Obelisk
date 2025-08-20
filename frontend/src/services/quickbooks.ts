@@ -123,6 +123,17 @@ export const QuickbooksService = {
     );
     return handleApiResponse<{ classes: QuickBooksClass[] }>(response);
   },
+  getMappings: async () => {
+    const headers = await getAuthHeaders();
+    const response = await fetch(
+      `${API_CONFIG.QUICKBOOKS_SYNC_BASE_URL}/mappings`,
+      {
+        method: 'GET',
+        headers
+      }
+    );
+    return handleApiResponse<{ mappings: AccountMapping[] }>(response);
+  },
   saveMapping: async (mapping: AccountMapping) => {
     const headers = await getAuthHeaders();
     const response = await fetch(
