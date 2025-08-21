@@ -69,4 +69,22 @@ export class ExpensesService {
     });
     return handleApiResponse<Expense>(response);
   }
+
+  static async updateExpense(caseId: string, expenseId: string, payload: FormData) {
+    const headers = await getAuthHeaders();
+    const uploadHeaders: Record<string, string> = {};
+    if (typeof headers === 'object' && headers !== null) {
+      Object.entries(headers).forEach(([key, value]) => {
+        if (key.toLowerCase() !== 'content-type') {
+          uploadHeaders[key] = value as string;
+        }
+      });
+    }
+    const response = await fetch(`${BASE_URL}/cases/${caseId}/${expenseId}`, {
+      method: 'PUT',
+      headers: uploadHeaders,
+      body: payload
+    });
+    return handleApiResponse<Expense>(response);
+  }
 }

@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   useExpenseTypes,
   useInitialDocuments,
-  useCreateExpense
+  useCreateExpense,
+  useUpdateExpense
 } from '@/hooks/useExpenses';
 import { useContactsBySearch } from '@/hooks/useContacts';
 import { useCreateContact, useContactTypes } from '@/hooks/useContacts';
@@ -31,6 +32,7 @@ import { useDebounce } from '@/hooks/use-debounce';
 import ContactModal from '@/features/contacts/components/contact-modal';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { Expense } from '@/types/expenses';
 
 const DEFAULT_COST_TYPES = [
   "Arbitrator's Fees",
@@ -64,6 +66,7 @@ interface InvoiceModalProps {
   caseId: string;
   loading?: boolean;
   onCreate?: (payload: any) => void;
+  selectedExpense?: Expense | null;
 }
 
 // Combined form state for performance and simpler updates
@@ -86,7 +89,7 @@ type FormState = {
   lastUpdatedFromQuickBooks: string;
   copyOfCheck: File | null;
   copyOfCheckId: string;
-  notifyAdminOfCheckPayment: '';
+  notifyAdminOfCheckPayment: string | null;
   billNo: string;
   dueDate: string;
 };
@@ -95,7 +98,8 @@ export default function InvoiceModal({
   isOpen,
   onClose,
   caseId,
-  loading
+  loading,
+  selectedExpense
 }: InvoiceModalProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -110,6 +114,7 @@ export default function InvoiceModal({
     useContactTypes();
   const createContact = useCreateContact();
   const createExpense = useCreateExpense();
+  const updateExpense = useUpdateExpense();
   const { data: contacts, isLoading: isLoadingContacts } =
     useContactsBySearch(debouncedSearchTerm);
   const [isOpenContactModal, setIsOpenContactModal] = useState(false);
@@ -138,14 +143,77 @@ export default function InvoiceModal({
   });
 
   useEffect(() => {
-    if (expenseTypes) {
-      setForm((p) => ({
-        ...p,
-        expenseTypeId: expenseTypes[0].id,
-        expenseType: expenseTypes[0].name
-      }));
+    if (isOpen) {
+      if (selectedExpense) {
+        // Populate form with existing expense data for editing
+        setForm({
+          expenseType: selectedExpense.expense_type,
+          expenseTypeId: '', // Will be set when expenseTypes loads
+          amount: selectedExpense.amount.toString(),
+          payeeId: selectedExpense.payee_id,
+          payeeName: selectedExpense.payee?.full_name || '',
+          type: selectedExpense.type,
+          invoiceNumber: selectedExpense.invoice_number || '',
+          invoiceDate: selectedExpense.invoice_date || '',
+          expenseDescription: selectedExpense.description || '',
+          memo: selectedExpense.memo || '',
+          notes: selectedExpense.notes || '',
+          createInQuickBooks: selectedExpense.create_checking_quickbooks
+            ? 'yes'
+            : 'no',
+          createBillingItem: (selectedExpense.create_billing_item ||
+            'unknown') as 'yes' | 'no' | 'unknown',
+          attachment: null,
+          attachmentId: '',
+          copyOfCheck: null,
+          copyOfCheckId: selectedExpense.copy_of_check_id || '',
+          notifyAdminOfCheckPayment:
+            selectedExpense.notify_admin_of_check_payment,
+          lastUpdatedFromQuickBooks:
+            selectedExpense.last_update_from_quickbooks || '',
+          dueDate: selectedExpense.due_date || '',
+          billNo: selectedExpense.bill_no || ''
+        });
+      } else if (expenseTypes && expenseTypes.length > 0) {
+        // Reset to default values for new expense
+        setForm({
+          expenseType: expenseTypes[0].name,
+          expenseTypeId: expenseTypes[0].id,
+          amount: '',
+          payeeId: '',
+          payeeName: '',
+          type: "Arbitrator's Fees",
+          invoiceNumber: '',
+          invoiceDate: '',
+          expenseDescription: '',
+          memo: '',
+          notes: '',
+          createInQuickBooks: '',
+          createBillingItem: 'unknown',
+          attachment: null,
+          attachmentId: '',
+          copyOfCheck: null,
+          copyOfCheckId: '',
+          notifyAdminOfCheckPayment: '',
+          lastUpdatedFromQuickBooks: '',
+          dueDate: '',
+          billNo: ''
+        });
+      }
     }
-  }, [expenseTypes]);
+  }, [isOpen, selectedExpense, expenseTypes]);
+
+  // Set expenseTypeId when expenseTypes load and we have a selectedExpense
+  useEffect(() => {
+    if (selectedExpense && expenseTypes) {
+      const matchingType = expenseTypes.find(
+        (type) => type.name === selectedExpense.expense_type
+      );
+      if (matchingType) {
+        setForm((p) => ({ ...p, expenseTypeId: matchingType.id }));
+      }
+    }
+  }, [selectedExpense, expenseTypes]);
 
   useEffect(() => {
     if (expenseTypes && form.expenseTypeId) {
@@ -202,7 +270,10 @@ export default function InvoiceModal({
       formData.append('description', form.expenseDescription);
       formData.append('memo', form.memo);
       formData.append('notes', form.notes);
-      formData.append('create_checking_quickbooks', form.createInQuickBooks === 'yes' ? 'true' : 'false');
+      formData.append(
+        'create_checking_quickbooks',
+        form.createInQuickBooks === 'yes' ? 'true' : 'false'
+      );
       formData.append('create_billing_item', form.createBillingItem);
       if (form.expenseType === 'Bill') {
         formData.append('bill_no', form.billNo);
@@ -226,30 +297,28 @@ export default function InvoiceModal({
       );
 
       try {
-        await createExpense.mutateAsync({ caseId, payload: formData });
-        toast.success('Expense created successfully');
-        setForm({
-          ...form,
-          expenseTypeId: '',
-          amount: '',
-          payeeId: '',
-          payeeName: '',
-          type: "Arbitrator's Fees",
-          invoiceNumber: '',
-          invoiceDate: '',
-          expenseDescription: '',
-          memo: '',
-          notes: '',
-          createInQuickBooks: '',
-          createBillingItem: 'unknown',
-          attachment: null,
-          attachmentId: '',
-          lastUpdatedFromQuickBooks: ''
-        });
+        if (selectedExpense) {
+          await updateExpense.mutateAsync({
+            caseId,
+            expenseId: selectedExpense.id,
+            payload: formData
+          });
+          toast.success('Expense updated successfully');
+        } else {
+          await createExpense.mutateAsync({ caseId, payload: formData });
+          toast.success('Expense created successfully');
+        }
         onClose();
       } catch (error) {
-        console.error('Error creating expense:', error);
-        toast.error('Error creating expense');
+        console.error(
+          selectedExpense
+            ? 'Error updating expense:'
+            : 'Error creating expense:',
+          error
+        );
+        toast.error(
+          selectedExpense ? 'Error updating expense' : 'Error creating expense'
+        );
       }
     },
     [
@@ -266,7 +335,18 @@ export default function InvoiceModal({
       form.createInQuickBooks,
       form.createBillingItem,
       form.attachment,
-      form.attachmentId
+      form.attachmentId,
+      form.expenseType,
+      form.billNo,
+      form.dueDate,
+      form.copyOfCheck,
+      form.copyOfCheckId,
+      form.lastUpdatedFromQuickBooks,
+      selectedExpense,
+      createExpense,
+      updateExpense,
+      canSubmit,
+      onClose
     ]
   );
 
@@ -277,7 +357,9 @@ export default function InvoiceModal({
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className='border-border dark:bg-card h-[80vh] w-full !max-w-7xl overflow-y-auto border-2 bg-white py-10 shadow-sm'>
           <DialogHeader>
-            <DialogTitle>Create Expense</DialogTitle>
+            <DialogTitle>
+              {selectedExpense ? 'Update Expense' : 'Create Expense'}
+            </DialogTitle>
             <div className='flex items-center justify-between'>
               <div className='text-muted-foreground text-xs'>
                 <div className='font-medium'>Table of Contents</div>
@@ -296,7 +378,13 @@ export default function InvoiceModal({
                   disabled={!canSubmit || !!loading}
                   className='cursor-pointer'
                 >
-                  {loading ? 'Creating…' : 'Create'}
+                  {loading
+                    ? selectedExpense
+                      ? 'Updating…'
+                      : 'Creating…'
+                    : selectedExpense
+                      ? 'Update'
+                      : 'Create'}
                 </Button>
               </div>
             </div>
@@ -874,7 +962,13 @@ export default function InvoiceModal({
                   disabled={!canSubmit || !!loading}
                   className='cursor-pointer'
                 >
-                  {loading ? 'Creating…' : 'Create'}
+                  {loading
+                    ? selectedExpense
+                      ? 'Updating…'
+                      : 'Creating…'
+                    : selectedExpense
+                      ? 'Update'
+                      : 'Create'}
                 </Button>
               </div>
             </form>
