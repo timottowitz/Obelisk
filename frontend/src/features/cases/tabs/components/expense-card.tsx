@@ -6,7 +6,10 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
-  Cloud
+  Cloud,
+  File,
+  Image,
+  FileSpreadsheet
 } from 'lucide-react';
 import { Expense } from '@/types/expenses';
 import { memo, useState } from 'react';
@@ -15,6 +18,54 @@ import { Badge } from '@/components/ui/badge';
 import { QuickbooksService } from '@/services/quickbooks';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
+
+// Helper function to get file type info based on extension
+const getFileTypeInfo = (fileName: string) => {
+  const extension = fileName.split('.').pop()?.toLowerCase() || '';
+  
+  // PDF files
+  if (extension === 'pdf') {
+    return {
+      icon: FileText,
+      bgColor: 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400',
+      iconColor: 'text-red-600 dark:text-red-400'
+    };
+  }
+  
+  // Image files
+  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'].includes(extension)) {
+    return {
+      icon: Image,
+      bgColor: 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400',
+      iconColor: 'text-green-600 dark:text-green-400'
+    };
+  }
+  
+  // Word documents
+  if (['doc', 'docx', 'odt', 'rtf'].includes(extension)) {
+    return {
+      icon: FileText,
+      bgColor: 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400',
+      iconColor: 'text-blue-600 dark:text-blue-400'
+    };
+  }
+  
+  // Excel/Spreadsheet files
+  if (['xls', 'xlsx', 'csv', 'ods'].includes(extension)) {
+    return {
+      icon: FileSpreadsheet,
+      bgColor: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400',
+      iconColor: 'text-emerald-600 dark:text-emerald-400'
+    };
+  }
+  
+  // Default for other file types
+  return {
+    icon: File,
+    bgColor: 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950/30 dark:text-gray-400',
+    iconColor: 'text-gray-600 dark:text-gray-400'
+  };
+};
 
 function ExpenseCard({
   item,
@@ -197,12 +248,18 @@ function ExpenseCard({
               Invoice Attachment
             </div>
             {item.attachment ? (
-              <div className='mt-2 inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:border-blue-800 dark:bg-transparent dark:text-blue-400'>
-                <FileText className='h-3.5 w-3.5 text-blue-600 dark:text-blue-400' />
-                <span className='max-w-[15vw] truncate'>
-                  {item.attachment?.name}
-                </span>
-              </div>
+              (() => {
+                const fileInfo = getFileTypeInfo(item.attachment.name);
+                const IconComponent = fileInfo.icon;
+                return (
+                  <div className={`mt-2 inline-flex items-center gap-2 rounded-md border px-3 py-2 text-xs ${fileInfo.bgColor}`}>
+                    <IconComponent className={`h-3.5 w-3.5 ${fileInfo.iconColor}`} />
+                    <span className='max-w-[15vw] truncate'>
+                      {item.attachment.name}
+                    </span>
+                  </div>
+                );
+              })()
             ) : (
               <div className='text-muted-foreground text-xs'>None</div>
             )}

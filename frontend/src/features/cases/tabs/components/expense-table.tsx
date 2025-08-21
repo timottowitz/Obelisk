@@ -7,10 +7,58 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FileText } from 'lucide-react';
+import { FileText, File, Image, FileSpreadsheet } from 'lucide-react';
 import { Expense } from '@/types/expenses';
 import dayjs from 'dayjs';
 import { Badge } from '@/components/ui/badge';
+
+// Helper function to get file type info based on extension
+const getFileTypeInfo = (fileName: string) => {
+  const extension = fileName.split('.').pop()?.toLowerCase() || '';
+  
+  // PDF files
+  if (extension === 'pdf') {
+    return {
+      icon: FileText,
+      iconColor: 'text-red-500 dark:text-red-400',
+      textColor: 'text-red-600 dark:text-red-400'
+    };
+  }
+  
+  // Image files
+  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'].includes(extension)) {
+    return {
+      icon: Image,
+      iconColor: 'text-green-500 dark:text-green-400',
+      textColor: 'text-green-600 dark:text-green-400'
+    };
+  }
+  
+  // Word documents
+  if (['doc', 'docx', 'odt', 'rtf'].includes(extension)) {
+    return {
+      icon: FileText,
+      iconColor: 'text-blue-500 dark:text-blue-400',
+      textColor: 'text-blue-600 dark:text-blue-400'
+    };
+  }
+  
+  // Excel/Spreadsheet files
+  if (['xls', 'xlsx', 'csv', 'ods'].includes(extension)) {
+    return {
+      icon: FileSpreadsheet,
+      iconColor: 'text-emerald-500 dark:text-emerald-400',
+      textColor: 'text-emerald-600 dark:text-emerald-400'
+    };
+  }
+  
+  // Default for other file types
+  return {
+    icon: File,
+    iconColor: 'text-gray-500 dark:text-gray-400',
+    textColor: 'text-gray-600 dark:text-gray-400'
+  };
+};
 
 export default function ExpenseTable({
   rows,
@@ -150,15 +198,21 @@ export default function ExpenseTable({
                 </TableCell>
                 <TableCell className='hidden lg:table-cell'>
                   {r.attachment ? (
-                    <div className='flex items-center gap-2'>
-                      <FileText className='text-destructive h-4 w-4' />
-                      <a
-                        className='text-primary max-w-[240px] truncate underline-offset-2 hover:underline'
-                        href='#'
-                      >
-                        {r.attachment?.name}
-                      </a>
-                    </div>
+                    (() => {
+                      const fileInfo = getFileTypeInfo(r.attachment.name);
+                      const IconComponent = fileInfo.icon;
+                      return (
+                        <div className='flex items-center gap-2'>
+                          <IconComponent className={`h-4 w-4 ${fileInfo.iconColor}`} />
+                          <a
+                            className={`max-w-[240px] truncate underline-offset-2 hover:underline ${fileInfo.textColor}`}
+                            href='#'
+                          >
+                            {r.attachment.name}
+                          </a>
+                        </div>
+                      );
+                    })()
                   ) : (
                     <span className='text-muted-foreground'>—</span>
                   )}

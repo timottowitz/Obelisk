@@ -84,6 +84,7 @@ type FormState = {
   notes: string;
   createInQuickBooks: '' | 'yes' | 'no';
   createBillingItem: 'yes' | 'no' | 'unknown';
+  attachmentName: string;
   attachment: File | null;
   attachmentId: string;
   lastUpdatedFromQuickBooks: string;
@@ -132,6 +133,7 @@ export default function InvoiceModal({
     notes: '',
     createInQuickBooks: '',
     createBillingItem: 'unknown',
+    attachmentName: '',
     attachment: null,
     attachmentId: '',
     copyOfCheck: null,
@@ -163,6 +165,7 @@ export default function InvoiceModal({
             : 'no',
           createBillingItem: (selectedExpense.create_billing_item ||
             'unknown') as 'yes' | 'no' | 'unknown',
+          attachmentName: selectedExpense.attachment?.name || '',
           attachment: null,
           attachmentId: '',
           copyOfCheck: null,
@@ -190,6 +193,7 @@ export default function InvoiceModal({
           notes: '',
           createInQuickBooks: '',
           createBillingItem: 'unknown',
+          attachmentName: '',
           attachment: null,
           attachmentId: '',
           copyOfCheck: null,
@@ -202,6 +206,8 @@ export default function InvoiceModal({
       }
     }
   }, [isOpen, selectedExpense, expenseTypes]);
+
+  console.log(selectedExpense);
 
   // Set expenseTypeId when expenseTypes load and we have a selectedExpense
   useEffect(() => {
@@ -355,7 +361,10 @@ export default function InvoiceModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className='border-border dark:bg-card h-[80vh] w-full !max-w-7xl overflow-y-auto border-2 bg-white py-10 shadow-sm'>
+        <DialogContent
+          className='border-border dark:bg-card h-[80vh] w-full !max-w-7xl overflow-y-auto border-2 bg-white py-10 shadow-sm'
+          aria-describedby={undefined}
+        >
           <DialogHeader>
             <DialogTitle>
               {selectedExpense ? 'Update Expense' : 'Create Expense'}
@@ -600,7 +609,7 @@ export default function InvoiceModal({
                 {/* Invoice Attachment */}
                 <div className='space-y-2'>
                   <Label>Invoice Attachment</Label>
-                  {!form.attachment && (
+                  {!form.attachment && !form.attachmentName && (
                     <div className='flex items-center gap-3'>
                       <Select
                         value={form.attachmentId}
@@ -643,7 +652,7 @@ export default function InvoiceModal({
                       />
                     </div>
                   )}
-                  {form.attachment && (
+                  {form.attachment && !form.attachmentName && (
                     <div className='flex items-center gap-3'>
                       <div className='text-sm text-green-500'>
                         {form.attachment.name}
@@ -654,6 +663,23 @@ export default function InvoiceModal({
                         className='h-9 w-9 p-0 text-red-500'
                         onClick={() =>
                           setForm((p) => ({ ...p, attachment: null }))
+                        }
+                      >
+                        <Trash />
+                      </Button>
+                    </div>
+                  )}
+                  {form.attachmentName && form.attachmentName !== '' && (
+                    <div className='flex items-center gap-3'>
+                      <div className='text-sm text-green-500'>
+                        {form.attachmentName}
+                      </div>
+                      <Button
+                        type='button'
+                        variant='outline'
+                        className='h-9 w-9 p-0 text-red-500'
+                        onClick={() =>
+                          setForm((p) => ({ ...p, attachmentName: '' }))
                         }
                       >
                         <Trash />
