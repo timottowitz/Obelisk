@@ -14,10 +14,12 @@ import { Badge } from '@/components/ui/badge';
 
 export default function ExpenseTable({
   rows,
-  totalAmount
+  totalAmount,
+  onEdit
 }: {
   rows: Expense[];
   totalAmount: number;
+  onEdit: (expense: Expense) => void;
 }) {
   const totalAmountDisplay = `$${totalAmount.toLocaleString()}`;
 
@@ -91,6 +93,7 @@ export default function ExpenseTable({
               <TableRow
                 key={idx}
                 className='even:bg-muted/20 dark:odd:bg-card dark:even:bg-muted/20 border-border border-b odd:bg-white'
+                onClick={() => onEdit(r)}
               >
                 <TableCell>
                   <Checkbox aria-label={`Select row ${idx + 1}`} />

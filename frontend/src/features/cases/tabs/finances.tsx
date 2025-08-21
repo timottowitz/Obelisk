@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils';
 
 export default function Finances({ caseId }: { caseId: string }) {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [view, setView] = useState<'cards' | 'compact'>('cards');
   const [searchValue, setSearchValue] = useState('');
   const router = useRouter();
@@ -107,13 +108,21 @@ export default function Finances({ caseId }: { caseId: string }) {
     queryParams.sortDir
   ]);
 
+  const handleEditExpense = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setIsInvoiceModalOpen(true);
+  };
+
   return (
     <div className='space-y-6'>
       <div className='bg-card flex flex-wrap items-center gap-3 rounded-md border p-3'>
         {/* Add Item */}
         <Button
           size='sm'
-          onClick={() => setIsInvoiceModalOpen(true)}
+          onClick={() => {
+            setSelectedExpense(null);
+            setIsInvoiceModalOpen(true);
+          }}
           className='cursor-pointer bg-emerald-600 text-white hover:bg-emerald-700'
           aria-label='Add an item'
         >
@@ -301,7 +310,11 @@ export default function Finances({ caseId }: { caseId: string }) {
       {/* Compact Table View */}
       {view === 'compact' && (
         <div className='bg-card rounded-md border'>
-          <ExpenseTable rows={expenses?.data || []} totalAmount={totalAmount} />
+          <ExpenseTable
+            rows={expenses?.data || []}
+            totalAmount={totalAmount}
+            onEdit={handleEditExpense}
+          />
         </div>
       )}
 
@@ -313,7 +326,11 @@ export default function Finances({ caseId }: { caseId: string }) {
           </p>
           {expenses &&
             expenses?.data.map((item: Expense) => (
-              <ExpenseCard key={item.id} item={item} />
+              <ExpenseCard
+                key={item.id}
+                item={item}
+                onEdit={handleEditExpense}
+              />
             ))}
         </div>
       )}
@@ -385,8 +402,12 @@ export default function Finances({ caseId }: { caseId: string }) {
 
       <InvoiceModal
         isOpen={isInvoiceModalOpen}
-        onClose={() => setIsInvoiceModalOpen(false)}
+        onClose={() => {
+          setIsInvoiceModalOpen(false);
+          setSelectedExpense(null);
+        }}
         caseId={caseId}
+        selectedExpense={selectedExpense}
       />
     </div>
   );

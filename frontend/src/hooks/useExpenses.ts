@@ -44,3 +44,20 @@ export const useCreateExpense = () => {
     }
   });
 };
+
+export const useUpdateExpense = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ caseId, expenseId, payload }: { caseId: string; expenseId: string; payload: FormData }) =>
+      ExpensesService.updateExpense(caseId, expenseId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.expenses] });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.initialDocuments]
+      });
+    },
+    onError: (error) => {
+      console.error(error);
+    }
+  });
+};

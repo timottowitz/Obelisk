@@ -56,7 +56,7 @@ export interface Expense {
   date_of_check: string | null;
   check_number: string | null;
   copy_of_check_id: string | null;
-  notify_admin_of_check_payment: boolean | null;
+  notify_admin_of_check_payment: string | null;
   qb_sync_status?: 'not_synced' | 'synced' | 'error';
   qb_id?: string;
   qb_entity_type?: 'Purchase' | 'Bill' | 'Invoice' | 'Expense';

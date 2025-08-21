@@ -16,7 +16,13 @@ import { QuickbooksService } from '@/services/quickbooks';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
 
-function ExpenseCard({ item }: { item: Expense }) {
+function ExpenseCard({
+  item,
+  onEdit
+}: {
+  item: Expense;
+  onEdit: (expense: Expense) => void;
+}) {
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState(
     item.qb_sync_status || 'not_synced'
@@ -80,7 +86,10 @@ function ExpenseCard({ item }: { item: Expense }) {
   };
 
   return (
-    <div className='border-border bg-card rounded-lg border shadow transition-shadow hover:shadow-md'>
+    <div
+      className='border-border bg-card cursor-pointer rounded-lg border shadow transition-shadow hover:shadow-md'
+      onClick={() => onEdit(item)}
+    >
       <div className='border-border bg-accent/70 text-accent-foreground dark:bg-muted dark:text-muted-foreground flex items-center justify-between border-b px-4 py-2'>
         <div className='flex items-center gap-4'>
           <div className='text-muted-foreground text-xs'>
