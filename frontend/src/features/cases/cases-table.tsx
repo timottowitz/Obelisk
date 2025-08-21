@@ -80,28 +80,31 @@ export function CasesTable({
   queryParams
 }: CasesTableProps) {
   return (
-    <div className='overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm'>
+    <div className='overflow-hidden rounded-xl border border-border bg-card shadow dark:shadow-sm'>
       <Table>
-        <TableHeader className='bg-gray-50'>
-          <TableRow className='border-b border-gray-200'>
+        <TableHeader className='bg-accent text-accent-foreground dark:bg-muted dark:text-muted-foreground'>
+          <TableRow className='border-b border-border'>
             {tableColumns.map((column) => (
               <TableHead
                 key={column.key}
                 className={cn(
-                  'px-6 py-4 text-xs font-semibold tracking-wider text-gray-600 uppercase',
+                  'px-6 py-4 text-xs font-semibold tracking-wider uppercase text-accent-foreground dark:text-muted-foreground',
                   column.className
                 )}
               >
                 <div
-                  className='flex cursor-pointer items-center gap-2'
+                  className={cn(
+                    'flex cursor-pointer items-center gap-2',
+                    queryParams.sortBy === column.key && 'text-foreground'
+                  )}
                   onClick={() => column.sortable && onChangeSort(column.key)}
                 >
                   {column.label}
                   {queryParams.sortBy === column.key &&
                   queryParams.order === 'desc' ? (
-                    <ChevronUp className='ml-1 h-3 w-3' />
+                    <ChevronUp className={cn('ml-1 h-3 w-3', 'text-blue-600 dark:text-blue-400')} />
                   ) : (
-                    <ChevronDown className='ml-1 h-3 w-3' />
+                    <ChevronDown className={cn('ml-1 h-3 w-3', queryParams.sortBy === column.key ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground')} />
                   )}
                 </div>
               </TableHead>
@@ -116,7 +119,7 @@ export function CasesTable({
                 className='py-4 text-center'
               >
                 <div className='flex items-center justify-center'>
-                  <div className='h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent' />
+                  <div className='h-4 w-4 animate-spin rounded-full border-2 border-foreground/50 dark:border-muted-foreground border-t-transparent' />
                 </div>
               </TableCell>
             </TableRow>
@@ -127,12 +130,12 @@ export function CasesTable({
             cases.map((caseItem) => (
               <TableRow
                 key={caseItem.id}
-                className='border-b border-gray-200 hover:bg-gray-50'
+                className='border-b border-border odd:bg-background even:bg-muted/40 hover:bg-accent/60 dark:odd:bg-card dark:even:bg-muted/30 dark:hover:bg-accent'
               >
                 <TableCell className='px-6 py-4'>
                   <Link
                     href={`/dashboard/cases/${caseItem.id}`}
-                    className='text-sm font-medium text-blue-600 underline hover:text-blue-800'
+                    className='text-sm font-medium text-blue-500 underline hover:text-blue-500/80'
                   >
                     {caseItem.claimant.full_name.length > 23
                       ? caseItem.claimant.full_name.substring(0, 23) + '...'
@@ -141,7 +144,7 @@ export function CasesTable({
                 </TableCell>
 
                 <TableCell className='px-6 py-4'>
-                  <p className='text-sm font-medium text-gray-900'>
+                  <p className='text-sm font-medium text-foreground'>
                     {caseItem.case_number}
                   </p>
                 </TableCell>
@@ -159,7 +162,7 @@ export function CasesTable({
                 </TableCell>
 
                 <TableCell className='px-6 py-4'>
-                  <p className='text-sm text-gray-700'>
+                  <p className='text-sm text-foreground dark:text-muted-foreground'>
                     {caseItem.respondent.full_name.length > 23
                       ? caseItem.respondent.full_name.substring(0, 23) + '...'
                       : caseItem.respondent.full_name}
@@ -169,32 +172,32 @@ export function CasesTable({
                 <TableCell className='px-6 py-4'>
                   <Button
                     variant='link'
-                    className='h-auto p-0 text-sm text-blue-600 underline hover:text-blue-800'
+                    className='h-auto p-0 text-sm text-blue-500 underline hover:text-blue-500/80'
                   >
                     {caseItem.case_manager}
                   </Button>
                 </TableCell>
 
                 <TableCell className='px-6 py-4'>
-                  <p className='text-sm text-gray-700'>
+                  <p className='text-sm text-foreground dark:text-muted-foreground'>
                     {caseItem.next_event || 'N/A'}
                   </p>
                 </TableCell>
 
                 <TableCell className='px-6 py-4'>
                   <div className='flex items-center gap-2'>
-                    <Eye className='h-4 w-4 text-gray-400' />
+                    <Eye className='h-4 w-4 text-foreground/70 dark:text-muted-foreground' />
                     {caseItem.case_tasks_count > 0 && (
-                      <span className='h-2 w-2 rounded-full bg-red-500' />
+                      <span className='h-2 w-2 rounded-full bg-destructive' />
                     )}
                   </div>
                 </TableCell>
 
                 <TableCell className='px-6 py-4'>
                   <div className='flex items-center gap-2'>
-                    <FileText className='h-4 w-4 text-gray-400' />
+                    <FileText className='h-4 w-4 text-foreground/70 dark:text-muted-foreground' />
                     {caseItem.documents_count > 0 && (
-                      <span className='h-2 w-2 rounded-full bg-red-500' />
+                      <span className='h-2 w-2 rounded-full bg-destructive' />
                     )}
                   </div>
                 </TableCell>
