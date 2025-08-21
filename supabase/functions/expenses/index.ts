@@ -835,6 +835,293 @@ app.post("/expenses/cases/:caseId", async (c) => {
   }
 });
 
+// Update expense
+app.put("/expenses/cases/:caseId/:expenseId", async (c) => {
+  const userId = c.get("userId");
+  const orgId = c.get("orgId");
+  const caseId = c.req.param("caseId");
+  const expenseId = c.req.param("expenseId");
+  const body = await c.req.formData();
+  const attachment = body.get("attachment") as File;
+  const copyOfCheck = body.get("copy_of_check") as File;
+  const {
+    expense_type_id,
+    amount,
+    payee_id,
+    type,
+    invoice_number,
+    invoice_date,
+    attachment_id,
+    due_date,
+    bill_no,
+    copy_of_check_id,
+    notify_admin_of_check_payment,
+    description,
+    memo,
+    notes,
+    create_checking_quickbooks,
+    create_billing_item,
+    last_updated_from_quickbooks,
+  } = Object.fromEntries(body.entries());
+
+  try {
+    const { supabase, schema, user, member } = await getSupabaseAndOrgInfo(
+      orgId,
+      userId
+    );
+
+    // Verify the expense exists and belongs to this case
+    const { data: existingExpense, error: existingExpenseError } = await supabase
+      .schema(schema)
+      .from("case_expenses")
+      .select("*")
+      .eq("id", expenseId)
+      .eq("case_id", caseId)
+      .single();
+
+    if (existingExpenseError || !existingExpense) {
+      return c.json({ error: "Expense not found" }, 404);
+    }
+
+    const { data: expenseType, error: expenseTypeError } = await supabase
+      .schema(schema)
+      .from("expense_types")
+      .select("*")
+      .eq("id", expense_type_id)
+      .single();
+
+    if (expenseTypeError) {
+      return c.json({ error: expenseTypeError.message }, 500);
+    }
+
+    if (expenseType.name !== "Soft Costs" && payee_id) {
+      const { error: payeeError } = await supabase
+        .schema(schema)
+        .from("contacts")
+        .select("*")
+        .eq("id", payee_id)
+        .single();
+
+      if (payeeError) {
+        return c.json({ error: payeeError.message }, 500);
+      }
+    }
+
+    const { data: folder, error: folderError } = await supabase
+      .schema(schema)
+      .from("storage_folders")
+      .select("*")
+      .eq("case_id", caseId)
+      .eq("name", "Expenses")
+      .single();
+
+    if (folderError) {
+      return c.json({ error: folderError.message }, 500);
+    }
+
+    let attachmentId = existingExpense.attachment_id;
+    
+    // Handle attachment update
+    if (attachment_id && attachment_id !== existingExpense.attachment_id) {
+      const { data: file, error: fileError } = await supabase
+        .schema(schema)
+        .from("storage_files")
+        .update({
+          folder_id: folder.id,
+        })
+        .eq("id", attachment_id)
+        .select()
+        .single();
+
+      if (fileError) {
+        return c.json({ error: fileError.message }, 500);
+      }
+
+      attachmentId = file.id;
+    }
+
+    if (attachment) {
+      const gcsService = getGcsService();
+      const buffer = await attachment.arrayBuffer();
+      const fileData = new Uint8Array(buffer);
+      const mimeType = attachment.type;
+      const fileName = attachment.name;
+
+      const fileRecord = await uploadAttachment(supabase, gcsService, {
+        userId: user.id,
+        fileName,
+        fileData,
+        mimeType,
+        uploadedBy: member.id,
+        schema,
+        tenantId: orgId,
+        folderId: folder.id,
+      });
+      attachmentId = fileRecord.id;
+    }
+
+    let dateOfCheck = existingExpense.date_of_check;
+    let checkNumber = existingExpense.check_number;
+    let copyOfCheckIdValue = existingExpense.copy_of_check_id;
+    
+    // Handle Check-specific fields
+    if (expenseType.name === "Check") {
+      // Keep existing date and number unless we're changing from a different type
+      if (existingExpense.expense_type_id !== expense_type_id) {
+        dateOfCheck = new Date().toISOString().split("T")[0];
+        const { data: checkTypeData, error: checkTypeDataError } = await supabase
+          .schema(schema)
+          .from("case_expenses")
+          .select("*")
+          .eq("case_id", caseId)
+          .eq("expense_type_id", expenseType.id)
+          .neq("id", expenseId); // Exclude current expense from count
+
+        if (checkTypeDataError) {
+          return c.json({ error: checkTypeDataError.message }, 500);
+        }
+
+        checkNumber = checkTypeData.length + 1;
+      }
+
+      if (copy_of_check_id && copy_of_check_id !== existingExpense.copy_of_check_id) {
+        const { data: file, error: fileError } = await supabase
+          .schema(schema)
+          .from("storage_files")
+          .update({
+            folder_id: folder.id,
+          })
+          .eq("id", copy_of_check_id)
+          .select()
+          .single();
+
+        if (fileError) {
+          return c.json({ error: fileError.message }, 500);
+        }
+
+        copyOfCheckIdValue = file.id;
+      }
+      
+      if (copyOfCheck) {
+        const gcsService = getGcsService();
+        const buffer = await copyOfCheck.arrayBuffer();
+        const fileData = new Uint8Array(buffer);
+        const mimeType = copyOfCheck.type;
+        const fileName = copyOfCheck.name;
+
+        const fileRecord = await uploadAttachment(supabase, gcsService, {
+          userId: user.id,
+          fileName,
+          fileData,
+          mimeType,
+          uploadedBy: member.id,
+          schema,
+          tenantId: orgId,
+          folderId: folder.id,
+        });
+        copyOfCheckIdValue = fileRecord.id;
+      }
+    } else {
+      // Clear check-specific fields if not a Check type
+      dateOfCheck = null;
+      checkNumber = null;
+      copyOfCheckIdValue = null;
+    }
+
+    const { data: updatedExpense, error: updateError } = await supabase
+      .schema(schema)
+      .from("case_expenses")
+      .update({
+        expense_type_id,
+        amount: parseFloat(amount as string),
+        payee_id: expenseType.name === "Soft Costs" ? null : payee_id || null,
+        type,
+        invoice_number: invoice_number || null,
+        bill_no: bill_no || null,
+        attachment_id: attachmentId || null,
+        invoice_date: invoice_date || null,
+        due_date: due_date || null,
+        description: description || null,
+        memo: memo || null,
+        notes: notes || null,
+        date_of_check: dateOfCheck,
+        check_number: checkNumber,
+        copy_of_check_id: copyOfCheckIdValue || null,
+        notify_admin_of_check_payment: notify_admin_of_check_payment || null,
+        create_checking_quickbooks: create_checking_quickbooks === "true",
+        create_billing_item:
+          create_billing_item === "unknown"
+            ? null
+            : create_billing_item === "yes",
+        last_updated_from_quickbooks:
+          last_updated_from_quickbooks || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", expenseId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error("Error updating expense:", updateError);
+      return c.json({ error: updateError.message }, 500);
+    }
+
+    // Fetch related data for response
+    if (updatedExpense.expense_type_id) {
+      const { data: expenseTypeData } = await supabase
+        .schema(schema)
+        .from("expense_types")
+        .select("name")
+        .eq("id", updatedExpense.expense_type_id)
+        .single();
+      if (expenseTypeData) {
+        updatedExpense.expense_type = expenseTypeData.name;
+      }
+    }
+
+    if (updatedExpense.payee_id) {
+      const { data: payee } = await supabase
+        .schema(schema)
+        .from("contacts")
+        .select("id, full_name, emails, phones, addresses")
+        .eq("id", updatedExpense.payee_id)
+        .single();
+      if (payee) {
+        updatedExpense.payee = payee;
+      }
+    }
+
+    if (updatedExpense.attachment_id) {
+      const { data: attachmentData } = await supabase
+        .schema(schema)
+        .from("storage_files")
+        .select("name")
+        .eq("id", updatedExpense.attachment_id)
+        .single();
+      if (attachmentData) {
+        updatedExpense.attachment = attachmentData;
+      }
+    }
+
+    if (updatedExpense.copy_of_check_id) {
+      const { data: copyOfCheckData } = await supabase
+        .schema(schema)
+        .from("storage_files")
+        .select("name")
+        .eq("id", updatedExpense.copy_of_check_id)
+        .single();
+      if (copyOfCheckData) {
+        updatedExpense.copy_of_check = copyOfCheckData;
+      }
+    }
+
+    return c.json({ data: updatedExpense }, 200);
+  } catch (error: any) {
+    console.error("updating expense error", error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
 //upload attachment
 async function uploadAttachment(
   supabaseClient: any,
