@@ -165,11 +165,11 @@ export default function CasesPage() {
   }, [queryParams, totalPages]);
 
   return (
-    <div className='min-h-screen bg-gray-50 p-8'>
+    <div className='min-h-screen bg-background p-8'>
       <div className='mx-auto max-w-7xl'>
         {/* Page Header */}
         <div className='mb-8'>
-          <h1 className='mb-2 text-3xl font-bold text-gray-900'>
+          <h1 className='mb-2 text-3xl font-bold text-foreground'>
             {queryParams.type === 'imva'
               ? 'IMVA'
               : queryParams.type === 'solar'
@@ -179,7 +179,7 @@ export default function CasesPage() {
         </div>
 
         {/* Search and Filter Bar */}
-        <div className='border-border bg-card mb-6 rounded-xl border p-6 shadow-sm'>
+        <div className='border-border bg-card mb-6 rounded-xl border p-6 shadow'>
           <div className='flex flex-col items-start gap-4 sm:flex-row sm:items-center'>
             {/* Search Input */}
             <div className='relative max-w-md flex-1'>
@@ -209,8 +209,8 @@ export default function CasesPage() {
                 }
                 value={queryParams.status}
               >
-                <SelectTrigger className='flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50'>
-                  <Filter className='h-4 w-4 text-gray-500' />
+                <SelectTrigger className='flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent/60 hover:text-accent-foreground'>
+                  <Filter className='h-4 w-4 text-muted-foreground' />
                   <SelectValue placeholder='Select a filter' />
                 </SelectTrigger>
                 <SelectContent>
@@ -226,8 +226,8 @@ export default function CasesPage() {
             {queryParams.type === 'imva' && (
               <>
                 <Select value='all-documents'>
-                  <SelectTrigger className='flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50'>
-                    <Filter className='h-4 w-4 text-gray-500' />
+                  <SelectTrigger className='flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent/60 hover:text-accent-foreground'>
+                    <Filter className='h-4 w-4 text-muted-foreground' />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -235,8 +235,8 @@ export default function CasesPage() {
                   </SelectContent>
                 </Select>
                 <Select value='viewing-privilege'>
-                  <SelectTrigger className='flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50'>
-                    <Filter className='h-4 w-4 text-gray-500' />
+                  <SelectTrigger className='flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent/60 hover:text-accent-foreground'>
+                    <Filter className='h-4 w-4 text-muted-foreground' />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -246,8 +246,8 @@ export default function CasesPage() {
                   </SelectContent>
                 </Select>
                 <Select value='document-group'>
-                  <SelectTrigger className='flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50'>
-                    <Filter className='h-4 w-4 text-gray-500' />
+                  <SelectTrigger className='flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent/60 hover:text-accent-foreground'>
+                    <Filter className='h-4 w-4 text-muted-foreground' />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -257,8 +257,8 @@ export default function CasesPage() {
                   </SelectContent>
                 </Select>
                 <Select value='document-type'>
-                  <SelectTrigger className='flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50'>
-                    <Filter className='h-4 w-4 text-gray-500' />
+                  <SelectTrigger className='flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent/60 hover:text-accent-foreground'>
+                    <Filter className='h-4 w-4 text-muted-foreground' />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -266,8 +266,8 @@ export default function CasesPage() {
                   </SelectContent>
                 </Select>
                 <Select value='hearing-exhibits'>
-                  <SelectTrigger className='flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50'>
-                    <Filter className='h-4 w-4 text-gray-500' />
+                  <SelectTrigger className='flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent/60 hover:text-accent-foreground'>
+                    <Filter className='h-4 w-4 text-muted-foreground' />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -289,7 +289,7 @@ export default function CasesPage() {
           queryParams={queryParams}
         />
         {/* Table Footer */}
-        <div className='text-muted-foreground mt-6 flex items-center justify-between text-sm'>
+        <div className='mt-6 flex items-center justify-between text-sm text-foreground'>
           <div className='flex items-center gap-4'>
             {casesTotal && casesTotal > 0 ? (
               <p>
@@ -313,7 +313,7 @@ export default function CasesPage() {
                     <PaginationPrevious
                       onClick={handlePreviousPage}
                       className={cn(
-                        'border-muted-foreground cursor-pointer border',
+                        'border-border cursor-pointer border bg-background',
                         queryParams.page <= 1
                           ? 'pointer-events-none opacity-50'
                           : ''
@@ -321,10 +321,24 @@ export default function CasesPage() {
                     />
                   </PaginationItem>
                   {getPageNumbers.map((page, index) => (
-                    <PaginationItem key={index} className='cursor-pointer'>
+                    <PaginationItem
+                      key={index}
+                      className={cn(
+                        'cursor-pointer',
+                        typeof page !== 'number' && 'pointer-events-none opacity-60'
+                      )}
+                    >
                       <PaginationLink
-                        onClick={() => handlePageChange(page as number)}
+                        onClick={
+                          typeof page === 'number' ? () => handlePageChange(page as number) : undefined
+                        }
                         isActive={queryParams.page === page}
+                        className={cn(
+                          'bg-background',
+                          queryParams.page === page
+                            ? 'bg-accent text-accent-foreground font-semibold'
+                            : 'hover:bg-accent/60'
+                        )}
                       >
                         {page}
                       </PaginationLink>
@@ -334,7 +348,7 @@ export default function CasesPage() {
                     <PaginationNext
                       onClick={handleNextPage}
                       className={cn(
-                        'border-muted-foreground cursor-pointer border',
+                        'border-border cursor-pointer border bg-background',
                         queryParams.page >= totalPages
                           ? 'pointer-events-none opacity-50'
                           : ''

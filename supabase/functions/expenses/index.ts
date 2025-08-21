@@ -215,11 +215,10 @@ app.get("/expenses/cases/:caseId", async (c) => {
     const {
       data: expenses,
       error: expensesError,
-      count,
     } = await supabase
       .schema(schema)
       .from("case_expenses")
-      .select("*", { count: "exact" })
+      .select("*")
       .eq("case_id", caseId)
       .order("created_at", { ascending: sortDir === "asc" });
 
@@ -295,7 +294,10 @@ app.get("/expenses/cases/:caseId", async (c) => {
       switch (filterBy) {
         case "expense_type":
           filteredExpenses = expenses.filter(
-            (expense: any) => expense.expense_type === filterValue
+            (expense: any) =>
+              expense.expense_type
+                .toLowerCase()
+                .includes(filterValue.toLowerCase())
           );
           break;
         case "payee":
@@ -309,7 +311,10 @@ app.get("/expenses/cases/:caseId", async (c) => {
           break;
         case "type":
           filteredExpenses = filteredExpenses.filter(
-            (expense: any) => expense.type === filterValue
+            (expense: any) =>
+              expense.type
+                .toLowerCase()
+                .includes(filterValue.toLowerCase())
           );
           break;
         case "invoice_number":
@@ -320,7 +325,9 @@ app.get("/expenses/cases/:caseId", async (c) => {
         case "attachment":
           filteredExpenses = filteredExpenses.filter((expense: any) =>
             expense.attachment
-              ? expense.attachment.name.includes(filterValue)
+              ? expense.attachment.name
+                  .toLowerCase()
+                  .includes(filterValue.toLowerCase())
               : false
           );
           break;
@@ -343,17 +350,23 @@ app.get("/expenses/cases/:caseId", async (c) => {
           break;
         case "description":
           filteredExpenses = filteredExpenses.filter((expense: any) =>
-            expense.description.includes(filterValue)
+            expense.description
+              .toLowerCase()
+              .includes(filterValue.toLowerCase())
           );
           break;
         case "memo":
           filteredExpenses = filteredExpenses.filter((expense: any) =>
-            expense.memo.includes(filterValue)
+            expense.memo
+              .toLowerCase()
+              .includes(filterValue.toLowerCase())
           );
           break;
         case "notes":
           filteredExpenses = filteredExpenses.filter((expense: any) =>
-            expense.notes.includes(filterValue)
+            expense.notes
+              .toLowerCase()
+              .includes(filterValue.toLowerCase())
           );
           break;
         case "notify_admin":
@@ -388,19 +401,26 @@ app.get("/expenses/cases/:caseId", async (c) => {
           break;
         case "last_update_from_quickbooks":
           filteredExpenses = filteredExpenses.filter((expense: any) =>
-            expense.last_update_from_quickbooks.includes(filterValue)
+            expense.last_update_from_quickbooks
+              .toLowerCase()
+              .includes(filterValue.toLowerCase())
           );
           break;
         case "copy_of_check":
           filteredExpenses = filteredExpenses.filter((expense: any) =>
             expense.copy_of_check
-              ? expense.copy_of_check.name.includes(filterValue)
+              ? expense.copy_of_check.name
+                  .toLowerCase()
+                  .includes(filterValue.toLowerCase())
               : false
           );
           break;
         case "status":
           filteredExpenses = filteredExpenses.filter(
-            (expense: any) => expense.status === filterValue
+            (expense: any) =>
+              expense.status
+                .toLowerCase()
+                .includes(filterValue.toLowerCase())
           );
           break;
         default:
@@ -559,7 +579,7 @@ app.get("/expenses/cases/:caseId", async (c) => {
     return c.json(
       {
         data: paginatedExpenses,
-        total: count,
+        total: filteredExpenses.length,
         limit,
         page,
         totalAmount,

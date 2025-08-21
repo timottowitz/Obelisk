@@ -80,8 +80,8 @@ function ExpenseCard({ item }: { item: Expense }) {
   };
 
   return (
-    <div className='border-border dark:bg-card rounded-md border bg-white shadow-sm'>
-      <div className='border-border bg-muted/40 flex items-center justify-between border-b px-4 py-2 dark:bg-transparent'>
+    <div className='border-border bg-card rounded-lg border shadow transition-shadow hover:shadow-md'>
+      <div className='border-border bg-accent/70 text-accent-foreground dark:bg-muted dark:text-muted-foreground flex items-center justify-between border-b px-4 py-2'>
         <div className='flex items-center gap-4'>
           <div className='text-muted-foreground text-xs'>
             Created: {dayjs(item.created_at).format('MM/DD/YYYY')} at{' '}
@@ -95,10 +95,10 @@ function ExpenseCard({ item }: { item: Expense }) {
             item.payee_id && (
               <Button
                 size='sm'
-                variant='outline'
+                variant='default'
                 onClick={handleSyncToQuickBooks}
                 disabled={syncing}
-                className='cursor-pointer bg-green-600 hover:bg-green-700 text-white'
+                className='cursor-pointer bg-emerald-600 text-emerald-50 hover:bg-emerald-700 focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-white'
               >
                 {syncing ? (
                   <>
@@ -133,24 +133,43 @@ function ExpenseCard({ item }: { item: Expense }) {
               {item.payee?.full_name}
             </div>
             <div className='text-muted-foreground mt-2 space-y-1 text-xs'>
-              {item.payee?.phones.map((phone) => (
-                <div className='flex items-center gap-2' key={phone.id}>
-                  <Phone className='h-3.5 w-3.5' />
-                  <span>{phone.number}</span>
+              {item.payee?.phones && item.payee.phones.length > 0 && (
+                <div className='flex items-center gap-2'>
+                  <Phone className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400' />
+                  <span>{item.payee.phones[0].number}</span>
+                  {item.payee.phones.length > 1 && (
+                    <Badge variant='secondary' className='ml-1'>
+                      +{item.payee.phones.length - 1} more
+                    </Badge>
+                  )}
                 </div>
-              ))}
-              {item.payee?.emails.map((email) => (
-                <div className='flex items-center gap-2' key={email.id}>
-                  <Mail className='h-3.5 w-3.5' />
-                  <span className='truncate'>{email.address}</span>
+              )}
+              {item.payee?.emails && item.payee.emails.length > 0 && (
+                <div className='flex items-center gap-2'>
+                  <Mail className='h-3.5 w-3.5 text-sky-600 dark:text-sky-400' />
+                  <span className='truncate'>
+                    {item.payee.emails[0].address}
+                  </span>
+                  {item.payee.emails.length > 1 && (
+                    <Badge variant='secondary' className='ml-1'>
+                      +{item.payee.emails.length - 1} more
+                    </Badge>
+                  )}
                 </div>
-              ))}
-              {item.payee?.addresses.map((address) => (
-                <div className='flex items-start gap-2' key={address.id}>
-                  <MapPin className='mt-0.5 h-3.5 w-3.5' />
-                  <span className='break-words'>{address.fullAddress}</span>
+              )}
+              {item.payee?.addresses && item.payee.addresses.length > 0 && (
+                <div className='flex items-start gap-2'>
+                  <MapPin className='mt-0.5 h-3.5 w-3.5 text-amber-600 dark:text-amber-400' />
+                  <span className='break-words'>
+                    {item.payee.addresses[0].fullAddress}
+                  </span>
+                  {item.payee.addresses.length > 1 && (
+                    <Badge variant='secondary' className='ml-1'>
+                      +{item.payee.addresses.length - 1} more
+                    </Badge>
+                  )}
                 </div>
-              ))}
+              )}
             </div>
           </div>
           <div>
@@ -169,8 +188,8 @@ function ExpenseCard({ item }: { item: Expense }) {
               Invoice Attachment
             </div>
             {item.attachment ? (
-              <div className='border-border bg-muted/30 mt-2 inline-flex items-center gap-2 rounded-md border px-3 py-2 text-xs dark:bg-transparent'>
-                <FileText className='h-3.5 w-3.5 text-red-500' />
+              <div className='mt-2 inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:border-blue-800 dark:bg-transparent dark:text-blue-400'>
+                <FileText className='h-3.5 w-3.5 text-blue-600 dark:text-blue-400' />
                 <span className='max-w-[15vw] truncate'>
                   {item.attachment?.name}
                 </span>
@@ -182,7 +201,9 @@ function ExpenseCard({ item }: { item: Expense }) {
           <div>
             <div className='text-muted-foreground text-xs'>Date of Invoice</div>
             <div className='text-sm'>
-              {item.invoice_date ? dayjs(item.invoice_date).format('MM/DD/YYYY') : '-'}
+              {item.invoice_date
+                ? dayjs(item.invoice_date).format('MM/DD/YYYY')
+                : '-'}
             </div>
           </div>
           <div>
@@ -224,7 +245,9 @@ function ExpenseCard({ item }: { item: Expense }) {
           <div>
             <div className='text-muted-foreground text-xs'>Date of Check</div>
             <div className='text-sm'>
-              {item.date_of_check ? dayjs(item.date_of_check).format('MM/DD/YYYY') : '-'}
+              {item.date_of_check
+                ? dayjs(item.date_of_check).format('MM/DD/YYYY')
+                : '-'}
             </div>
           </div>
           <div>
@@ -246,7 +269,7 @@ function ExpenseCard({ item }: { item: Expense }) {
             <div className='text-sm'>{item.create_billing_item || '-'}</div>
           </div>
           <div>
-            <div className='border-border border-b text-sm font-semibold'>
+            <div className='border-border text-foreground border-b text-sm font-semibold'>
               Payment Status
             </div>
             <div className='mt-2 space-y-2 text-sm'>

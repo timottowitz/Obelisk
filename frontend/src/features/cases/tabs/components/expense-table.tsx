@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { FileText } from 'lucide-react';
 import { Expense } from '@/types/expenses';
 import dayjs from 'dayjs';
+import { Badge } from '@/components/ui/badge';
 
 export default function ExpenseTable({
   rows,
@@ -111,27 +112,30 @@ export default function ExpenseTable({
                       <div className='font-medium break-words'>
                         {r.payee?.full_name}
                       </div>
-                      {r.payee?.phones.map((phone) => (
-                        <div
-                          className='text-primary text-xs break-words'
-                          key={phone.id}
-                        >
-                          {phone.number}
+                      {r.payee?.phones && r.payee.phones.length > 0 && (
+                        <div className='text-xs break-words'>
+                          <span className='text-primary'>
+                            {r.payee.phones[0].number}
+                          </span>
+                          {r.payee.phones.length > 1 && (
+                            <Badge variant='secondary' className='ml-2'>
+                              +{r.payee.phones.length - 1} more
+                            </Badge>
+                          )}
                         </div>
-                      ))}
-                      {r.payee?.emails.map((email) => (
-                        <div
-                          className='text-primary text-xs break-words'
-                          key={email.id}
-                        >
-                          {email.address}
+                      )}
+                      {r.payee?.emails && r.payee.emails.length > 0 && (
+                        <div className='text-xs break-words'>
+                          <span className='text-primary'>
+                            {r.payee.emails[0].address}
+                          </span>
+                          {r.payee.emails.length > 1 && (
+                            <Badge variant='secondary' className='ml-2'>
+                              +{r.payee.emails.length - 1} more
+                            </Badge>
+                          )}
                         </div>
-                      ))}
-                      <div className='text-primary text-xs break-words'>
-                        {r.payee?.emails
-                          .map((email) => email.address)
-                          .join(', ')}
-                      </div>
+                      )}
                     </div>
                   </div>
                 </TableCell>
@@ -157,10 +161,10 @@ export default function ExpenseTable({
                   )}
                 </TableCell>
                 <TableCell className='truncate'>
-                  {dayjs(r.invoice_date).format('MM/DD/YYYY') || '—'}
+                  {r.invoice_date ? dayjs(r.invoice_date).format('MM/DD/YYYY') : '—'}
                 </TableCell>
                 <TableCell className='truncate'>
-                  {dayjs(r.due_date).format('MM/DD/YYYY') || '—'}
+                  {r.due_date ? dayjs(r.due_date).format('MM/DD/YYYY') : '—'}
                 </TableCell>
                 <TableCell className='hidden xl:table-cell'>
                   {r.bill_no || '—'}
@@ -185,7 +189,7 @@ export default function ExpenseTable({
                 </TableCell>
                 <TableCell className='truncate'>{r.status || '—'}</TableCell>
                 <TableCell className='hidden 2xl:table-cell'>
-                  {dayjs(r.date_of_check).format('MM/DD/YYYY') || '—'}
+                  {r.date_of_check ? dayjs(r.date_of_check).format('MM/DD/YYYY') : '—'}
                 </TableCell>
                 <TableCell className='hidden 2xl:table-cell'>
                   {r.check_number || '—'}
@@ -197,7 +201,7 @@ export default function ExpenseTable({
                   {r.copy_of_check?.name || '—'}
                 </TableCell>
                 <TableCell className='hidden break-words lg:table-cell'>
-                  {dayjs(r.created_at).format('MM/DD/YYYY hh:mm A') || '—'}
+                  {r.created_at ? dayjs(r.created_at).format('MM/DD/YYYY hh:mm A') : '—'}
                 </TableCell>
               </TableRow>
             ))}
