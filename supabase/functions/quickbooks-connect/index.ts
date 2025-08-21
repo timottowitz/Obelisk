@@ -85,7 +85,7 @@ async function getSupabaseAndOrgInfo(orgId: string, userId: string) {
 }
 
 // Generate OAuth authorization URL
-app.get("/quickbooks-connect/connect", extractUserAndOrgId, async (c) => {
+app.get("/quickbooks-connect/connect", async (c) => {
   const userId = c.get("userId");
   const orgId = c.get("orgId");
 
@@ -108,8 +108,6 @@ app.get("/quickbooks-connect/connect", extractUserAndOrgId, async (c) => {
     })
     .select()
     .single();
-
-  console.log(data, error);
 
   if (error || !data) {
     console.error("Failed to store state:", error);
@@ -232,7 +230,7 @@ app.get("/quickbooks-connect/callback", async (c) => {
 });
 
 // Refresh access token
-app.post("/quickbooks-connect/refresh", extractUserAndOrgId, async (c) => {
+app.post("/quickbooks-connect/refresh", async (c) => {
   const userId = c.get("userId");
   const orgId = c.get("orgId");
 
@@ -307,7 +305,7 @@ app.post("/quickbooks-connect/refresh", extractUserAndOrgId, async (c) => {
 });
 
 // Disconnect QuickBooks
-app.delete("/quickbooks-connect/disconnect", extractUserAndOrgId, async (c) => {
+app.delete("/quickbooks-connect/disconnect", async (c) => {
   const userId = c.get("userId");
   const orgId = c.get("orgId");
 
@@ -332,7 +330,7 @@ app.delete("/quickbooks-connect/disconnect", extractUserAndOrgId, async (c) => {
 });
 
 // Get connection status
-app.get("/quickbooks-connect/status", extractUserAndOrgId, async (c) => {
+app.get("/quickbooks-connect/status", async (c) => {
   const userId = c.get("userId");
   const orgId = c.get("orgId");
 

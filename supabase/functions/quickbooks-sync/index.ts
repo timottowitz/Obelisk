@@ -322,11 +322,11 @@ app.post("/quickbooks-sync/customer/:caseId", async (c) => {
   const orgId = c.get("orgId");
   const caseId = c.req.param("caseId");
 
-  const { supabase, schema, org } = await getSupabaseAndOrgInfo(orgId, userId);
-
   if (!userId || !orgId) {
     return c.json({ error: "Unauthorized" }, 401);
   }
+  const { supabase, schema, org } = await getSupabaseAndOrgInfo(orgId, userId);
+
 
   try {
     const qbClient = new QuickBooksClient(org.id, schema);
@@ -357,10 +357,21 @@ app.post("/quickbooks-sync/customer/:caseId", async (c) => {
     // Create or find parent customer (client)
     let parentCustomerId = null;
 
+    const {data: client, error: clientError} = await supabase
+      .schema(schema)
+      .from("contacts")
+      .select("*")
+      .eq("id", caseData.claimant_id)
+      .single();
+
+    if (clientError || !client) {
+      return c.json({ error: "Client not found" }, 404);
+    }
+
     // For now, we'll create a generic parent customer
     // In production, you'd want to link this to actual client records
     const parentQuery = `SELECT * FROM Customer WHERE DisplayName = '${
-      caseData.client_name || "Default Client"
+      client.full_name || "Default Client"
     }'`;
     const parentResult = await qbClient.queryCustomers(parentQuery);
 
@@ -369,8 +380,8 @@ app.post("/quickbooks-sync/customer/:caseId", async (c) => {
     } else {
       // Create parent customer
       const parentCustomer = await qbClient.createCustomer({
-        DisplayName: caseData.client_name || "Default Client",
-        CompanyName: caseData.client_name,
+        DisplayName: client.full_name || "Default Client",
+        CompanyName: client.full_name,
       });
       parentCustomerId = parentCustomer.Customer.Id;
     }
@@ -378,7 +389,7 @@ app.post("/quickbooks-sync/customer/:caseId", async (c) => {
     // Create sub-customer for the case
     const subCustomer = await qbClient.createCustomer({
       DisplayName: `Case ${caseData.case_number}`,
-      CompanyName: caseData.case_title,
+      CompanyName: caseData.full_name,
       ParentRef: { value: parentCustomerId },
       Job: true,
     });
