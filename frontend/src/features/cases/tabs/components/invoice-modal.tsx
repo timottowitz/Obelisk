@@ -30,6 +30,7 @@ import { Loader2, Plus, Trash, Upload, UserPlus2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/use-debounce';
 import ContactModal from '@/features/contacts/components/contact-modal';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 const DEFAULT_COST_TYPES = [
   "Arbitrator's Fees",
@@ -118,7 +119,7 @@ export default function InvoiceModal({
     amount: '',
     payeeId: '',
     payeeName: '',
-    type: 'unknown',
+    type: "Arbitrator's Fees",
     invoiceNumber: '',
     invoiceDate: '',
     expenseDescription: '',
@@ -201,7 +202,7 @@ export default function InvoiceModal({
       formData.append('description', form.expenseDescription);
       formData.append('memo', form.memo);
       formData.append('notes', form.notes);
-      formData.append('create_checking_quickbooks', form.createInQuickBooks);
+      formData.append('create_checking_quickbooks', form.createInQuickBooks === 'yes' ? 'true' : 'false');
       formData.append('create_billing_item', form.createBillingItem);
       if (form.expenseType === 'Bill') {
         formData.append('bill_no', form.billNo);
@@ -233,7 +234,7 @@ export default function InvoiceModal({
           amount: '',
           payeeId: '',
           payeeName: '',
-          type: 'unknown',
+          type: "Arbitrator's Fees",
           invoiceNumber: '',
           invoiceDate: '',
           expenseDescription: '',
@@ -671,10 +672,24 @@ export default function InvoiceModal({
                       }
                       className='border-input border'
                     >
-                      <ToggleGroupItem value='yes' className='px-6'>
+                      <ToggleGroupItem
+                        value='yes'
+                        className={cn(
+                          'px-6',
+                          form.createInQuickBooks === 'yes' &&
+                            'border-dark-foreground border-2'
+                        )}
+                      >
                         Yes
                       </ToggleGroupItem>
-                      <ToggleGroupItem value='no' className='px-6'>
+                      <ToggleGroupItem
+                        value='no'
+                        className={cn(
+                          'px-6',
+                          form.createInQuickBooks === 'no' &&
+                            'border-dark-foreground border-2'
+                        )}
+                      >
                         No
                       </ToggleGroupItem>
                     </ToggleGroup>
@@ -711,13 +726,34 @@ export default function InvoiceModal({
                       }
                       className='border-input border'
                     >
-                      <ToggleGroupItem value='yes' className='p-4'>
+                      <ToggleGroupItem
+                        value='yes'
+                        className={cn(
+                          'p-4',
+                          form.createBillingItem === 'yes' &&
+                            'border-dark-foreground border-2'
+                        )}
+                      >
                         Yes
                       </ToggleGroupItem>
-                      <ToggleGroupItem value='no' className='p-4'>
+                      <ToggleGroupItem
+                        value='no'
+                        className={cn(
+                          'p-4',
+                          form.createBillingItem === 'no' &&
+                            'border-dark-foreground border-2'
+                        )}
+                      >
                         No
                       </ToggleGroupItem>
-                      <ToggleGroupItem value='unknown' className='p-4'>
+                      <ToggleGroupItem
+                        value='unknown'
+                        className={cn(
+                          'p-4',
+                          form.createBillingItem === 'unknown' &&
+                            'border-dark-foreground border-2'
+                        )}
+                      >
                         Unknown
                       </ToggleGroupItem>
                     </ToggleGroup>
