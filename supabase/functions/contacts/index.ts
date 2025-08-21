@@ -42,9 +42,17 @@ async function getSupabaseClinet() {
 
 //get contact types
 app.get("/contacts/types", async (c) => {
+  const orgId = c.get("orgId");
+  
   try {
     const supabaseClient = await getSupabaseClinet();
-    const contactTypes = await getContactTypes(supabaseClient);
+    const org = await supabaseClient
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+    const contactTypes = await getContactTypes(supabaseClient, org);
     return c.json(contactTypes, 200);
   } catch (error: any) {
     console.error("getting contact types error", error);
@@ -243,7 +251,7 @@ app.post("/contacts/types", async (c) => {
     }
 
     const { data: contactType, error: contactTypeError } = await supabaseClient
-      .schema("public")
+      .schema(org.data?.schema_name.toLowerCase())
       .from("contact_types")
       .insert({ name: body.get("name") })
       .select();
@@ -405,7 +413,7 @@ async function getContacts(supabaseClient: any, schema: string, url: any) {
   if (search) query = query.or(`full_name.ilike.%${search}%`);
   if (typeFilter !== "all") {
     const { data: contactType, error: contactTypeError } = await supabaseClient
-      .schema("public")
+      .schema(schema)
       .from("contact_types")
       .select("*")
       .eq("name", typeFilter)
@@ -431,7 +439,7 @@ async function getContacts(supabaseClient: any, schema: string, url: any) {
     for (const contactTypeId of contact.contact_type_ids) {
       const { data: contactType, error: contactTypeError } =
         await supabaseClient
-          .schema("public")
+          .schema(schema)
           .from("contact_types")
           .select("*")
           .eq("id", contactTypeId)
@@ -476,7 +484,7 @@ async function createContact(
 
   for (const id of JSON.parse(contact_type_ids)) {
     const { error: contactTypeError } = await supabaseClient
-      .schema("public")
+      .schema(org.data?.schema_name.toLowerCase())
       .from("contact_types")
       .select("*")
       .eq("id", id)
@@ -571,7 +579,7 @@ async function updateContact(
 
   for (const id of JSON.parse(contact_type_ids)) {
     const { error: contactTypeError } = await supabaseClient
-      .schema("public")
+      .schema(org.data?.schema_name.toLowerCase())
       .from("contact_types")
       .select("*")
       .eq("id", id)
@@ -732,9 +740,9 @@ async function uploadAvatar(
   }
 }
 
-async function getContactTypes(supabaseClient: any) {
+async function getContactTypes(supabaseClient: any, org: any) {
   const { data: contactType, error: contactTypeError } = await supabaseClient
-    .schema("public")
+    .schema(org.data?.schema_name.toLowerCase())
     .from("contact_types")
     .select("*");
 

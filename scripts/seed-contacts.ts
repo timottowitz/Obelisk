@@ -288,7 +288,7 @@ class ContactsSeeder {
         // Get contact types
         for (const personType of contact.personTypes) {
           const caseTypeResult = await this.client.query(
-            `SELECT id FROM public.contact_types WHERE name = $1`,
+            `SELECT id FROM ${schema}.contact_types WHERE name = $1`,
             [personType.name]
           );
           contactTypeIds.push(caseTypeResult.rows[0].id);

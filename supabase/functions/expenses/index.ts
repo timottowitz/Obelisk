@@ -108,9 +108,9 @@ app.get("/expenses/types", async (c) => {
   const orgId = c.get("orgId");
 
   try {
-    const { supabase } = await getSupabaseAndOrgInfo(orgId, userId);
+    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
     const { data: expenseTypes, error: expenseTypesError } = await supabase
-      .schema("public")
+      .schema(schema)
       .from("expense_types")
       .select("*");
     if (expenseTypesError) {
@@ -136,10 +136,10 @@ app.post("/expenses/types", async (c) => {
   }
 
   try {
-    const { supabase } = await getSupabaseAndOrgInfo(orgId, userId);
+    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
 
     const { data: expenseType, error: expenseTypeError } = await supabase
-      .schema("public")
+      .schema(schema)
       .from("expense_types")
       .insert({ name: name })
       .select()
@@ -230,7 +230,7 @@ app.get("/expenses/cases/:caseId", async (c) => {
 
     for (const expense of expenses) {
       const { data: expenseType, error: expenseTypeError } = await supabase
-        .schema("public")
+        .schema(schema)
         .from("expense_types")
         .select("*")
         .eq("id", expense.expense_type_id)
@@ -638,7 +638,7 @@ app.post("/expenses/cases/:caseId", async (c) => {
     }
 
     const { data: expenseType, error: expenseTypeError } = await supabase
-      .schema("public")
+      .schema(schema)
       .from("expense_types")
       .select("*")
       .eq("id", expense_type_id)
