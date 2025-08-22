@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import EventsTable from './components/case-events-table';
-import { useGetCaseEvents } from '@/hooks/useCases';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useCaseEvents } from '@/hooks/useEvents';
 
 export default function Events({ caseId }: { caseId: string }) {
   const searchParams = useSearchParams();
@@ -16,8 +16,7 @@ export default function Events({ caseId }: { caseId: string }) {
     router.push(`/dashboard/cases/${caseId}?page=${currentPage}`);
   }, [currentPage, router, caseId]);
 
-  const { data: events, isLoading } = useGetCaseEvents(caseId, currentPage);
-  console.log(events?.data);
+  const { data: events, isLoading } = useCaseEvents(caseId, currentPage);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);

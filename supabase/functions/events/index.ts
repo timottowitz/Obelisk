@@ -135,4 +135,34 @@ app.get("/events", async (c) => {
   }
 });
 
+//Get all events for a case
+app.get("/events/cases/:caseId", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const caseId = c.req.param("caseId");
+  const url = new URL(c.req.url);
+  const page = parseInt(url.searchParams.get("page") ?? "1");
+  const limit = parseInt(url.searchParams.get("limit") ?? "5");
+
+  try {
+    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
+
+    const { data, error } = await supabase
+      .schema(schema)
+      .from("case_events")
+      .select("*")
+      .eq("case_id", caseId)
+      .order("created_at", { ascending: false })
+      .range(limit * (page - 1), limit * page - 1);
+
+    if (error) {
+      return c.json({ error: error.message }, 500);
+    }
+
+    return c.json({ data }, 200);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
 export default app;
