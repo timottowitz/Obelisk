@@ -60,110 +60,112 @@ export function EventsTable({
   isLoading = false
 }: EventsTableProps) {
   return (
-    <div className='overflow-hidden rounded-lg border border-gray-200 bg-white'>
-      <Table>
-        <TableHeader>
-          <TableRow className='bg-gray-50'>
-            {tableColumns.map((column) => (
-              <TableHead
-                key={column.key}
-                className='px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase'
-              >
-                {column.sortable ? (
-                  <Button
-                    variant='ghost'
-                    size='sm'
-                    className='h-auto p-0 font-medium text-gray-500 hover:text-gray-700'
-                  >
-                    {column.label}
-                    <ChevronDown className='ml-1 h-3 w-3' />
-                  </Button>
-                ) : (
-                  <span>{column.label}</span>
-                )}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading ? (
-            <TableRow>
-              <TableCell
-                colSpan={tableColumns.length}
-                className='h-24 text-center'
-              >
-                <div className='flex items-center justify-center'>
-                  <div className='h-6 w-6 animate-spin rounded-full border-2 border-gray-400 border-t-transparent' />
-                </div>
-              </TableCell>
+    <div className='overflow-hidden rounded-lg border border-border bg-card'>
+      <div className='w-full overflow-x-auto'>
+        <Table>
+          <TableHeader>
+            <TableRow className='bg-muted'>
+              {tableColumns.map((column) => (
+                <TableHead
+                  key={column.key}
+                  className='px-4 py-2 text-left text-xs font-medium tracking-wider text-muted-foreground uppercase md:px-6 md:py-3'
+                >
+                  {column.sortable ? (
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      className='h-auto p-0 font-medium text-muted-foreground hover:text-foreground'
+                    >
+                      {column.label}
+                      <ChevronDown className='ml-1 h-3 w-3' />
+                    </Button>
+                  ) : (
+                    <span>{column.label}</span>
+                  )}
+                </TableHead>
+              ))}
             </TableRow>
-          ) : events.length > 0 ? (
-            events.map((event) => (
-              <TableRow
-                key={event.id}
-                className='cursor-pointer hover:bg-gray-50'
-              >
-                <TableCell className='px-6 py-4 text-sm whitespace-nowrap text-gray-900'>
-                  {event.date}
-                </TableCell>
-                <TableCell className='px-6 py-4 text-sm whitespace-nowrap text-gray-900'>
-                  {event.time}
-                </TableCell>
-                <TableCell className='px-6 py-4 text-sm whitespace-nowrap text-gray-900'>
-                  {event.eventType}
-                </TableCell>
-                <TableCell className='px-6 py-4 text-sm whitespace-nowrap text-gray-900'>
-                  {event.method}
-                </TableCell>
-                <TableCell className='px-6 py-4 whitespace-nowrap'>
-                  <Badge
-                    variant={getStatusVariant(event.status)}
-                    className='font-medium'
-                  >
-                    {event.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className='px-6 py-4 text-sm whitespace-nowrap text-gray-900'>
-                  {event.location}
-                </TableCell>
-                <TableCell className='px-6 py-4 whitespace-nowrap'>
-                  <Button
-                    variant='link'
-                    className='h-auto p-0 text-sm text-blue-600 hover:text-blue-800'
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      console.log('Case number clicked:', event.caseNumber);
-                    }}
-                  >
-                    {event.caseNumber}
-                  </Button>
-                </TableCell>
-                <TableCell className='px-6 py-4 whitespace-nowrap'>
-                  <Button
-                    variant='link'
-                    className='h-auto p-0 text-sm text-blue-600 hover:text-blue-800'
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      console.log('Claimant clicked:', event.claimant);
-                    }}
-                  >
-                    {event.claimant}
-                  </Button>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={tableColumns.length}
+                  className='h-24 text-center'
+                >
+                  <div className='flex items-center justify-center'>
+                    <div className='h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground/40 border-t-transparent' />
+                  </div>
                 </TableCell>
               </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell
-                colSpan={tableColumns.length}
-                className='h-24 text-center text-gray-500'
-              >
-                No data to display
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+            ) : events.length > 0 ? (
+              events.map((event) => (
+                <TableRow
+                  key={event.id}
+                  className='cursor-pointer hover:bg-muted'
+                >
+                  <TableCell className='px-4 py-3 text-sm whitespace-nowrap text-foreground md:px-6 md:py-4'>
+                    {event.date}
+                  </TableCell>
+                  <TableCell className='px-4 py-3 text-sm whitespace-nowrap text-foreground md:px-6 md:py-4'>
+                    {event.time}
+                  </TableCell>
+                  <TableCell className='px-4 py-3 text-sm whitespace-nowrap text-foreground md:px-6 md:py-4'>
+                    {event.eventType}
+                  </TableCell>
+                  <TableCell className='px-4 py-3 text-sm whitespace-nowrap text-foreground md:px-6 md:py-4'>
+                    {event.method}
+                  </TableCell>
+                  <TableCell className='px-4 py-3 whitespace-nowrap md:px-6 md:py-4'>
+                    <Badge
+                      variant={getStatusVariant(event.status)}
+                      className='font-medium'
+                    >
+                      {event.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className='px-4 py-3 text-sm whitespace-nowrap text-foreground md:px-6 md:py-4'>
+                    {event.location}
+                  </TableCell>
+                  <TableCell className='px-4 py-3 whitespace-nowrap md:px-6 md:py-4'>
+                    <Button
+                      variant='link'
+                      className='h-auto p-0 text-sm text-primary hover:text-primary/80'
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('Case number clicked:', event.caseNumber);
+                      }}
+                    >
+                      {event.caseNumber}
+                    </Button>
+                  </TableCell>
+                  <TableCell className='px-4 py-3 whitespace-nowrap md:px-6 md:py-4'>
+                    <Button
+                      variant='link'
+                      className='h-auto p-0 text-sm text-primary hover:text-primary/80'
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('Claimant clicked:', event.claimant);
+                      }}
+                    >
+                      {event.claimant}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={tableColumns.length}
+                  className='h-24 text-center text-muted-foreground'
+                >
+                  No data to display
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

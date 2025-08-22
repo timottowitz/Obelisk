@@ -549,7 +549,7 @@ export default function InvoiceModal({
                       <Button
                         type='button'
                         variant='outline'
-                        className='shrink-0'
+                        className='shrink-0 cursor-pointer'
                         onClick={() => setIsOpenContactModal(true)}
                       >
                         <UserPlus2 className='mr-1' />
@@ -632,7 +632,7 @@ export default function InvoiceModal({
                       <Button
                         type='button'
                         variant='outline'
-                        className='h-9 w-9 p-0'
+                        className='h-9 w-9 p-0 cursor-pointer'
                         onClick={() => handleFileClick('attachment')}
                       >
                         <Upload />
@@ -658,7 +658,7 @@ export default function InvoiceModal({
                       <Button
                         type='button'
                         variant='outline'
-                        className='h-9 w-9 p-0 text-red-500'
+                        className='h-9 w-9 p-0 text-red-500 cursor-pointer'
                         onClick={() =>
                           setForm((p) => ({ ...p, attachment: null }))
                         }
@@ -675,7 +675,7 @@ export default function InvoiceModal({
                       <Button
                         type='button'
                         variant='outline'
-                        className='h-9 w-9 p-0 text-red-500'
+                        className='h-9 w-9 p-0 text-red-500 cursor-pointer'
                         onClick={() =>
                           setForm((p) => ({ ...p, attachmentName: '' }))
                         }
@@ -932,7 +932,7 @@ export default function InvoiceModal({
                         <Button
                           type='button'
                           variant='outline'
-                          className='h-9 w-9 p-0'
+                          className='h-9 w-9 p-0 cursor-pointer'
                           onClick={() => handleFileClick('check')}
                         >
                           <Upload />
@@ -958,7 +958,7 @@ export default function InvoiceModal({
                         <Button
                           type='button'
                           variant='outline'
-                          className='h-9 w-9 p-0 text-red-500'
+                          className='h-9 w-9 p-0 text-red-500 cursor-pointer'
                           onClick={() =>
                             setForm((p) => ({ ...p, copyOfCheck: null }))
                           }
@@ -975,7 +975,7 @@ export default function InvoiceModal({
                         <Button
                           type='button'
                           variant='outline'
-                          className='h-9 w-9 p-0 text-red-500'
+                          className='h-9 w-9 p-0 text-red-500 cursor-pointer'
                           onClick={() =>
                             setForm((p) => ({ ...p, copyOfCheckName: '' }))
                           }

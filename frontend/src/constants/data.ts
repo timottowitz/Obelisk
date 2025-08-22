@@ -93,14 +93,6 @@ export const navItems: NavItem[] = [
     isActive: false,
     shortcut: ['p', 'r'],
     items: []
-  },
-  {
-    title: 'Expenses',
-    url: '/dashboard/expenses',
-    icon: 'dollar',
-    isActive: false,
-    shortcut: ['e', 'x'],
-    items: []
   }
 ];
 

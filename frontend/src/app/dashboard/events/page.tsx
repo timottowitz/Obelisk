@@ -14,19 +14,19 @@ export interface EventsPageProps {}
 
 export default function EventsPage({}: EventsPageProps) {
   return (
-    <div className='flex-1 overflow-auto bg-white p-6'>
+    <div className='flex-1 overflow-auto bg-background p-4 md:p-6'>
       <div className='mx-auto max-w-7xl'>
         {/* Header */}
         <div className='mb-6'>
-          <h1 className='mb-4 text-2xl font-semibold text-gray-900'>
+          <h1 className='mb-4 text-2xl font-semibold text-foreground'>
             Case Events
           </h1>
 
           {/* Filter Controls */}
-          <div className='flex gap-3'>
+          <div className='flex flex-col gap-3 sm:flex-row sm:items-center'>
             {/* Status Filter Dropdown */}
             <Select value='all'>
-              <SelectTrigger>
+              <SelectTrigger className='w-full sm:w-64'>
                 <SelectValue placeholder='Select Status' />
               </SelectTrigger>
               <SelectContent>
