@@ -301,7 +301,7 @@ export function MoveFileModal({
                     <div className='text-muted-foreground py-8 text-center'>
                       <Folder className='mx-auto mb-3 h-12 w-12 opacity-30' />
                       <p className='text-sm'>
-                        No folders found matching "{searchQuery}"
+                        No folders found matching {searchQuery}
                       </p>
                     </div>
                   )}
