@@ -63,17 +63,6 @@ export default function CaseDetailClient({ caseId }: CaseDetailClientProps) {
               <span>Back to My Cases</span>
             </div>
           </div>
-
-          <div className='flex items-center space-x-3'>
-            <Button variant='outline' className='flex items-center space-x-2'>
-              <Upload className='h-4 w-4' />
-              <span>Upload New Document</span>
-            </Button>
-            <Button className='flex items-center space-x-2 bg-red-600 text-white hover:bg-red-700'>
-              <FileText className='h-4 w-4' />
-              <span>File Additional Claim/Counterclaim</span>
-            </Button>
-          </div>
         </div>
       </div>
 

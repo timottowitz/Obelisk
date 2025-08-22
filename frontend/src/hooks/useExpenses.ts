@@ -3,6 +3,7 @@ import { ExpensesService } from '@/services/expenses';
 
 const QUERY_KEYS = {
   expenseTypes: ['expenseTypes'],
+  costTypes: ['costTypes'],
   initialDocuments: ['initialDocuments'],
   expenses: ['expenses']
 };
@@ -14,6 +15,13 @@ export const useExpenseTypes = () => {
   });
 };
 
+export const useCostTypes = () => {
+  return useQuery({
+    queryKey: [...QUERY_KEYS.costTypes],
+    queryFn: () => ExpensesService.getCostTypes()
+  });
+};
+
 export const useInitialDocuments = (caseId: string) => {
   return useQuery({
     queryKey: [...QUERY_KEYS.initialDocuments, caseId],
@@ -21,10 +29,33 @@ export const useInitialDocuments = (caseId: string) => {
   });
 };
 
-export const useExpenses = (caseId: string, filterBy: string, filterValue: string, sortBy: string, sortDir: string, page: number) => {
+export const useExpenses = (
+  caseId: string,
+  filterBy: string,
+  filterValue: string,
+  sortBy: string,
+  sortDir: string,
+  page: number
+) => {
   return useQuery({
-    queryKey: [...QUERY_KEYS.expenses, caseId, filterBy, filterValue, sortBy, sortDir, page],
-    queryFn: () => ExpensesService.getExpenses(caseId, filterBy, filterValue, sortBy, sortDir, page)
+    queryKey: [
+      ...QUERY_KEYS.expenses,
+      caseId,
+      filterBy,
+      filterValue,
+      sortBy,
+      sortDir,
+      page
+    ],
+    queryFn: () =>
+      ExpensesService.getExpenses(
+        caseId,
+        filterBy,
+        filterValue,
+        sortBy,
+        sortDir,
+        page
+      )
   });
 };
 
@@ -48,8 +79,15 @@ export const useCreateExpense = () => {
 export const useUpdateExpense = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ caseId, expenseId, payload }: { caseId: string; expenseId: string; payload: FormData }) =>
-      ExpensesService.updateExpense(caseId, expenseId, payload),
+    mutationFn: ({
+      caseId,
+      expenseId,
+      payload
+    }: {
+      caseId: string;
+      expenseId: string;
+      payload: FormData;
+    }) => ExpensesService.updateExpense(caseId, expenseId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.expenses] });
       queryClient.invalidateQueries({

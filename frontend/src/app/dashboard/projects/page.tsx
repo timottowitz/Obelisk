@@ -24,6 +24,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 import { Project } from '@/types/cases';
+import { Badge } from '@/components/ui/badge';
 
 interface CreateProjectModalProps {
   open: boolean;
@@ -103,35 +104,43 @@ function CreateProjectModal({ open, onOpenChange }: CreateProjectModalProps) {
 }
 
 function ProjectCard({ project }: { project: Project }) {
+  const statusVariant: 'default' | 'secondary' | 'outline' =
+    project.status === 'active'
+      ? 'default'
+      : project.status === 'completed'
+      ? 'secondary'
+      : 'outline';
+
+  const badgeClassName =
+    project.status === 'active'
+      ? 'bg-emerald-600 text-emerald-50 hover:bg-emerald-600'
+      : project.status === 'completed'
+      ? 'bg-blue-600 text-blue-50 hover:bg-blue-600'
+      : 'bg-amber-500 text-amber-50 hover:bg-amber-500';
+
   return (
     <Link href={`/dashboard/projects/${project.id}`}>
-      <div className="group cursor-pointer rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition-all duration-200 hover:border-blue-200 hover:shadow-md">
+      <div className="group cursor-pointer rounded-lg border border-border bg-card p-6 shadow-sm transition-all duration-200 hover:border-primary/30 hover:shadow-md">
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
-              <Building2 className="h-5 w-5 text-blue-600" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Building2 className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900 group-hover:text-blue-600">
+              <h3 className="font-semibold text-foreground group-hover:text-primary">
                 {project.name}
               </h3>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 Created {new Date(project.created_at).toLocaleDateString()}
               </p>
             </div>
           </div>
-          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-            project.status === 'active' 
-              ? 'bg-green-100 text-green-800' 
-              : project.status === 'completed'
-              ? 'bg-blue-100 text-blue-800'
-              : 'bg-yellow-100 text-yellow-800'
-          }`}>
+          <Badge variant={statusVariant} className={badgeClassName}>
             {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
-          </span>
+          </Badge>
         </div>
         {project.description && (
-          <p className="mt-3 line-clamp-2 text-sm text-gray-600">
+          <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">
             {project.description}
           </p>
         )}
@@ -158,10 +167,10 @@ export default function ProjectsPage() {
     <div className="container mx-auto max-w-7xl px-4 py-8">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
-            <p className="mt-2 text-gray-600">
+            <h1 className="text-3xl font-bold text-foreground">Projects</h1>
+            <p className="mt-2 text-muted-foreground">
               Manage internal projects, administrative tasks, and team initiatives
             </p>
           </div>
@@ -174,9 +183,9 @@ export default function ProjectsPage() {
 
       {/* Filters */}
       <div className="mb-6 flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-        <div className="flex flex-1 items-center space-x-4">
+        <div className="flex w-full items-center space-x-4">
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary/70" />
             <Input
               placeholder="Search projects..."
               value={searchQuery}
@@ -185,8 +194,8 @@ export default function ProjectsPage() {
             />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
-              <Filter className="mr-2 h-4 w-4" />
+            <SelectTrigger className="w-full sm:w-40">
+              <Filter className="mr-2 h-4 w-4 text-primary" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -203,17 +212,17 @@ export default function ProjectsPage() {
       {isLoading ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="animate-pulse rounded-lg border border-gray-200 bg-white p-6">
+            <div key={i} className="animate-pulse rounded-lg border border-border bg-card p-6">
               <div className="flex items-start space-x-3">
-                <div className="h-10 w-10 rounded-lg bg-gray-200" />
+                <div className="h-10 w-10 rounded-lg bg-muted" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-3/4 rounded bg-gray-200" />
-                  <div className="h-3 w-1/2 rounded bg-gray-200" />
+                  <div className="h-4 w-3/4 rounded bg-muted" />
+                  <div className="h-3 w-1/2 rounded bg-muted" />
                 </div>
               </div>
               <div className="mt-3 space-y-2">
-                <div className="h-3 w-full rounded bg-gray-200" />
-                <div className="h-3 w-2/3 rounded bg-gray-200" />
+                <div className="h-3 w-full rounded bg-muted" />
+                <div className="h-3 w-2/3 rounded bg-muted" />
               </div>
             </div>
           ))}
@@ -225,12 +234,12 @@ export default function ProjectsPage() {
           ))}
         </div>
       ) : (
-        <div className="text-center py-12">
-          <Building2 className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-4 text-lg font-medium text-gray-900">
+        <div className="py-12 text-center">
+          <Building2 className="mx-auto h-12 w-12 text-primary" />
+          <h3 className="mt-4 text-lg font-medium text-foreground">
             {searchQuery || statusFilter !== 'all' ? 'No projects found' : 'No projects yet'}
           </h3>
-          <p className="mt-2 text-gray-600">
+          <p className="mt-2 text-muted-foreground">
             {searchQuery || statusFilter !== 'all' 
               ? 'Try adjusting your search or filters'
               : 'Get started by creating your first project'

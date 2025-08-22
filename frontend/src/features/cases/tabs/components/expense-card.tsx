@@ -22,47 +22,52 @@ import dayjs from 'dayjs';
 // Helper function to get file type info based on extension
 const getFileTypeInfo = (fileName: string) => {
   const extension = fileName.split('.').pop()?.toLowerCase() || '';
-  
+
   // PDF files
   if (extension === 'pdf') {
     return {
       icon: FileText,
-      bgColor: 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400',
+      bgColor:
+        'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400',
       iconColor: 'text-red-600 dark:text-red-400'
     };
   }
-  
+
   // Image files
   if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'].includes(extension)) {
     return {
       icon: Image,
-      bgColor: 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400',
+      bgColor:
+        'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400',
       iconColor: 'text-green-600 dark:text-green-400'
     };
   }
-  
+
   // Word documents
   if (['doc', 'docx', 'odt', 'rtf'].includes(extension)) {
     return {
       icon: FileText,
-      bgColor: 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400',
+      bgColor:
+        'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400',
       iconColor: 'text-blue-600 dark:text-blue-400'
     };
   }
-  
+
   // Excel/Spreadsheet files
   if (['xls', 'xlsx', 'csv', 'ods'].includes(extension)) {
     return {
       icon: FileSpreadsheet,
-      bgColor: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400',
+      bgColor:
+        'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400',
       iconColor: 'text-emerald-600 dark:text-emerald-400'
     };
   }
-  
+
   // Default for other file types
   return {
     icon: File,
-    bgColor: 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950/30 dark:text-gray-400',
+    bgColor:
+      'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950/30 dark:text-gray-400',
     iconColor: 'text-gray-600 dark:text-gray-400'
   };
 };
@@ -137,10 +142,7 @@ function ExpenseCard({
   };
 
   return (
-    <div
-      className='border-border bg-card cursor-pointer rounded-lg border shadow transition-shadow hover:shadow-md'
-      onClick={() => onEdit(item)}
-    >
+    <div className='border-border bg-card cursor-pointer rounded-lg border shadow transition-shadow hover:shadow-md'>
       <div className='border-border bg-accent/70 text-accent-foreground dark:bg-muted dark:text-muted-foreground flex items-center justify-between border-b px-4 py-2'>
         <div className='flex items-center gap-4'>
           <div className='text-muted-foreground text-xs'>
@@ -179,7 +181,10 @@ function ExpenseCard({
         </div>
       </div>
 
-      <div className='grid grid-cols-1 gap-6 p-4 sm:grid-cols-2 lg:grid-cols-4'>
+      <div
+        className='grid grid-cols-1 gap-6 p-4 sm:grid-cols-2 lg:grid-cols-4'
+        onClick={() => onEdit(item)}
+      >
         <div className='lg:border-border space-y-4 lg:border-r'>
           <div>
             <div className='text-muted-foreground text-xs'>Expense Type</div>
@@ -238,7 +243,7 @@ function ExpenseCard({
           </div>
           <div>
             <div className='text-muted-foreground text-xs'>Type</div>
-            <div className='text-sm'>{item.type || '-'}</div>
+            <div className='text-sm'>{item.cost_type_name || '-'}</div>
           </div>
         </div>
 
@@ -252,8 +257,12 @@ function ExpenseCard({
                 const fileInfo = getFileTypeInfo(item.attachment.name);
                 const IconComponent = fileInfo.icon;
                 return (
-                  <div className={`mt-2 inline-flex items-center gap-2 rounded-md border px-3 py-2 text-xs ${fileInfo.bgColor}`}>
-                    <IconComponent className={`h-3.5 w-3.5 ${fileInfo.iconColor}`} />
+                  <div
+                    className={`mt-2 inline-flex items-center gap-2 rounded-md border px-3 py-2 text-xs ${fileInfo.bgColor}`}
+                  >
+                    <IconComponent
+                      className={`h-3.5 w-3.5 ${fileInfo.iconColor}`}
+                    />
                     <span className='max-w-[15vw] truncate'>
                       {item.attachment.name}
                     </span>

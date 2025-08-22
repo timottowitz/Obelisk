@@ -1,5 +1,6 @@
 export interface AccountMapping {
-  cost_type: string;
+  cost_type_id: string;
+  cost_type_name: string;
   qb_account_id?: string;
   qb_account_name?: string;
   qb_class_id?: string;
