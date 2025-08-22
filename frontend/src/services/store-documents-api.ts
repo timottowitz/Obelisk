@@ -45,8 +45,8 @@ export default class StoreDocumentsAPI {
 
   static async getFolders(caseId: string) {
     // Validate caseId before making API call
-    if (!caseId || caseId === "undefined" || caseId === "null") {
-      throw new Error("Invalid case ID provided");
+    if (!caseId || caseId === 'undefined' || caseId === 'null') {
+      throw new Error('Invalid case ID provided');
     }
 
     const headers = await getAuthHeaders();
@@ -110,7 +110,7 @@ export default class StoreDocumentsAPI {
       method: 'POST',
       headers: uploadHeaders,
       body: JSON.stringify({ folderCaseName })
-    });   
+    });
 
     return handleApiResponse(response);
   }
@@ -121,6 +121,17 @@ export default class StoreDocumentsAPI {
     const response = await fetch(`${API_BASE_URL}/case-types`, {
       method: 'GET',
       headers: uploadHeaders
+    });
+    return handleApiResponse(response);
+  }
+
+  static async moveFile(fileId: string, targetFolderId: string) {
+    const headers = await getAuthHeaders();
+    const uploadHeaders = createUploadHeaders(headers);
+    const response = await fetch(`${API_BASE_URL}/move`, {
+      method: 'POST',
+      headers: uploadHeaders,
+      body: JSON.stringify({ fileId, targetFolderId })
     });
     return handleApiResponse(response);
   }
