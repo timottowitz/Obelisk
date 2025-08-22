@@ -19,7 +19,8 @@ import {
   ChevronLeft,
   Trash2,
   FolderPlus,
-  UploadIcon
+  UploadIcon,
+  FolderInput
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -57,6 +58,7 @@ import { DocumentPreviewModal } from '@/features/documents/components/document-p
 import { CreateFolderModal } from '@/features/documents/components/create-folder-modal';
 import { useGetCase } from '@/hooks/useCases';
 import { useDebounce } from '@/hooks/use-debounce';
+import { useOrganization } from '@clerk/nextjs';
 
 // Get file icon
 function getFileIcon(type: string, className?: string) {
@@ -88,7 +90,7 @@ export default function Documents({
   caseTypeName: string;
 }) {
   const { data: caseData, isLoading: isLoadingCase } = useGetCase(caseId);
-
+  const { organization } = useOrganization();
   // Use React Query hooks for all storage operations
   const {
     uploadDocument,
@@ -706,30 +708,28 @@ export default function Documents({
               <nav className='mb-4' aria-label='Case navigation'>
                 <Breadcrumb>
                   <BreadcrumbList>
-                    {!selectedFolder.name && (
-                      <BreadcrumbItem>
-                        <BreadcrumbLink className='text-muted-foreground hover:text-primary flex items-center gap-1 text-sm font-medium transition-colors'>
-                          <Sun className='h-4 w-4' />
-                          {isLoadingCase ? (
-                            <Loader2 className='h-3 w-3 animate-spin' />
-                          ) : (
-                            caseData?.full_name
-                          )}
-                        </BreadcrumbLink>
-                      </BreadcrumbItem>
-                    )}
+                    <BreadcrumbItem>
+                      <BreadcrumbLink className='text-muted-foreground hover:text-primary flex items-center gap-1 text-sm font-medium transition-colors'>
+                        <Sun className='h-4 w-4' />
+                        {isLoadingCase ? (
+                          <Loader2 className='h-3 w-3 animate-spin' />
+                        ) : (
+                          organization?.name
+                        )}
+                      </BreadcrumbLink>
+                    </BreadcrumbItem>
                     {selectedFolderPath.length > 0 &&
                       selectedFolderPath.map((folderNode: any) => (
                         <Fragment key={folderNode.id}>
+                          <BreadcrumbSeparator>
+                            <ChevronRight className='h-4 w-4' />
+                          </BreadcrumbSeparator>
                           <BreadcrumbItem>
                             <BreadcrumbLink className='text-muted-foreground hover:text-primary flex items-center gap-1 text-sm font-medium transition-colors'>
                               <FolderTree className='h-4 w-4' />
                               {folderNode.name}
                             </BreadcrumbLink>
                           </BreadcrumbItem>
-                          <BreadcrumbSeparator>
-                            <ChevronRight className='h-4 w-4' />
-                          </BreadcrumbSeparator>
                         </Fragment>
                       ))}
                   </BreadcrumbList>
@@ -859,7 +859,95 @@ export default function Documents({
                             disabled={isUploadingDocument}
                           />
                         </div>
-                        {renderFolderTree(foldersList)}
+                        {/* Render root folder contents directly without showing root folder itself */}
+                        {foldersList.map((rootFolder) => (
+                          <div key={rootFolder.id}>
+                            {/* Render root folder's children directly */}
+                            {rootFolder.children &&
+                              rootFolder.children.length > 0 &&
+                              renderFolderTree(rootFolder.children, 0)}
+
+                            {/* Render root folder's documents directly */}
+                            {rootFolder.documents &&
+                              rootFolder.documents.length > 0 &&
+                              rootFolder.documents.map(
+                                (document: any, docIndex: number) => {
+                                  const statusDisplay = getStatusDisplay(
+                                    document.status
+                                  );
+                                  return (
+                                    <motion.div
+                                      key={document.id}
+                                      initial={{ opacity: 0, x: -10 }}
+                                      animate={{ opacity: 1, x: 0 }}
+                                      transition={{ duration: 0.2 }}
+                                      className='relative mb-2'
+                                    >
+                                      <Button
+                                        variant='ghost'
+                                        onClick={() => {
+                                          handleGetDownloadUrl(document);
+                                          setSelectedDocument(document);
+                                          setIsDocumentDialogOpen(true);
+                                        }}
+                                        className='hover:bg-accent/60 h-auto w-full justify-start gap-3 p-3 text-left transition-colors'
+                                        role='treeitem'
+                                        aria-label={`${document.name}, ${document.mime_type.toUpperCase()}, ${formatFileSize(document.size_bytes)}, modified ${formatDate(document.created_at)}`}
+                                      >
+                                        <div className='flex flex-shrink-0 items-center gap-2'>
+                                          {getFileIcon(document.mime_type)}
+                                        </div>
+
+                                        <div className='min-w-0 flex-1 space-y-1'>
+                                          <div className='flex items-center justify-between gap-2'>
+                                            <h3 className='truncate text-sm font-medium'>
+                                              {document.name}
+                                            </h3>
+                                          </div>
+
+                                          <div className='text-muted-foreground flex items-center gap-4 text-xs'>
+                                            <span className='flex items-center gap-1'>
+                                              <File className='h-3 w-3' />
+                                              {formatFileSize(
+                                                document.size_bytes
+                                              )}
+                                            </span>
+                                            <span className='flex items-center gap-1'>
+                                              <Clock className='h-3 w-3' />
+                                              {formatDate(document.created_at)}
+                                            </span>
+                                            <span
+                                              className={cn(
+                                                'rounded-full px-2 py-0.5 text-xs font-medium',
+                                                statusDisplay.bg,
+                                                statusDisplay.color
+                                              )}
+                                            >
+                                              {document.status}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className='flex items-center gap-1'>
+                                          <span
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setDeleteTargetId(document.id);
+                                              setDeleteTargetType('document');
+                                              setDeleteModalOpen(true);
+                                            }}
+                                            className='hover:bg-destructive/10 text-destructive flex h-6 w-6 flex-shrink-0 cursor-pointer items-center justify-center rounded transition-colors'
+                                            aria-label={`Delete ${document.name}`}
+                                          >
+                                            <Trash2 className='h-3 w-3' />
+                                          </span>
+                                        </div>
+                                      </Button>
+                                    </motion.div>
+                                  );
+                                }
+                              )}
+                          </div>
+                        ))}
                       </nav>
                     )}
                   </div>
