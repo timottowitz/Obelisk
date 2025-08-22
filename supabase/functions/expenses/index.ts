@@ -190,12 +190,23 @@ app.get("/expenses/cases/:caseId/initial-documents", async (c) => {
   try {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
 
+    const { data: caseData, error: caseError } = await supabase
+      .schema(schema)
+      .from("cases")
+      .select("*")
+      .eq("id", caseId)
+      .single();
+      
+    if (caseError) {
+      return c.json({ error: caseError.message }, 500);
+    }
+
     const { data: folder, error: folderError } = await supabase
       .schema(schema)
       .from("storage_folders")
       .select("*")
       .eq("case_id", caseId)
-      .eq("name", "Initial Documents")
+      .eq("name", caseData.full_name)
       .single();
 
     if (folderError) {

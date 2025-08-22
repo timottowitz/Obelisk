@@ -321,9 +321,11 @@ export default function Finances({ caseId }: { caseId: string }) {
       {/* Cards View */}
       {view === 'cards' && (
         <div className='space-y-2'>
-          <p className='text-foreground pb-0 text-right text-lg font-semibold'>
-            ${totalAmount.toLocaleString()}
-          </p>
+          {expenses && expenses.data.length > 0 && (
+            <p className='text-foreground pb-0 text-right text-lg font-semibold'>
+              ${totalAmount.toLocaleString()}
+            </p>
+          )}
           {expenses &&
             expenses?.data.map((item: Expense) => (
               <ExpenseCard
@@ -334,6 +336,13 @@ export default function Finances({ caseId }: { caseId: string }) {
             ))}
         </div>
       )}
+
+      {expenses && expenses.data.length === 0 && (
+        <div className='flex h-full items-center justify-center'>
+          <p className='text-muted-foreground text-sm'>No expenses found</p>
+        </div>
+      )}
+
       {/* Pagination */}
       {totalPages > 1 && (
         <div className='flex items-center justify-between'>

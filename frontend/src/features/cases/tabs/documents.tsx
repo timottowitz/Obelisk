@@ -107,6 +107,13 @@ export default function Documents({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDocument, setSelectedDocument] =
     useState<SolarDocumentItem | null>(null);
+  const [selectedFolder, setSelectedFolder] = useState<{
+    id: string;
+    name: string;
+  }>({
+    id: '',
+    name: ''
+  });
   const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
 
   // Create folder state
@@ -196,6 +203,29 @@ export default function Documents({
 
   const folderStructure = Array.isArray(foldersList) ? filteredFolders : [];
 
+  // Compute selected folder full path for breadcrumb (root -> ... -> selected)
+  const findFolderPath = useCallback(
+    (nodes: any[], targetId: string): any[] | null => {
+      for (const node of nodes) {
+        if (node.id === targetId) {
+          return [node];
+        }
+        const childPath = findFolderPath(node.children || [], targetId);
+        if (childPath) {
+          return [node, ...childPath];
+        }
+      }
+      return null;
+    },
+    []
+  );
+
+  const selectedFolderPath = useMemo(() => {
+    if (!selectedFolder?.id) return [] as any[];
+    const path = findFolderPath(folderStructure, selectedFolder.id);
+    return path ?? [];
+  }, [findFolderPath, folderStructure, selectedFolder?.id]);
+
   // Handle search
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -258,40 +288,43 @@ export default function Documents({
   }, []);
 
   // Handle create folder
-  const handleCreateFolder = useCallback(async (folderName: string) => {
-    if (!folderName.trim()) {
-      toast.error('Please enter a folder name');
-      return;
-    }
-
-    setIsCreatingFolder(true);
-    try {
-      await createFolder.mutateAsync({
-        folderName: folderName.trim(),
-        parentId: selectedParentFolderId
-      });
-
-      toast.success(`Folder "${folderName}" created successfully`);
-
-      // Expand the parent folder if a parent was selected
-      if (selectedParentFolderId !== 'root') {
-        setExpandedFolders((prev) => {
-          const newSet = new Set(prev);
-          newSet.add(selectedParentFolderId);
-          return newSet;
-        });
+  const handleCreateFolder = useCallback(
+    async (folderName: string) => {
+      if (!folderName.trim()) {
+        toast.error('Please enter a folder name');
+        return;
       }
 
-      // Reset form
-      setNewFolderName('');
-      setIsCreateFolderDialogOpen(false);
-    } catch (error) {
-      console.error('Error creating folder:', error);
-      toast.error('Failed to create folder');
-    } finally {
-      setIsCreatingFolder(false);
-    }
-  }, [newFolderName, selectedParentFolderId, createFolder]);
+      setIsCreatingFolder(true);
+      try {
+        await createFolder.mutateAsync({
+          folderName: folderName.trim(),
+          parentId: selectedParentFolderId
+        });
+
+        toast.success(`Folder "${folderName}" created successfully`);
+
+        // Expand the parent folder if a parent was selected
+        if (selectedParentFolderId !== 'root') {
+          setExpandedFolders((prev) => {
+            const newSet = new Set(prev);
+            newSet.add(selectedParentFolderId);
+            return newSet;
+          });
+        }
+
+        // Reset form
+        setNewFolderName('');
+        setIsCreateFolderDialogOpen(false);
+      } catch (error) {
+        console.error('Error creating folder:', error);
+        toast.error('Failed to create folder');
+      } finally {
+        setIsCreatingFolder(false);
+      }
+    },
+    [newFolderName, selectedParentFolderId, createFolder]
+  );
 
   const handleUploadEvidence = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -448,7 +481,13 @@ export default function Documents({
             {/* Folder Header */}
             <Collapsible.Root
               open={isExpanded}
-              onOpenChange={() => toggleFolder(folder.id)}
+              onOpenChange={() => {
+                toggleFolder(folder.id);
+                setSelectedFolder({
+                  id: folder.id,
+                  name: folder.name
+                });
+              }}
             >
               <Collapsible.Trigger asChild>
                 <Button
@@ -656,34 +695,32 @@ export default function Documents({
               <nav className='mb-4' aria-label='Case navigation'>
                 <Breadcrumb>
                   <BreadcrumbList>
-                    <BreadcrumbItem>
-                      <BreadcrumbLink className='text-muted-foreground hover:text-primary flex items-center gap-1 text-sm font-medium transition-colors'>
-                        <Sun className='h-4 w-4' />
-                        {isLoadingCase ? (
-                          <Loader2 className='h-3 w-3 animate-spin' />
-                        ) : (
-                          caseData?.full_name
-                        )}
-                      </BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator>
-                      <ChevronRight className='h-4 w-4' />
-                    </BreadcrumbSeparator>
-                    <BreadcrumbItem>
-                      <BreadcrumbLink className='text-muted-foreground hover:text-primary flex items-center gap-1 text-sm font-medium transition-colors'>
-                        <FolderTree className='h-4 w-4' />
-                        Document Explorer
-                      </BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator>
-                      <ChevronRight className='h-4 w-4' />
-                    </BreadcrumbSeparator>
-                    <BreadcrumbItem>
-                      <BreadcrumbLink className='text-primary flex items-center gap-1 text-sm font-medium'>
-                        <Zap className='h-4 w-4' />
-                        {caseTypeName}
-                      </BreadcrumbLink>
-                    </BreadcrumbItem>
+                    {!selectedFolder.name && (
+                      <BreadcrumbItem>
+                        <BreadcrumbLink className='text-muted-foreground hover:text-primary flex items-center gap-1 text-sm font-medium transition-colors'>
+                          <Sun className='h-4 w-4' />
+                          {isLoadingCase ? (
+                            <Loader2 className='h-3 w-3 animate-spin' />
+                          ) : (
+                            caseData?.full_name
+                          )}
+                        </BreadcrumbLink>
+                      </BreadcrumbItem>
+                    )}
+                    {selectedFolderPath.length > 0 &&
+                      selectedFolderPath.map((folderNode: any) => (
+                        <>
+                          <BreadcrumbItem key={folderNode.id}>
+                            <BreadcrumbLink className='text-muted-foreground hover:text-primary flex items-center gap-1 text-sm font-medium transition-colors'>
+                              <FolderTree className='h-4 w-4' />
+                              {folderNode.name}
+                            </BreadcrumbLink>
+                          </BreadcrumbItem>
+                          <BreadcrumbSeparator key={`sep-${folderNode.id}`}>
+                            <ChevronRight className='h-4 w-4' />
+                          </BreadcrumbSeparator>
+                        </>
+                      ))}
                   </BreadcrumbList>
                 </Breadcrumb>
               </nav>
