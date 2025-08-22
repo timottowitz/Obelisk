@@ -1150,7 +1150,8 @@ async function createFoldersFromTemplates(
   schema: string,
   caseTypeId: string,
   caseId: string,
-  userId: string
+  userId: string,
+  caseName: string
 ) {
   // Get folder templates for the case type
   const { data: templates, error: templatesError } = await supabase
@@ -1162,8 +1163,28 @@ async function createFoldersFromTemplates(
 
   if (templatesError || !templates) {
     console.error("Failed to fetch folder templates:", templatesError);
-    return;
+    throw new Error("Failed to fetch folder templates", templatesError);
   }
+
+  const { data: parentFolder, error: parentFolderError } = await supabase
+    .schema(schema)
+    .from("storage_folders")
+    .insert({
+      name: caseName, //format "Bennet Legal"
+      path: `/${caseName.toLowerCase().replace(/ /g, "-")}`,
+      parent_folder_id: null,
+      case_type_id: caseTypeId,
+      case_id: caseId,
+      created_by: userId,
+    })
+    .select()
+    .single();
+
+  if (parentFolderError) {
+    console.error("Failed to fetch parent folder:", parentFolderError);
+    throw new Error("Failed to fetch parent folder", parentFolderError);
+  }
+
   // Create folders from templates
   for (const template of templates) {
     try {
@@ -1172,11 +1193,11 @@ async function createFoldersFromTemplates(
         .from("storage_folders")
         .insert({
           name: template.name,
-          path: template.path,
+          path: `${parentFolder.path}${template.path}`,
           case_id: caseId,
           case_type_id: caseTypeId,
           created_by: userId,
-          parent_folder_id: null, // We'll handle nesting in a future enhancement
+          parent_folder_id: parentFolder.id,
         })
         .select()
         .single();
@@ -1185,10 +1206,14 @@ async function createFoldersFromTemplates(
         throw new Error("Failed to create folder", folderError);
       }
       console.log("Folder created:", folder);
-    } catch (error) {
+
+    } catch (error: any) {
       console.error(`Failed to create folder ${template.name}:`, error);
+      throw new Error(`Failed to create folder ${template.name}`, error);
     }
   }
+
+  return parentFolder.id;
 }
 
 // POST /cases - Create new case with automatic folder structure
@@ -1298,12 +1323,13 @@ app.post("/cases", async (c) => {
     }
 
     // Create folder structure from template
-    await createFoldersFromTemplates(
+    const parentFolderId = await createFoldersFromTemplates(
       supabase,
       schema,
       case_type_id as string,
       newCase.id,
-      user.id
+      user.id,
+      newCase.full_name
     );
 
     try {
@@ -1311,11 +1337,11 @@ app.post("/cases", async (c) => {
         supabase,
         schema,
         newCase.id,
-        case_type_id as string,
         userId,
         documents,
         orgId,
-        member
+        member,
+        parentFolderId
       );
     } catch (error: any) {
       console.error("Failed to upload initial documents:", error);
@@ -1561,345 +1587,35 @@ app.delete("/cases/:id", async (c) => {
   }
 });
 
-// GET /cases/:id/tasks - Get tasks for case
-app.get("/cases/:id/tasks", async (c) => {
-  const orgId = c.get("orgId");
-  const userId = c.get("userId");
-  const caseId = c.req.param("id");
-  const url = new URL(c.req.url);
-  const page = parseInt(url.searchParams.get("page") || "1");
-  const limit = parseInt(url.searchParams.get("limit") || "5");
-
-  try {
-    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
-
-    const {
-      data: tasks,
-      error: selectError,
-      count,
-    } = await supabase
-      .schema(schema)
-      .from("case_tasks")
-      .select("*", { count: "exact" })
-      .eq("case_id", caseId)
-      .order("due_date", { ascending: true })
-      .range((page - 1) * limit, page * limit - 1);
-
-    if (selectError || !tasks) {
-      return c.json(
-        { error: "Failed to fetch tasks", details: selectError },
-        500
-      );
-    }
-
-    return c.json({ tasks, count: count }, 200);
-  } catch (error: any) {
-    return c.json({ error: error.message }, 500);
-  }
-});
-
-// POST /cases/:id/tasks - Create task for case
-app.post("/cases/:id/tasks", async (c) => {
-  const orgId = c.get("orgId");
-  const userId = c.get("userId");
-  const case_id = c.req.param("id");
-
-  try {
-    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
-    const body = await c.req.json();
-
-    const { name, description, due_date, assignee_id, priority, category_id } =
-      body;
-
-    const { data: newTask, error: insertError } = await supabase
-      .schema(schema)
-      .from("case_tasks")
-      .insert({
-        case_id,
-        name,
-        description,
-        due_date,
-        assignee_id,
-        priority,
-        category_id,
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      return c.json(
-        { error: "Failed to create task", details: insertError },
-        500
-      );
-    }
-
-    const { data: user } = await supabase
-      .schema("private")
-      .from("users")
-      .select("*")
-      .eq("clerk_user_id", userId)
-      .single();
-
-    const { error: eventError } = await supabase
-      .schema(schema)
-      .from("case_events")
-      .insert({
-        case_id: case_id,
-        event_type: "task_created",
-        description: `${user.email} created task ${name}`,
-        date: new Date().toISOString().split("T")[0],
-        time: new Date().toISOString().split("T")[1].split(".")[0],
-      })
-      .select()
-      .single();
-
-    if (eventError) {
-      return c.json(
-        { error: "Failed to create event", details: eventError },
-        500
-      );
-    }
-
-    return c.json(newTask, 201);
-  } catch (error: any) {
-    return c.json({ error: error.message }, 500);
-  }
-});
-
-// PUT /cases/:id/tasks/:taskId - Update task for case
-app.put("/cases/:id/tasks/:taskId", async (c) => {
-  const orgId = c.get("orgId");
-  const userId = c.get("userId");
-  const caseId = c.req.param("id");
-  const taskId = c.req.param("taskId");
-
-  try {
-    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
-    const body = await c.req.json();
-
-    const { name, description, due_date } = body;
-
-    const { data: updatedTask, error: updateError } = await supabase
-      .schema(schema)
-      .from("case_tasks")
-      .update({ name, description, due_date })
-      .eq("id", taskId)
-      .eq("case_id", caseId)
-      .select()
-      .single();
-
-    if (updateError || !updatedTask) {
-      return c.json(
-        { error: "Failed to update task", details: updateError },
-        500
-      );
-    }
-
-    const { data: user } = await supabase
-      .schema("private")
-      .from("users")
-      .select("*")
-      .eq("clerk_user_id", userId)
-      .single();
-
-    const { error: eventError } = await supabase
-      .schema(schema)
-      .from("case_events")
-      .insert({
-        case_id: caseId,
-        event_type: "task_updated",
-        description: `${user.email} updated task ${name}`,
-        date: new Date().toISOString().split("T")[0],
-        time: new Date().toISOString().split("T")[1].split(".")[0],
-      });
-
-    if (eventError) {
-      return c.json(
-        { error: "Failed to create event", details: eventError },
-        500
-      );
-    }
-
-    return c.json(updatedTask, 200);
-  } catch (error: any) {
-    return c.json({ error: error.message }, 500);
-  }
-});
-
-// DELETE /cases/:id/tasks/:taskId - Delete task for case
-app.delete("/cases/:id/tasks/:taskId", async (c) => {
-  const orgId = c.get("orgId");
-  const userId = c.get("userId");
-  const caseId = c.req.param("id");
-  const taskId = c.req.param("taskId");
-
-  try {
-    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
-
-    const { data: user } = await supabase
-      .schema("private")
-      .from("users")
-      .select("*")
-      .eq("clerk_user_id", userId)
-      .single();
-
-    const { data: task } = await supabase
-      .schema(schema)
-      .from("case_tasks")
-      .select("*")
-      .eq("id", taskId)
-      .eq("case_id", caseId)
-      .single();
-
-    if (!task) {
-      return c.json({ error: "Task not found" }, 404);
-    }
-
-    const { error: deleteError } = await supabase
-      .schema(schema)
-      .from("case_tasks")
-      .delete()
-      .eq("id", taskId)
-      .eq("case_id", caseId);
-
-    if (deleteError) {
-      return c.json(
-        { error: "Failed to delete task", details: deleteError },
-        500
-      );
-    }
-
-    const { error: eventError } = await supabase
-      .schema(schema)
-      .from("case_events")
-      .insert({
-        case_id: caseId,
-        event_type: "task_deleted",
-        description: `${user.email} deleted task ${task.name}`,
-        date: new Date().toISOString().split("T")[0],
-        time: new Date().toISOString().split("T")[1].split(".")[0],
-      });
-
-    if (eventError) {
-      return c.json(
-        { error: "Failed to create event", details: eventError },
-        500
-      );
-    }
-
-    return c.json({ success: true, message: "Task deleted successfully" }, 200);
-  } catch (error: any) {
-    return c.json({ error: error.message }, 500);
-  }
-});
-
-//GET /cases/:id/events - Get events for case
-app.get("/cases/:id/events", async (c) => {
-  const orgId = c.get("orgId");
-  const userId = c.get("userId");
-  const caseId = c.req.param("id");
-  const url = new URL(c.req.url);
-  const page = parseInt(url.searchParams.get("page") || "1");
-  const limit = parseInt(url.searchParams.get("limit") || "5");
-
-  try {
-    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
-
-    const {
-      data: events,
-      error: selectError,
-      count,
-    } = await supabase
-      .schema(schema)
-      .from("case_events")
-      .select("*", { count: "exact" })
-      .eq("case_id", caseId)
-      .order("created_at", { ascending: false })
-      .range((page - 1) * limit, page * limit - 1);
-
-    if (selectError) {
-      return c.json(
-        { error: "Failed to fetch events", details: selectError },
-        500
-      );
-    }
-
-    return c.json({ data: events, count: count }, 200);
-  } catch (error: any) {
-    return c.json({ error: error.message }, 500);
-  }
-});
-
 async function uploadInitialDocuments(
   supabase: any,
   schema: string,
   caseId: string,
-  caseTypeId: string,
   userId: string,
   documents: any[],
   orgId: string,
-  member: any
+  member: any,
+  parentFolderId: string
 ) {
   try {
     // Skip if no documents
     if (!documents || documents.length === 0) {
       return;
     }
+    // Initialize Google Cloud Storage
+    const gcsService = getGcsService();
 
-    // Create or find Initial Documents folder
-    let initialDocsFolder;
-
-    // First check if Initial Documents folder already exists for this case
-    const { data: existingFolder } = await supabase
-      .schema(schema)
-      .from("storage_folders")
-      .select("*")
-      .eq("case_id", caseId)
-      .eq("name", "Initial Documents")
-      .single();
-
-    const { data: user } = await supabase
+    const { data: user, error: userError } = await supabase
       .schema("private")
       .from("users")
       .select("*")
       .eq("clerk_user_id", userId)
       .single();
 
-    if (!user) {
-      throw new Error("User not found");
+    if (userError) {
+      console.error("Failed to fetch user:", userError);
+      throw new Error("Failed to fetch user", userError);
     }
-
-    if (existingFolder) {
-      initialDocsFolder = existingFolder;
-    } else {
-      // Create Initial Documents folder
-      const { data: newFolder, error: folderError } = await supabase
-        .schema(schema)
-        .from("storage_folders")
-        .insert({
-          name: "Initial Documents",
-          path: "/Initial Documents",
-          parent_folder_id: null,
-          created_by: user.id,
-          case_type_id: caseTypeId,
-          case_id: caseId,
-        })
-        .select()
-        .single();
-
-      if (folderError) {
-        console.error(
-          "Failed to create Initial Documents folder:",
-          folderError
-        );
-        throw new Error("Failed to create Initial Documents folder");
-      }
-
-      initialDocsFolder = newFolder;
-    }
-
-    // Initialize Google Cloud Storage
-    const gcsService = getGcsService();
 
     // Upload each document to Google Cloud Storage and save metadata
     for (const document of documents) {
@@ -1912,7 +1628,7 @@ async function uploadInitialDocuments(
           const checksum = await calculateChecksum(fileData);
           const folderPath = await getFolderPath(
             supabase,
-            initialDocsFolder.id,
+            parentFolderId,
             schema
           );
 
@@ -1937,7 +1653,7 @@ async function uploadInitialDocuments(
             .insert({
               name: document.name,
               original_name: document.name,
-              folder_id: initialDocsFolder.id,
+              folder_id: parentFolderId,
               gcs_blob_name: uploadResult.blobName,
               gcs_blob_url: uploadResult.blobUrl,
               mime_type: document.type || "application/pdf",

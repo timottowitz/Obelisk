@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { cn } from '@/lib/utils';
 import {
   Search,
@@ -56,6 +56,7 @@ import {
 import { DocumentPreviewModal } from '@/features/documents/components/document-preview-modal';
 import { CreateFolderModal } from '@/features/documents/components/create-folder-modal';
 import { useGetCase } from '@/hooks/useCases';
+import { useDebounce } from '@/hooks/use-debounce';
 
 // Get file icon
 function getFileIcon(type: string, className?: string) {
@@ -101,12 +102,18 @@ export default function Documents({
   // Derive state from React Query data
   const foldersList = folders.data || [];
   const isLoadingFolders = folders.isLoading;
-  const foldersError = folders.error;
 
   const [searchValue, setSearchValue] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchValue = useDebounce(searchValue, 1000);
   const [selectedDocument, setSelectedDocument] =
     useState<SolarDocumentItem | null>(null);
+  const [selectedFolder, setSelectedFolder] = useState<{
+    id: string;
+    name: string;
+  }>({
+    id: '',
+    name: ''
+  });
   const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
 
   // Create folder state
@@ -163,43 +170,77 @@ export default function Documents({
     }
   ]);
 
-  // Use processed folder structure from backend
-  const filteredFolders = useMemo(
-    () =>
-      foldersList.filter((folder) => {
-        // Logically fix: search should check folder name, its documents, and recursively its children
-        const matchesSearch = (folderOrChild: any): boolean => {
-          if (searchQuery.length === 0) {
-            return true;
-          }
-          // Check documents in this folder/child
-          if (
-            folderOrChild.documents?.some((doc: any) =>
-              doc.name?.toLowerCase().includes(searchQuery.toLowerCase())
-            )
-          ) {
-            return true;
-          }
-          // Recursively check children
-          if (
-            folderOrChild.children?.some((child: any) => matchesSearch(child))
-          ) {
-            return true;
-          }
-          return false;
-        };
+  const findMatchingFolderIds = useCallback(
+    (nodes: any[]): string[] => {
+      if (debouncedSearchValue.length === 0) {
+        return [];
+      }
 
-        return matchesSearch(folder);
-      }),
-    [foldersList, searchQuery]
+      const matchedFolderIds: string[] = [];
+
+      for (const node of nodes) {
+        const hasMatchInThisFolder = node.documents?.some((doc: any) =>
+          doc.name?.toLowerCase().includes(debouncedSearchValue.toLowerCase())
+        );
+        if (hasMatchInThisFolder) {
+          matchedFolderIds.push(node.id);
+          if (node.parent_folder_id) {
+            matchedFolderIds.push(node.parent_folder_id);
+          }
+        }
+        const childMatch = findMatchingFolderIds(node.children || []);
+        if (childMatch) {
+          matchedFolderIds.push(...childMatch);
+        }
+      }
+      return matchedFolderIds;
+    },
+    [debouncedSearchValue]
   );
 
-  const folderStructure = Array.isArray(foldersList) ? filteredFolders : [];
+  const matchedFolderIds = useMemo(() => {
+    return findMatchingFolderIds(foldersList);
+  }, [findMatchingFolderIds, foldersList]);
+
+  useEffect(() => {
+    setExpandedFolders((prev) => {
+      const newIds = new Set(matchedFolderIds);
+      if (
+        newIds.size > 0 &&
+        (prev.size !== newIds.size ||
+          Array.from(prev).some((id) => !newIds.has(id)))
+      ) {
+        return newIds;
+      }
+      return prev;
+    });
+  }, [matchedFolderIds]);
+
+  const findFolderPath = useCallback(
+    (nodes: any[], targetId: string): any[] | null => {
+      for (const node of nodes) {
+        if (node.id === targetId) {
+          return [node];
+        }
+        const childPath = findFolderPath(node.children || [], targetId);
+        if (childPath) {
+          return [node, ...childPath];
+        }
+      }
+      return null;
+    },
+    []
+  );
+
+  const selectedFolderPath = useMemo(() => {
+    if (!selectedFolder?.id) return [] as any[];
+    const path = findFolderPath(foldersList, selectedFolder.id);
+    return path ?? [];
+  }, [findFolderPath, foldersList, selectedFolder?.id]);
 
   // Handle search
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSearchQuery(searchValue);
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchValue(e.target.value);
   };
 
   const toggleFolder = useCallback((folderId: string) => {
@@ -258,40 +299,43 @@ export default function Documents({
   }, []);
 
   // Handle create folder
-  const handleCreateFolder = useCallback(async (folderName: string) => {
-    if (!folderName.trim()) {
-      toast.error('Please enter a folder name');
-      return;
-    }
-
-    setIsCreatingFolder(true);
-    try {
-      await createFolder.mutateAsync({
-        folderName: folderName.trim(),
-        parentId: selectedParentFolderId
-      });
-
-      toast.success(`Folder "${folderName}" created successfully`);
-
-      // Expand the parent folder if a parent was selected
-      if (selectedParentFolderId !== 'root') {
-        setExpandedFolders((prev) => {
-          const newSet = new Set(prev);
-          newSet.add(selectedParentFolderId);
-          return newSet;
-        });
+  const handleCreateFolder = useCallback(
+    async (folderName: string) => {
+      if (!folderName.trim()) {
+        toast.error('Please enter a folder name');
+        return;
       }
 
-      // Reset form
-      setNewFolderName('');
-      setIsCreateFolderDialogOpen(false);
-    } catch (error) {
-      console.error('Error creating folder:', error);
-      toast.error('Failed to create folder');
-    } finally {
-      setIsCreatingFolder(false);
-    }
-  }, [newFolderName, selectedParentFolderId, createFolder]);
+      setIsCreatingFolder(true);
+      try {
+        await createFolder.mutateAsync({
+          folderName: folderName.trim(),
+          parentId: selectedParentFolderId
+        });
+
+        toast.success(`Folder "${folderName}" created successfully`);
+
+        // Expand the parent folder if a parent was selected
+        if (selectedParentFolderId !== 'root') {
+          setExpandedFolders((prev) => {
+            const newSet = new Set(prev);
+            newSet.add(selectedParentFolderId);
+            return newSet;
+          });
+        }
+
+        // Reset form
+        setNewFolderName('');
+        setIsCreateFolderDialogOpen(false);
+      } catch (error) {
+        console.error('Error creating folder:', error);
+        toast.error('Failed to create folder');
+      } finally {
+        setIsCreatingFolder(false);
+      }
+    },
+    [newFolderName, selectedParentFolderId, createFolder]
+  );
 
   const handleUploadEvidence = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -448,7 +492,13 @@ export default function Documents({
             {/* Folder Header */}
             <Collapsible.Root
               open={isExpanded}
-              onOpenChange={() => toggleFolder(folder.id)}
+              onOpenChange={() => {
+                toggleFolder(folder.id);
+                setSelectedFolder({
+                  id: folder.id,
+                  name: folder.name
+                });
+              }}
             >
               <Collapsible.Trigger asChild>
                 <Button
@@ -656,34 +706,32 @@ export default function Documents({
               <nav className='mb-4' aria-label='Case navigation'>
                 <Breadcrumb>
                   <BreadcrumbList>
-                    <BreadcrumbItem>
-                      <BreadcrumbLink className='text-muted-foreground hover:text-primary flex items-center gap-1 text-sm font-medium transition-colors'>
-                        <Sun className='h-4 w-4' />
-                        {isLoadingCase ? (
-                          <Loader2 className='h-3 w-3 animate-spin' />
-                        ) : (
-                          caseData?.full_name
-                        )}
-                      </BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator>
-                      <ChevronRight className='h-4 w-4' />
-                    </BreadcrumbSeparator>
-                    <BreadcrumbItem>
-                      <BreadcrumbLink className='text-muted-foreground hover:text-primary flex items-center gap-1 text-sm font-medium transition-colors'>
-                        <FolderTree className='h-4 w-4' />
-                        Document Explorer
-                      </BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator>
-                      <ChevronRight className='h-4 w-4' />
-                    </BreadcrumbSeparator>
-                    <BreadcrumbItem>
-                      <BreadcrumbLink className='text-primary flex items-center gap-1 text-sm font-medium'>
-                        <Zap className='h-4 w-4' />
-                        {caseTypeName}
-                      </BreadcrumbLink>
-                    </BreadcrumbItem>
+                    {!selectedFolder.name && (
+                      <BreadcrumbItem>
+                        <BreadcrumbLink className='text-muted-foreground hover:text-primary flex items-center gap-1 text-sm font-medium transition-colors'>
+                          <Sun className='h-4 w-4' />
+                          {isLoadingCase ? (
+                            <Loader2 className='h-3 w-3 animate-spin' />
+                          ) : (
+                            caseData?.full_name
+                          )}
+                        </BreadcrumbLink>
+                      </BreadcrumbItem>
+                    )}
+                    {selectedFolderPath.length > 0 &&
+                      selectedFolderPath.map((folderNode: any) => (
+                        <Fragment key={folderNode.id}>
+                          <BreadcrumbItem>
+                            <BreadcrumbLink className='text-muted-foreground hover:text-primary flex items-center gap-1 text-sm font-medium transition-colors'>
+                              <FolderTree className='h-4 w-4' />
+                              {folderNode.name}
+                            </BreadcrumbLink>
+                          </BreadcrumbItem>
+                          <BreadcrumbSeparator>
+                            <ChevronRight className='h-4 w-4' />
+                          </BreadcrumbSeparator>
+                        </Fragment>
+                      ))}
                   </BreadcrumbList>
                 </Breadcrumb>
               </nav>
@@ -705,7 +753,7 @@ export default function Documents({
                         {isLoadingFolders ? (
                           <Loader2 className='h-3 w-3 animate-spin' />
                         ) : (
-                          countAllDocuments(folderStructure)
+                          countAllDocuments(foldersList)
                         )}{' '}
                         documents
                       </span>
@@ -716,7 +764,7 @@ export default function Documents({
                         {isLoadingFolders ? (
                           <Loader2 className='h-3 w-3 animate-spin' />
                         ) : (
-                          folderStructure.length
+                          foldersList.length
                         )}{' '}
                         categories
                       </span>
@@ -739,24 +787,17 @@ export default function Documents({
 
                 {/* Search and Actions */}
                 <div className='flex items-center gap-4'>
-                  <form
-                    onSubmit={handleSearch}
-                    role='search'
-                    aria-label='Search documents'
-                    className='max-w-md flex-1'
-                  >
-                    <div className='relative'>
-                      <Search className='text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2' />
-                      <Input
-                        type='search'
-                        value={searchValue}
-                        onChange={(e) => setSearchValue(e.target.value)}
-                        placeholder='Search documents...'
-                        className='bg-background/80 border-border/60 focus:border-primary/60 focus:ring-primary/20 h-9 pr-4 pl-10'
-                        aria-label='Search documents'
-                      />
-                    </div>
-                  </form>
+                  <div className='relative'>
+                    <Search className='text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2' />
+                    <Input
+                      type='search'
+                      value={searchValue}
+                      onChange={handleSearch}
+                      placeholder='Search documents...'
+                      className='bg-background/80 border-border/60 focus:border-primary/60 focus:ring-primary/20 h-9 pr-4 pl-10'
+                      aria-label='Search documents'
+                    />
+                  </div>
                 </div>
               </div>
             </section>
@@ -818,7 +859,7 @@ export default function Documents({
                             disabled={isUploadingDocument}
                           />
                         </div>
-                        {renderFolderTree(folderStructure)}
+                        {renderFolderTree(foldersList)}
                       </nav>
                     )}
                   </div>
