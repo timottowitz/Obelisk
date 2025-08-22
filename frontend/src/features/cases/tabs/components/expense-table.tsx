@@ -191,7 +191,7 @@ export default function ExpenseTable({
                   </div>
                 </TableCell>
                 <TableCell className='hidden md:table-cell'>
-                  {r.type || '—'}
+                  {r.cost_type_name || '—'}
                 </TableCell>
                 <TableCell className='hidden lg:table-cell'>
                   {r.invoice_number || '—'}

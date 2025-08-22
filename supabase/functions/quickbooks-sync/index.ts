@@ -111,19 +111,30 @@ app.post("/quickbooks-sync/expense/:expenseId", async (c) => {
       return c.json({ error: "expense record not found" }, 404);
     }
 
+    const { data: costType, error: costTypeError } = await supabase
+      .schema(schema)
+      .from("cost_types")
+      .select("*")
+      .eq("id", expense.cost_type_id)
+      .single();
+
+    if (costTypeError || !costType) {
+      return c.json({ error: "Cost type not found" }, 404);
+    }
+
     // Get account mapping
     const { data: mapping, error: mappingError } = await supabase
       .schema(schema)
       .from("qb_account_mappings")
       .select("*")
       .eq("org_id", orgId)
-      .eq("cost_type", expense.type)
+      .eq("cost_type_id", expense.cost_type_id)
       .single();
 
     if (mappingError || !mapping) {
       return c.json(
         {
-          error: `No QuickBooks account mapping found for cost type: ${expense.type}`,
+          error: `No QuickBooks account mapping found for cost type: ${costType.name}`,
         },
         400
       );
@@ -327,7 +338,6 @@ app.post("/quickbooks-sync/customer/:caseId", async (c) => {
   }
   const { supabase, schema, org } = await getSupabaseAndOrgInfo(orgId, userId);
 
-
   try {
     const qbClient = new QuickBooksClient(org.id, schema);
     await qbClient.initialize();
@@ -357,7 +367,7 @@ app.post("/quickbooks-sync/customer/:caseId", async (c) => {
     // Create or find parent customer (client)
     let parentCustomerId = null;
 
-    const {data: client, error: clientError} = await supabase
+    const { data: client, error: clientError } = await supabase
       .schema(schema)
       .from("contacts")
       .select("*")
@@ -515,6 +525,13 @@ app.post("/quickbooks-sync/save-mapping", async (c) => {
   const userId = c.get("userId");
   const orgId = c.get("orgId");
   const mapping = await c.req.json();
+  const {
+    cost_type_id,
+    qb_account_id,
+    qb_account_name,
+    qb_class_id,
+    qb_class_name,
+  } = mapping;
 
   if (!userId || !orgId) {
     return c.json({ error: "Unauthorized" }, 401);
@@ -525,15 +542,14 @@ app.post("/quickbooks-sync/save-mapping", async (c) => {
   const { error } = await supabase
     .schema(schema)
     .from("qb_account_mappings")
-    .upsert(
-      {
-        org_id: orgId,
-        ...mapping,
-      },
-      {
-        onConflict: "org_id,cost_type",
-      }
-    );
+    .upsert({
+      org_id: orgId,
+      cost_type_id,
+      qb_account_id,
+      qb_account_name,
+      qb_class_id,
+      qb_class_name,
+    });
 
   if (error) {
     console.error("Failed to save mapping:", error);

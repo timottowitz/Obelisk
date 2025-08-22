@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -131,7 +131,7 @@ export default function IntegrationsPage() {
     }
   };
 
-  const getStatusBadge = () => {
+  const getStatusBadge = useMemo(() => {
     if (!qbStatus.connected) {
       return <Badge variant='secondary'>Not Connected</Badge>;
     }
@@ -143,16 +143,16 @@ export default function IntegrationsPage() {
         Connected
       </Badge>
     );
-  };
+  }, [qbStatus.connected, qbStatus.expired]);
 
-  const getEnvironmentBadge = () => {
+  const getEnvironmentBadge = useMemo(() => {
     if (!qbStatus.connected) return null;
     return qbStatus.is_sandbox ? (
       <Badge variant='outline'>Sandbox</Badge>
     ) : (
       <Badge variant='outline'>Production</Badge>
     );
-  };
+  }, [qbStatus.connected, qbStatus.is_sandbox]);
 
   if (loading) {
     return (
@@ -200,8 +200,8 @@ export default function IntegrationsPage() {
               </div>
             </div>
             <div className='flex items-center space-x-2'>
-              {getEnvironmentBadge()}
-              {getStatusBadge()}
+              {getEnvironmentBadge}
+              {getStatusBadge}
             </div>
           </div>
         </CardHeader>

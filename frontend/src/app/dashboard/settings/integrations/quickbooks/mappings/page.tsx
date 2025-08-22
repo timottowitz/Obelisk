@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -11,8 +11,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -33,8 +31,6 @@ import {
   Save,
   Loader2,
   AlertCircle,
-  Plus,
-  Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -44,61 +40,39 @@ import {
   useQuickbooksMappings
 } from '@/hooks/useQuickbooks';
 import { AccountMapping } from '@/types/quickbooks';
-
-const DEFAULT_COST_TYPES = [
-  "Arbitrator's Fees",
-  "Attorney's Fees",
-  'Certified Crash Report',
-  'Court Filing Fee',
-  'Demand Letter Drafting',
-  'Deposition Transcript',
-  'Expert Fee',
-  'Flight',
-  'Focus Group/Mock Trial',
-  'Gas',
-  'Hotel',
-  'Investigation',
-  'Mailing Service',
-  'Meal',
-  'Mediator Fees',
-  'Mefical Record',
-  'Medical Report',
-  'Notary',
-  'Open Records',
-  'Phone Conferencing',
-  'Postage',
-  'Service of Process',
-  'Taxi/Uber'
-];
+import { useCostTypes } from '@/hooks/useExpenses';
+import { CostType } from '@/types/expenses';
 
 export default function QuickBooksMappingsPage() {
   const { data: classes, isLoading: isLoadingClasses } = useQuickbooksClasses();
   const { data: accounts, isLoading: isLoadingAccounts } =
     useQuickbooksAccounts();
-  const { data: savedMappings, isLoading: isLoadingMappings } = useQuickbooksMappings();
+  const { data: savedMappings, isLoading: isLoadingMappings } =
+    useQuickbooksMappings();
   const [saving, setSaving] = useState(false);
   const [mappings, setMappings] = useState<AccountMapping[]>([]);
-  const [newCostType, setNewCostType] = useState('');
   const saveMapping = useQuickbooksSaveMapping();
+  const { data: costTypes } = useCostTypes();
 
   useEffect(() => {
-    if (accounts && classes && savedMappings) {
+    if (accounts && classes && savedMappings && costTypes) {
       // Create a map of saved mappings for quick lookup
       const savedMappingsMap = new Map(
-        savedMappings.mappings.map((m: AccountMapping) => [m.cost_type, m])
+        savedMappings.mappings.map((m: AccountMapping) => [m.cost_type_id, m])
       );
 
       // Combine DEFAULT_COST_TYPES with any additional saved cost types
       const allCostTypes = new Set([
-        ...DEFAULT_COST_TYPES,
-        ...savedMappings.mappings.map((m: AccountMapping) => m.cost_type)
+        ...costTypes.map((type: CostType) => type.id),
+        ...savedMappings.mappings.map((m: AccountMapping) => m.cost_type_id)
       ]);
 
       // Create mappings with saved data where available
       const initialMappings = Array.from(allCostTypes).map((costType) => {
         const saved = savedMappingsMap.get(costType);
         return {
-          cost_type: costType,
+          cost_type_id: costType,
+          cost_type_name: costTypes.find((type: CostType) => type.id === costType)?.name || '',
           qb_account_id: saved?.qb_account_id || '',
           qb_account_name: saved?.qb_account_name || '',
           qb_class_id: saved?.qb_class_id || '',
@@ -108,61 +82,45 @@ export default function QuickBooksMappingsPage() {
 
       setMappings(initialMappings);
     }
-  }, [accounts, classes, savedMappings]);
+  }, [accounts, classes, savedMappings, costTypes]);
 
-  const handleAccountChange = (costType: string, accountId: string) => {
-    const account = accounts?.accounts.find((a: any) => a.Id === accountId);
-    setMappings((prev) =>
-      prev.map((m) =>
-        m.cost_type === costType
-          ? {
-              ...m,
-              qb_account_id: accountId,
-              qb_account_name: account?.Name || ''
-            }
-          : m
-      )
-    );
-  };
+  const handleAccountChange = useCallback(
+    (costTypeId: string, accountId: string) => {
+      const account = accounts?.accounts.find((a: any) => a.Id === accountId);
+      setMappings((prev) =>
+        prev.map((m) =>
+          m.cost_type_id === costTypeId
+            ? {
+                ...m,
+                qb_account_id: accountId,
+                qb_account_name: account?.Name || ''
+              }
+            : m
+        )
+      );
+    },
+    [accounts]
+  );
 
-  const handleClassChange = (costType: string, classId: string) => {
-    const qbClass = classes?.classes.find((c: any) => c.Id === classId);
-    setMappings((prev) =>
-      prev.map((m) =>
-        m.cost_type === costType
-          ? {
-              ...m,
-              qb_class_id: classId,
-              qb_class_name: qbClass?.Name || ''
-            }
-          : m
-      )
-    );
-  };
+  const handleClassChange = useCallback(
+    (costTypeId: string, classId: string) => {
+      const qbClass = classes?.classes.find((c: any) => c.Id === classId);
+      setMappings((prev) =>
+        prev.map((m) =>
+          m.cost_type_id === costTypeId
+            ? {
+                ...m,
+                qb_class_id: classId,
+                qb_class_name: qbClass?.Name || ''
+              }
+            : m
+        )
+      );
+    },
+    [classes]
+  );
 
-  const handleAddCostType = () => {
-    if (newCostType && !mappings.some((m) => m.cost_type === newCostType)) {
-      setMappings((prev) => [
-        ...prev,
-        {
-          cost_type: newCostType,
-          qb_account_id: '',
-          qb_account_name: '',
-          qb_class_id: '',
-          qb_class_name: ''
-        }
-      ]);
-      setNewCostType('');
-    }
-  };
-
-  const handleRemoveCostType = (costType: string) => {
-    if (!DEFAULT_COST_TYPES.includes(costType)) {
-      setMappings((prev) => prev.filter((m) => m.cost_type !== costType));
-    }
-  };
-
-  const handleSaveMappings = async () => {
+  const handleSaveMappings = useCallback(async () => {
     setSaving(true);
     try {
       const validMappings = mappings.filter((m) => m.qb_account_id);
@@ -180,7 +138,7 @@ export default function QuickBooksMappingsPage() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [mappings, saveMapping]);
 
   if (isLoadingClasses || isLoadingAccounts || isLoadingMappings) {
     return (
@@ -230,129 +188,95 @@ export default function QuickBooksMappingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className='space-y-4'>
-            <div className='flex items-end gap-2'>
-              <div className='flex-1'>
-                <Label htmlFor='new-cost-type'>Add Custom Cost Type</Label>
-                <Input
-                  id='new-cost-type'
-                  placeholder='Enter cost type name'
-                  value={newCostType}
-                  onChange={(e) => setNewCostType(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleAddCostType();
-                    }
-                  }}
-                />
-              </div>
-              <Button onClick={handleAddCostType} disabled={!newCostType}>
-                <Plus className='mr-2 h-4 w-4' />
-                Add
-              </Button>
-            </div>
-
-            <div className='rounded-lg border'>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cost Type</TableHead>
-                    <TableHead>QuickBooks Account</TableHead>
-                    <TableHead>QuickBooks Class</TableHead>
-                    <TableHead className='w-[50px]'></TableHead>
+          <div className='rounded-lg border'>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Cost Type</TableHead>
+                  <TableHead>QuickBooks Account</TableHead>
+                  <TableHead>QuickBooks Class</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {mappings.map((mapping) => (
+                  <TableRow key={mapping.cost_type_id}>
+                    <TableCell className='font-medium'>
+                      {mapping.cost_type_name}
+                      {costTypes?.some(
+                        (type: CostType) => type.id === mapping.cost_type_id
+                      ) && (
+                        <Badge
+                          variant='secondary'
+                          className='bg-primary ml-2 text-white'
+                        >
+                          Default
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={mapping.qb_account_id}
+                        onValueChange={(value) =>
+                          handleAccountChange(mapping.cost_type_id, value)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder='Select account' />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts &&
+                            accounts.accounts.map((account: any) => (
+                              <SelectItem key={account.Id} value={account.Id}>
+                                {account.Name} ({account.AccountType})
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={mapping.qb_class_id || ''}
+                        onValueChange={(value) =>
+                          handleClassChange(mapping.cost_type_id, value)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder='Select class (optional)' />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {classes &&
+                            classes.classes.map((qbClass: any) => (
+                              <SelectItem key={qbClass.Id} value={qbClass.Id}>
+                                {qbClass.Name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mappings.map((mapping) => (
-                    <TableRow key={mapping.cost_type}>
-                      <TableCell className='font-medium'>
-                        {mapping.cost_type}
-                        {DEFAULT_COST_TYPES.includes(mapping.cost_type) && (
-                          <Badge variant='secondary' className='ml-2 bg-primary text-white'>
-                            Default
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={mapping.qb_account_id}
-                          onValueChange={(value) =>
-                            handleAccountChange(mapping.cost_type, value)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder='Select account' />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value='None'>None</SelectItem>
-                            {accounts &&
-                              accounts.accounts.map((account: any) => (
-                                <SelectItem key={account.Id} value={account.Id}>
-                                  {account.Name} ({account.AccountType})
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={mapping.qb_class_id || ''}
-                          onValueChange={(value) =>
-                            handleClassChange(mapping.cost_type, value)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder='Select class (optional)' />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value='None'>None</SelectItem>
-                            {classes &&
-                              classes.classes.map((qbClass: any) => (
-                                <SelectItem key={qbClass.Id} value={qbClass.Id}>
-                                  {qbClass.Name}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        {!DEFAULT_COST_TYPES.includes(mapping.cost_type) && (
-                          <Button
-                            variant='ghost'
-                            size='icon'
-                            onClick={() =>
-                              handleRemoveCostType(mapping.cost_type)
-                            }
-                          >
-                            <Trash2 className='h-4 w-4' />
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
 
-            <div className='flex justify-end'>
-              <Button
-                onClick={handleSaveMappings}
-                disabled={saving}
-                className='cursor-pointer'
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className='mr-2 h-4 w-4' />
-                    Save Mappings
-                  </>
-                )}
-              </Button>
-            </div>
+          <div className='flex justify-end'>
+            <Button
+              onClick={handleSaveMappings}
+              disabled={saving}
+              className='cursor-pointer'
+            >
+              {saving ? (
+                <>
+                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className='mr-2 h-4 w-4' />
+                  Save Mappings
+                </>
+              )}
+            </Button>
           </div>
         </CardContent>
       </Card>

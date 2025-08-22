@@ -1,7 +1,7 @@
 import { API_CONFIG } from '@/config/api';
 import { getAuthHeaders } from '@/config/api';
 import { handleApiResponse } from '@/config/api';
-import { Expense, ExpenseType, InitialDocument } from '@/types/expenses';
+import { CostType, Expense, ExpenseType, InitialDocument } from '@/types/expenses';
 
 const BASE_URL = API_CONFIG.EXPENSES_BASE_URL;
 
@@ -25,6 +25,15 @@ export class ExpensesService {
       }
     );
     return handleApiResponse<InitialDocument[]>(response);
+  }
+
+  static async getCostTypes() {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${BASE_URL}/cost-types`, {
+      method: 'GET',
+      headers
+    });
+    return handleApiResponse<CostType[]>(response);
   }
 
   static async getExpenses(

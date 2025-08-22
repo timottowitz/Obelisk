@@ -3,6 +3,11 @@ export interface ExpenseType {
   name: string;
 }
 
+export interface CostType {
+  id: string;
+  name: string;
+}
+
 export interface InitialDocument {
   id: string;
   name: string;
@@ -42,7 +47,8 @@ export interface Expense {
     name: string;
   } | null;
   status: string;
-  type: string;
+  cost_type_id: string;
+  cost_type_name: string;
   invoice_number: string | null;
   invoice_date: string | null;
   due_date: string | null;

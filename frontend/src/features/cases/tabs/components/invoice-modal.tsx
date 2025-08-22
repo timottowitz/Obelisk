@@ -32,33 +32,8 @@ import { useDebounce } from '@/hooks/use-debounce';
 import ContactModal from '@/features/contacts/components/contact-modal';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { Expense } from '@/types/expenses';
-
-const DEFAULT_COST_TYPES = [
-  "Arbitrator's Fees",
-  "Attorney's Fees",
-  'Certified Crash Report',
-  'Court Filing Fee',
-  'Demand Letter Drafting',
-  'Deposition Transcript',
-  'Expert Fee',
-  'Flight',
-  'Focus Group/Mock Trial',
-  'Gas',
-  'Hotel',
-  'Investigation',
-  'Mailing Service',
-  'Meal',
-  'Mediator Fees',
-  'Mefical Record',
-  'Medical Report',
-  'Notary',
-  'Open Records',
-  'Phone Conferencing',
-  'Postage',
-  'Service of Process',
-  'Taxi/Uber'
-];
+import { CostType, Expense } from '@/types/expenses';
+import { useCostTypes } from '@/hooks/useExpenses';
 
 interface InvoiceModalProps {
   isOpen: boolean;
@@ -76,7 +51,7 @@ type FormState = {
   amount: string;
   payeeId: string;
   payeeName: string;
-  type: string; // 'unknown' | 'service' | 'product'
+  costTypeId: string;
   invoiceNumber: string;
   invoiceDate: string;
   expenseDescription: string;
@@ -93,6 +68,7 @@ type FormState = {
   notifyAdminOfCheckPayment: string | null;
   billNo: string;
   dueDate: string;
+  copyOfCheckName: string;
 };
 
 export default function InvoiceModal({
@@ -102,13 +78,15 @@ export default function InvoiceModal({
   loading,
   selectedExpense
 }: InvoiceModalProps) {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef1 = useRef<HTMLInputElement | null>(null);
+  const fileInputRef2 = useRef<HTMLInputElement | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 1000);
   const isTyping = searchTerm !== debouncedSearchTerm;
   const [showingContacts, setShowingContacts] = useState(false);
   const { data: expenseTypes, isLoading: isLoadingExpenseTypes } =
     useExpenseTypes();
+  const { data: costTypes, isLoading: isLoadingCostTypes } = useCostTypes();
   const { data: initialDocuments, isLoading: isLoadingInitialDocuments } =
     useInitialDocuments(caseId);
   const { data: contactTypes, isLoading: isLoadingContactTypes } =
@@ -125,7 +103,7 @@ export default function InvoiceModal({
     amount: '',
     payeeId: '',
     payeeName: '',
-    type: "Arbitrator's Fees",
+    costTypeId: '',
     invoiceNumber: '',
     invoiceDate: '',
     expenseDescription: '',
@@ -138,6 +116,7 @@ export default function InvoiceModal({
     attachmentId: '',
     copyOfCheck: null,
     copyOfCheckId: '',
+    copyOfCheckName: '',
     notifyAdminOfCheckPayment: '',
     lastUpdatedFromQuickBooks: '',
     dueDate: '',
@@ -154,7 +133,7 @@ export default function InvoiceModal({
           amount: selectedExpense.amount.toString(),
           payeeId: selectedExpense.payee_id,
           payeeName: selectedExpense.payee?.full_name || '',
-          type: selectedExpense.type,
+          costTypeId: selectedExpense.cost_type_id,
           invoiceNumber: selectedExpense.invoice_number || '',
           invoiceDate: selectedExpense.invoice_date || '',
           expenseDescription: selectedExpense.description || '',
@@ -170,6 +149,7 @@ export default function InvoiceModal({
           attachmentId: '',
           copyOfCheck: null,
           copyOfCheckId: selectedExpense.copy_of_check_id || '',
+          copyOfCheckName: selectedExpense.copy_of_check?.name || '',
           notifyAdminOfCheckPayment:
             selectedExpense.notify_admin_of_check_payment,
           lastUpdatedFromQuickBooks:
@@ -177,7 +157,12 @@ export default function InvoiceModal({
           dueDate: selectedExpense.due_date || '',
           billNo: selectedExpense.bill_no || ''
         });
-      } else if (expenseTypes && expenseTypes.length > 0) {
+      } else if (
+        expenseTypes &&
+        expenseTypes.length > 0 &&
+        costTypes &&
+        costTypes.length > 0
+      ) {
         // Reset to default values for new expense
         setForm({
           expenseType: expenseTypes[0].name,
@@ -185,7 +170,7 @@ export default function InvoiceModal({
           amount: '',
           payeeId: '',
           payeeName: '',
-          type: "Arbitrator's Fees",
+          costTypeId: costTypes[0].id,
           invoiceNumber: '',
           invoiceDate: '',
           expenseDescription: '',
@@ -198,6 +183,7 @@ export default function InvoiceModal({
           attachmentId: '',
           copyOfCheck: null,
           copyOfCheckId: '',
+          copyOfCheckName: '',
           notifyAdminOfCheckPayment: '',
           lastUpdatedFromQuickBooks: '',
           dueDate: '',
@@ -205,9 +191,7 @@ export default function InvoiceModal({
         });
       }
     }
-  }, [isOpen, selectedExpense, expenseTypes]);
-
-  console.log(selectedExpense);
+  }, [isOpen, selectedExpense, expenseTypes, costTypes]);
 
   // Set expenseTypeId when expenseTypes load and we have a selectedExpense
   useEffect(() => {
@@ -242,8 +226,12 @@ export default function InvoiceModal({
     );
   }, [form.expenseTypeId, form.amount, form.createInQuickBooks, form.payeeId]);
 
-  const handleFileClick = useCallback(() => {
-    fileInputRef.current?.click();
+  const handleFileClick = useCallback((type: 'check' | 'attachment') => {
+    if (type === 'check') {
+      fileInputRef1.current?.click();
+    } else {
+      fileInputRef2.current?.click();
+    }
   }, []);
 
   const handleCreateContact = useCallback(
@@ -270,7 +258,7 @@ export default function InvoiceModal({
       formData.append('expense_type_id', form.expenseTypeId);
       formData.append('amount', form.amount);
       formData.append('payee_id', form.payeeId);
-      formData.append('type', form.type);
+      formData.append('cost_type_id', form.costTypeId);
       formData.append('invoce_number', form.invoiceNumber);
       formData.append('invoice_date', form.invoiceDate);
       formData.append('description', form.expenseDescription);
@@ -332,7 +320,7 @@ export default function InvoiceModal({
       form.expenseTypeId,
       form.amount,
       form.payeeId,
-      form.type,
+      form.costTypeId,
       form.invoiceNumber,
       form.invoiceDate,
       form.expenseDescription,
@@ -578,19 +566,29 @@ export default function InvoiceModal({
                 <div className='space-y-2'>
                   <Label>Type</Label>
                   <Select
-                    value={form.type}
-                    onValueChange={(v) => setForm((p) => ({ ...p, type: v }))}
+                    value={form.costTypeId}
+                    onValueChange={(v) =>
+                      setForm((p) => ({ ...p, costTypeId: v }))
+                    }
                   >
                     <SelectTrigger className='w-full'>
                       <SelectValue placeholder='Unknown' />
                     </SelectTrigger>
-                    <SelectContent>
-                      {DEFAULT_COST_TYPES.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
+                    {isLoadingCostTypes ? (
+                      <SelectContent>
+                        <SelectItem value='unknown'>Unknown</SelectItem>
+                      </SelectContent>
+                    ) : (
+                      <SelectContent>
+                        {costTypes &&
+                          costTypes.length > 0 &&
+                          costTypes.map((type: CostType) => (
+                            <SelectItem key={type.id} value={type.id}>
+                              {type.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    )}
                   </Select>
                 </div>
 
@@ -635,12 +633,12 @@ export default function InvoiceModal({
                         type='button'
                         variant='outline'
                         className='h-9 w-9 p-0'
-                        onClick={handleFileClick}
+                        onClick={() => handleFileClick('attachment')}
                       >
                         <Upload />
                       </Button>
                       <input
-                        ref={fileInputRef}
+                        ref={fileInputRef2}
                         type='file'
                         className='hidden'
                         onChange={(e) =>
@@ -904,7 +902,7 @@ export default function InvoiceModal({
                 <div className='border-border flex items-center justify-start gap-2 border-t pt-4'>
                   <div className='space-y-2'>
                     <Label>Add Docs</Label>
-                    {!form.copyOfCheck && (
+                    {!form.copyOfCheck && !form.copyOfCheckName && (
                       <div className='flex items-center gap-3'>
                         <Select
                           value={form.copyOfCheckId}
@@ -935,12 +933,12 @@ export default function InvoiceModal({
                           type='button'
                           variant='outline'
                           className='h-9 w-9 p-0'
-                          onClick={handleFileClick}
+                          onClick={() => handleFileClick('check')}
                         >
                           <Upload />
                         </Button>
                         <input
-                          ref={fileInputRef}
+                          ref={fileInputRef1}
                           type='file'
                           className='hidden'
                           onChange={(e) =>
@@ -952,7 +950,7 @@ export default function InvoiceModal({
                         />
                       </div>
                     )}
-                    {form.copyOfCheck && (
+                    {form.copyOfCheck && !form.copyOfCheckName && (
                       <div className='flex items-center gap-3'>
                         <div className='text-sm text-green-500'>
                           {form.copyOfCheck.name}
@@ -963,6 +961,23 @@ export default function InvoiceModal({
                           className='h-9 w-9 p-0 text-red-500'
                           onClick={() =>
                             setForm((p) => ({ ...p, copyOfCheck: null }))
+                          }
+                        >
+                          <Trash />
+                        </Button>
+                      </div>
+                    )}
+                    {form.copyOfCheckName && form.copyOfCheckName !== '' && (
+                      <div className='flex items-center gap-3'>
+                        <div className='text-sm text-green-500'>
+                          {form.copyOfCheckName}
+                        </div>
+                        <Button
+                          type='button'
+                          variant='outline'
+                          className='h-9 w-9 p-0 text-red-500'
+                          onClick={() =>
+                            setForm((p) => ({ ...p, copyOfCheckName: '' }))
                           }
                         >
                           <Trash />

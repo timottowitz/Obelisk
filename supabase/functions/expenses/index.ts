@@ -156,6 +156,31 @@ app.post("/expenses/types", async (c) => {
   }
 });
 
+//get cost types
+app.get("/expenses/cost-types", async (c) => {
+  const userId = c.get("userId");
+  const orgId = c.get("orgId");
+
+  try {
+    const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
+
+    const { data: costTypes, error: costTypesError } = await supabase
+      .schema(schema)
+      .from("cost_types")
+      .select("*");
+
+    if (costTypesError) {
+      console.error("getting cost types error", costTypesError);
+      return c.json({ error: costTypesError.message }, 500);
+    }
+
+    return c.json(costTypes, 200);
+  } catch (error: any) {
+    console.error("getting cost types error", error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
 //get initial documents for expense
 app.get("/expenses/cases/:caseId/initial-documents", async (c) => {
   const userId = c.get("userId");
@@ -212,10 +237,7 @@ app.get("/expenses/cases/:caseId", async (c) => {
   try {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
 
-    const {
-      data: expenses,
-      error: expensesError,
-    } = await supabase
+    const { data: expenses, error: expensesError } = await supabase
       .schema(schema)
       .from("case_expenses")
       .select("*")
@@ -253,6 +275,21 @@ app.get("/expenses/cases/:caseId", async (c) => {
         expense.payee = payee;
       } else {
         expense.payee = null;
+      }
+
+      if (expense.cost_type_id) {
+        const { data: costType, error: costTypeError } = await supabase
+          .schema(schema)
+          .from("cost_types")
+          .select("*")
+          .eq("id", expense.cost_type_id)
+          .single();
+        if (costTypeError) {
+          return c.json({ error: costTypeError.message }, 500);
+        }
+        expense.cost_type_name = costType.name;
+      } else {
+        expense.cost_type_name = null;
       }
 
       if (expense.attachment_id) {
@@ -293,11 +330,10 @@ app.get("/expenses/cases/:caseId", async (c) => {
     if (filterBy !== "all" && filterValue !== "") {
       switch (filterBy) {
         case "expense_type":
-          filteredExpenses = expenses.filter(
-            (expense: any) =>
-              expense.expense_type
-                .toLowerCase()
-                .includes(filterValue.toLowerCase())
+          filteredExpenses = expenses.filter((expense: any) =>
+            expense.expense_type
+              .toLowerCase()
+              .includes(filterValue.toLowerCase())
           );
           break;
         case "payee":
@@ -310,11 +346,10 @@ app.get("/expenses/cases/:caseId", async (c) => {
           );
           break;
         case "type":
-          filteredExpenses = filteredExpenses.filter(
-            (expense: any) =>
-              expense.type
+          filteredExpenses = filteredExpenses.filter((expense: any) =>
+              expense.cost_type_name
                 .toLowerCase()
-                .includes(filterValue.toLowerCase())
+              .includes(filterValue.toLowerCase())
           );
           break;
         case "invoice_number":
@@ -357,16 +392,12 @@ app.get("/expenses/cases/:caseId", async (c) => {
           break;
         case "memo":
           filteredExpenses = filteredExpenses.filter((expense: any) =>
-            expense.memo
-              .toLowerCase()
-              .includes(filterValue.toLowerCase())
+            expense.memo.toLowerCase().includes(filterValue.toLowerCase())
           );
           break;
         case "notes":
           filteredExpenses = filteredExpenses.filter((expense: any) =>
-            expense.notes
-              .toLowerCase()
-              .includes(filterValue.toLowerCase())
+            expense.notes.toLowerCase().includes(filterValue.toLowerCase())
           );
           break;
         case "notify_admin":
@@ -416,11 +447,8 @@ app.get("/expenses/cases/:caseId", async (c) => {
           );
           break;
         case "status":
-          filteredExpenses = filteredExpenses.filter(
-            (expense: any) =>
-              expense.status
-                .toLowerCase()
-                .includes(filterValue.toLowerCase())
+          filteredExpenses = filteredExpenses.filter((expense: any) =>
+            expense.status.toLowerCase().includes(filterValue.toLowerCase())
           );
           break;
         default:
@@ -450,7 +478,7 @@ app.get("/expenses/cases/:caseId", async (c) => {
                   : 0;
               break;
             case "type":
-              compareValue = a.type.localeCompare(b.type);
+              compareValue = a.cost_type_name.localeCompare(b.cost_type_name);
               break;
             case "invoice_number":
               compareValue =
@@ -604,7 +632,7 @@ app.post("/expenses/cases/:caseId", async (c) => {
     expense_type_id,
     amount,
     payee_id,
-    type,
+    cost_type_id,
     invoice_number,
     invoice_date,
     attachment_id,
@@ -646,6 +674,17 @@ app.post("/expenses/cases/:caseId", async (c) => {
 
     if (expenseTypeError) {
       return c.json({ error: expenseTypeError.message }, 500);
+    }
+
+    const { error: costTypeError } = await supabase
+      .schema(schema)
+      .from("cost_types")
+      .select("*")
+      .eq("id", cost_type_id)
+      .single();
+
+    if (costTypeError) {
+      return c.json({ error: costTypeError.message }, 500);
     }
 
     if (expenseType.name !== "Soft Costs") {
@@ -798,7 +837,7 @@ app.post("/expenses/cases/:caseId", async (c) => {
         expense_type_id,
         amount: parseFloat(amount as string),
         payee_id: expenseType.name === "Soft Costs" ? null : payee_id,
-        type,
+        cost_type_id,
         invoice_number,
         bill_no,
         attachment_id: attachmentId === "" ? null : attachmentId,
@@ -848,7 +887,7 @@ app.put("/expenses/cases/:caseId/:expenseId", async (c) => {
     expense_type_id,
     amount,
     payee_id,
-    type,
+    cost_type_id,
     invoice_number,
     invoice_date,
     attachment_id,
@@ -871,13 +910,14 @@ app.put("/expenses/cases/:caseId/:expenseId", async (c) => {
     );
 
     // Verify the expense exists and belongs to this case
-    const { data: existingExpense, error: existingExpenseError } = await supabase
-      .schema(schema)
-      .from("case_expenses")
-      .select("*")
-      .eq("id", expenseId)
-      .eq("case_id", caseId)
-      .single();
+    const { data: existingExpense, error: existingExpenseError } =
+      await supabase
+        .schema(schema)
+        .from("case_expenses")
+        .select("*")
+        .eq("id", expenseId)
+        .eq("case_id", caseId)
+        .single();
 
     if (existingExpenseError || !existingExpense) {
       return c.json({ error: "Expense not found" }, 404);
@@ -920,7 +960,7 @@ app.put("/expenses/cases/:caseId/:expenseId", async (c) => {
     }
 
     let attachmentId = existingExpense.attachment_id;
-    
+
     // Handle attachment update
     if (attachment_id && attachment_id !== existingExpense.attachment_id) {
       const { data: file, error: fileError } = await supabase
@@ -963,19 +1003,20 @@ app.put("/expenses/cases/:caseId/:expenseId", async (c) => {
     let dateOfCheck = existingExpense.date_of_check;
     let checkNumber = existingExpense.check_number;
     let copyOfCheckIdValue = existingExpense.copy_of_check_id;
-    
+
     // Handle Check-specific fields
     if (expenseType.name === "Check") {
       // Keep existing date and number unless we're changing from a different type
       if (existingExpense.expense_type_id !== expense_type_id) {
         dateOfCheck = new Date().toISOString().split("T")[0];
-        const { data: checkTypeData, error: checkTypeDataError } = await supabase
-          .schema(schema)
-          .from("case_expenses")
-          .select("*")
-          .eq("case_id", caseId)
-          .eq("expense_type_id", expenseType.id)
-          .neq("id", expenseId); // Exclude current expense from count
+        const { data: checkTypeData, error: checkTypeDataError } =
+          await supabase
+            .schema(schema)
+            .from("case_expenses")
+            .select("*")
+            .eq("case_id", caseId)
+            .eq("expense_type_id", expenseType.id)
+            .neq("id", expenseId); // Exclude current expense from count
 
         if (checkTypeDataError) {
           return c.json({ error: checkTypeDataError.message }, 500);
@@ -984,7 +1025,10 @@ app.put("/expenses/cases/:caseId/:expenseId", async (c) => {
         checkNumber = checkTypeData.length + 1;
       }
 
-      if (copy_of_check_id && copy_of_check_id !== existingExpense.copy_of_check_id) {
+      if (
+        copy_of_check_id &&
+        copy_of_check_id !== existingExpense.copy_of_check_id
+      ) {
         const { data: file, error: fileError } = await supabase
           .schema(schema)
           .from("storage_files")
@@ -1001,7 +1045,7 @@ app.put("/expenses/cases/:caseId/:expenseId", async (c) => {
 
         copyOfCheckIdValue = file.id;
       }
-      
+
       if (copyOfCheck) {
         const gcsService = getGcsService();
         const buffer = await copyOfCheck.arrayBuffer();
@@ -1035,7 +1079,7 @@ app.put("/expenses/cases/:caseId/:expenseId", async (c) => {
         expense_type_id,
         amount: parseFloat(amount as string),
         payee_id: expenseType.name === "Soft Costs" ? null : payee_id || null,
-        type,
+        cost_type_id: cost_type_id,
         invoice_number: invoice_number || null,
         bill_no: bill_no || null,
         attachment_id: attachmentId || null,
@@ -1053,8 +1097,7 @@ app.put("/expenses/cases/:caseId/:expenseId", async (c) => {
           create_billing_item === "unknown"
             ? null
             : create_billing_item === "yes",
-        last_updated_from_quickbooks:
-          last_updated_from_quickbooks || null,
+        last_updated_from_quickbooks: last_updated_from_quickbooks || null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", expenseId)

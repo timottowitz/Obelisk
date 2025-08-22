@@ -29,3 +29,15 @@ CREATE TABLE IF NOT EXISTS {{schema_name}}.cost_types (
 
 --CREATE INDEX ON cost_types(name)
 CREATE INDEX IF NOT EXISTS idx_cost_types_name ON {{schema_name}}.cost_types(name);
+
+ALTER TABLE {{schema_name}}.case_expenses
+DROP COLUMN IF EXISTS type;
+
+ALTER TABLE {{schema_name}}.case_expenses
+ADD COLUMN IF NOT EXISTS cost_type_id UUID REFERENCES {{schema_name}}.cost_types(id);
+
+ALTER TABLE {{schema_name}}.qb_account_mappings
+DROP COLUMN IF EXISTS cost_type;
+
+ALTER TABLE {{schema_name}}.qb_account_mappings
+ADD COLUMN IF NOT EXISTS cost_type_id UUID REFERENCES {{schema_name}}.cost_types(id);
