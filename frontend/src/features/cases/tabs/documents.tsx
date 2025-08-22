@@ -20,14 +20,21 @@ import {
   Trash2,
   FolderPlus,
   UploadIcon,
-  FolderInput
+  FolderInput,
+  MoreVertical
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from '@/components/ui/dropdown-menu';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -52,10 +59,12 @@ import * as Collapsible from '@radix-ui/react-collapsible';
 import { AlertModal } from '@/components/modal/alert-modal';
 import {
   useFoldersOperations,
-  useStorageOperations
+  useStorageOperations,
+  useMoveFile
 } from '@/hooks/useDocuments';
 import { DocumentPreviewModal } from '@/features/documents/components/document-preview-modal';
 import { CreateFolderModal } from '@/features/documents/components/create-folder-modal';
+import { MoveFileModal } from '@/features/documents/components/move-file-modal';
 import { useGetCase } from '@/hooks/useCases';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useOrganization } from '@clerk/nextjs';
@@ -100,6 +109,7 @@ export default function Documents({
     downloadFile
   } = useStorageOperations();
   const { folders } = useFoldersOperations(caseId);
+  const moveFile = useMoveFile();
 
   // Derive state from React Query data
   const foldersList = folders.data || [];
@@ -171,6 +181,15 @@ export default function Documents({
       timestamp: new Date(Date.now() - 180000)
     }
   ]);
+
+  // Move file modal state
+  const [moveFileModalOpen, setMoveFileModalOpen] = useState(false);
+  const [selectedFileToMove, setSelectedFileToMove] = useState<{
+    id: string;
+    name: string;
+    folderId: string;
+    folderName: string;
+  } | null>(null);
 
   const findMatchingFolderIds = useCallback(
     (nodes: any[]): string[] => {
@@ -476,6 +495,36 @@ export default function Documents({
     [deleteFolder]
   );
 
+  // Handle move file
+  const handleMoveFile = useCallback(
+    async (targetFolderId: string) => {
+      if (!selectedFileToMove) {
+        toast.error('No file selected');
+        return;
+      }
+
+      if (!targetFolderId) {
+        toast.error('No target folder selected');
+        return;
+      }
+
+      try {
+        await moveFile.mutateAsync({
+          fileId: selectedFileToMove.id,
+          targetFolderId: targetFolderId
+        });
+
+        toast.success(`File moved successfully`);
+
+        setMoveFileModalOpen(false);
+        setSelectedFileToMove(null);
+      } catch (error) {
+        toast.error('Failed to move file');
+      }
+    },
+    [selectedFileToMove]
+  );
+
   // Recursive component to render folder tree
   const renderFolderTree = useCallback(
     (folders: any[], level: number = 0) => {
@@ -487,10 +536,6 @@ export default function Documents({
 
         return (
           <div key={folder.id} className='relative space-y-1'>
-            {/* Vertical line for non-last items */}
-            {!isLastItem && (
-              <div className='bg-border absolute top-8 left-6 h-full w-px' />
-            )}
             {/* Folder Header */}
             <Collapsible.Root
               open={isExpanded}
@@ -503,10 +548,9 @@ export default function Documents({
               }}
             >
               <Collapsible.Trigger asChild>
-                <Button
-                  variant='ghost'
+                <div
                   className={cn(
-                    'hover:bg-accent/80 h-10 w-full justify-start gap-2 px-3 text-sm font-medium transition-colors',
+                    'hover:bg-accent/80 flex h-10 w-full items-center justify-start gap-2 px-3 text-sm font-medium transition-colors',
                     level > 0 && 'ml-6'
                   )}
                   role='treeitem'
@@ -518,71 +562,101 @@ export default function Documents({
                     <div className='bg-border absolute top-1/2 left-0 h-px w-6 -translate-y-1/2' />
                   )}
                   {isExpanded ? (
-                    <FolderOpen className='h-4 w-4 text-blue-500' />
+                    <FolderOpen
+                      className='h-4 w-4 text-blue-500 dark:text-blue-500'
+                      fill={documents.length > 0 ? 'currentColor' : 'none'}
+                    />
                   ) : (
-                    <Folder className='h-4 w-4 text-blue-500' />
+                    <Folder
+                      className='h-4 w-4 text-blue-500 dark:text-blue-500'
+                      fill={documents.length > 0 ? 'currentColor' : 'none'}
+                    />
                   )}
-                  {/* Folder name and add button in a row */}
-                  <span className='flex flex-1 flex-row items-center gap-1 text-left'>
-                    {folder.name}
-                  </span>
-                  <Badge variant='secondary' className='px-2 py-0.5 text-xs'>
-                    {countDocuments(folder)}
-                  </Badge>
-                  <span
-                    className='hover:bg-accent/10 hover:text-accent ml-1 flex h-6 w-6 flex-shrink-0 cursor-pointer flex-row items-center justify-start rounded text-left'
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedParentFolderId(folder.id);
-                      setIsCreateFolderDialogOpen(true);
-                    }}
-                  >
-                    <FolderPlus className='h-4 w-4 text-green-600' />
-                  </span>
-                  <span
-                    className={cn(
-                      'hover:bg-accent/10 hover:text-accent ml-1 flex h-6 w-6 flex-shrink-0 cursor-pointer flex-row items-center justify-start rounded text-left',
-                      isUploadingDocument && 'cursor-not-allowed opacity-50'
-                    )}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (isUploadingDocument) return;
-                      setSelectedUploadFolderId(folder.id);
-                      const input = document.getElementById('upload-document');
-                      if (input) {
-                        input.click();
-                      }
-                    }}
-                  >
-                    {isUploadingDocument &&
-                    selectedUploadFolderId === folder.id ? (
-                      <Loader2 className='h-4 w-4 animate-spin text-blue-600' />
-                    ) : (
-                      <UploadIcon className='h-4 w-4 text-blue-600' />
-                    )}
-                  </span>
-                  {/* Folder delete button */}
-                  {folder.parent_folder_id && (
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteTargetId(folder.id);
-                        setDeleteTargetType('folder');
-                        setDeleteModalOpen(true);
-                      }}
-                      className='text-destructive flex h-6 w-6 flex-shrink-0 cursor-pointer items-center justify-center rounded'
-                      aria-label={`Delete folder ${folder.name}`}
-                    >
-                      <Trash2 className='h-3 w-3' />
+                  {/* Folder name with flex container */}
+                  <div className='flex min-w-0 flex-1 items-center justify-between'>
+                    <span className='truncate text-sm font-medium'>
+                      {folder.name}
                     </span>
-                  )}
-                  <ChevronRight
-                    className={cn(
-                      'h-3 w-3 transition-transform duration-200',
-                      isExpanded && 'rotate-90'
-                    )}
-                  />
-                </Button>
+
+                    <div className='ml-2 flex items-center gap-1'>
+                      {/* Folder actions dropdown */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            className='hover:bg-accent/50 h-7 w-7 flex-shrink-0 opacity-70 transition-opacity hover:opacity-100'
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreVertical className='h-3.5 w-3.5' />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align='end' className='w-48'>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedParentFolderId(folder.id);
+                              setIsCreateFolderDialogOpen(true);
+                            }}
+                            className='flex items-center gap-3 px-3 py-2'
+                          >
+                            <FolderPlus className='h-4 w-4 text-green-600' />
+                            <span>Add Subfolder</span>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isUploadingDocument) return;
+                              setSelectedUploadFolderId(folder.id);
+                              const input =
+                                document.getElementById('upload-document');
+                              if (input) {
+                                input.click();
+                              }
+                            }}
+                            disabled={isUploadingDocument}
+                            className='flex items-center gap-3 px-3 py-2'
+                          >
+                            {isUploadingDocument &&
+                            selectedUploadFolderId === folder.id ? (
+                              <Loader2 className='h-4 w-4 animate-spin text-blue-600' />
+                            ) : (
+                              <UploadIcon className='h-4 w-4 text-blue-600' />
+                            )}
+                            <span>Upload Document</span>
+                          </DropdownMenuItem>
+
+                          {foldersList.length > 0 &&
+                            folder.parent_folder_id !== foldersList[0].id && (
+                              <>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteTargetId(folder.id);
+                                    setDeleteTargetType('folder');
+                                    setDeleteModalOpen(true);
+                                  }}
+                                  className='text-destructive focus:text-destructive flex items-center gap-3 px-3 py-2'
+                                >
+                                  <Trash2 className='h-4 w-4' />
+                                  <span>Delete Folder</span>
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {/* Expand/Collapse chevron */}
+                      <ChevronRight
+                        className={cn(
+                          'text-muted-foreground h-4 w-4 transition-transform duration-200',
+                          isExpanded && 'rotate-90'
+                        )}
+                      />
+                    </div>
+                  </div>
+                </div>
               </Collapsible.Trigger>
 
               {/* Folder Contents */}
@@ -615,14 +689,13 @@ export default function Documents({
                         {!isLastDocument && (
                           <div className='bg-border absolute top-8 left-6 h-full w-px' />
                         )}
-                        <Button
-                          variant='ghost'
+                        <div
                           onClick={() => {
                             handleGetDownloadUrl(document);
                             setSelectedDocument(document);
                             setIsDocumentDialogOpen(true);
                           }}
-                          className='hover:bg-accent/60 h-auto w-full justify-start gap-3 p-3 text-left transition-colors'
+                          className='hover:bg-accent/60 flex h-auto w-full items-center justify-start gap-3 p-3 text-left transition-colors'
                           role='treeitem'
                           aria-label={`${document.name}, ${document.mime_type.toUpperCase()}, ${formatFileSize(document.size_bytes)}, modified ${formatDate(document.created_at)}`}
                         >
@@ -658,19 +731,52 @@ export default function Documents({
                             </div>
                           </div>
 
-                          <span
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteTargetId(document.id);
-                              setDeleteTargetType('document');
-                              setDeleteModalOpen(true);
-                            }}
-                            className='text-destructive h-6 w-6 flex-shrink-0'
-                            aria-label={`Delete ${document.name}`}
-                          >
-                            <Trash2 className='h-3 w-3' />
-                          </span>
-                        </Button>
+                          {/* Document actions dropdown */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <div
+                                className='h-6 w-6 flex-shrink-0'
+                                onClick={(e) => e.stopPropagation()}
+                                aria-label='Document actions'
+                              >
+                                <MoreVertical className='h-4 w-4' />
+                              </div>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align='end' className='w-44'>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedFileToMove({
+                                    id: document.id,
+                                    name: document.name,
+                                    folderId: folder.id,
+                                    folderName: folder.name
+                                  });
+                                  setMoveFileModalOpen(true);
+                                }}
+                                className='flex items-center gap-3 px-3 py-2'
+                              >
+                                <FolderInput className='text-primary h-4 w-4' />
+                                <span>Move to...</span>
+                              </DropdownMenuItem>
+
+                              <DropdownMenuSeparator />
+
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteTargetId(document.id);
+                                  setDeleteTargetType('document');
+                                  setDeleteModalOpen(true);
+                                }}
+                                className='text-destructive focus:text-destructive flex items-center gap-3 px-3 py-2'
+                              >
+                                <Trash2 className='h-4 w-4' />
+                                <span>Delete File</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </motion.div>
                     );
                   })
@@ -883,14 +989,13 @@ export default function Documents({
                                       transition={{ duration: 0.2 }}
                                       className='relative mb-2'
                                     >
-                                      <Button
-                                        variant='ghost'
+                                      <div
                                         onClick={() => {
                                           handleGetDownloadUrl(document);
                                           setSelectedDocument(document);
                                           setIsDocumentDialogOpen(true);
                                         }}
-                                        className='hover:bg-accent/60 h-auto w-full justify-start gap-3 p-3 text-left transition-colors'
+                                        className='hover:bg-accent/60 flex h-auto w-full items-center justify-start gap-3 p-3 text-left transition-colors'
                                         role='treeitem'
                                         aria-label={`${document.name}, ${document.mime_type.toUpperCase()}, ${formatFileSize(document.size_bytes)}, modified ${formatDate(document.created_at)}`}
                                       >
@@ -927,21 +1032,57 @@ export default function Documents({
                                             </span>
                                           </div>
                                         </div>
-                                        <div className='flex items-center gap-1'>
-                                          <span
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setDeleteTargetId(document.id);
-                                              setDeleteTargetType('document');
-                                              setDeleteModalOpen(true);
-                                            }}
-                                            className='hover:bg-destructive/10 text-destructive flex h-6 w-6 flex-shrink-0 cursor-pointer items-center justify-center rounded transition-colors'
-                                            aria-label={`Delete ${document.name}`}
+                                        {/* Document actions dropdown */}
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <div
+                                              className='h-6 w-6 flex-shrink-0'
+                                              onClick={(e) =>
+                                                e.stopPropagation()
+                                              }
+                                            >
+                                              <MoreVertical className='h-4 w-4' />
+                                            </div>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent
+                                            align='end'
+                                            className='w-44'
                                           >
-                                            <Trash2 className='h-3 w-3' />
-                                          </span>
-                                        </div>
-                                      </Button>
+                                            <DropdownMenuItem
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedFileToMove({
+                                                  id: document.id,
+                                                  name: document.name,
+                                                  folderId: rootFolder.id,
+                                                  folderName:
+                                                    rootFolder.name || 'Root'
+                                                });
+                                                setMoveFileModalOpen(true);
+                                              }}
+                                              className='flex items-center gap-3 px-3 py-2'
+                                            >
+                                              <FolderInput className='text-primary h-4 w-4' />
+                                              <span>Move to...</span>
+                                            </DropdownMenuItem>
+
+                                            <DropdownMenuSeparator />
+
+                                            <DropdownMenuItem
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setDeleteTargetId(document.id);
+                                                setDeleteTargetType('document');
+                                                setDeleteModalOpen(true);
+                                              }}
+                                              className='text-destructive focus:text-destructive flex items-center gap-3 px-3 py-2'
+                                            >
+                                              <Trash2 className='h-4 w-4' />
+                                              <span>Delete File</span>
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </div>
                                     </motion.div>
                                   );
                                 }
@@ -1219,6 +1360,21 @@ export default function Documents({
         downloadUrl={downloadUrl}
         isLoadingDownloadUrl={isLoadingDownloadUrl}
         onDownload={handleDownloadFile}
+      />
+
+      {/* Move File Modal */}
+      <MoveFileModal
+        isOpen={moveFileModalOpen}
+        onClose={() => {
+          setMoveFileModalOpen(false);
+          setSelectedFileToMove(null);
+        }}
+        fileName={selectedFileToMove?.name || ''}
+        currentFolderId={selectedFileToMove?.folderId || ''}
+        currentFolderName={selectedFileToMove?.folderName || 'Root'}
+        folders={foldersList}
+        onMove={handleMoveFile}
+        isLoading={isLoadingFolders}
       />
 
       {/* Confirm Delete Modal */}

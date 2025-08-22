@@ -603,6 +603,57 @@ app.post("/storage/upload-direct", async (c) => {
   }
 });
 
+// Move file endpoint
+app.post("/storage/move", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  try {
+    const supabaseClient = await getSupabaseClient();
+
+    const user = await supabaseClient
+      .schema("private")
+      .from("users")
+      .select("*")
+      .eq("clerk_user_id", userId)
+      .single();
+
+    const org = await supabaseClient
+      .schema("private")
+      .from("organizations")
+      .select("*")
+      .eq("clerk_organization_id", orgId)
+      .single();
+
+    if (!user || !org) {
+      return c.json({ error: "User or organization not found" }, 404);
+    }
+
+    const body = await c.req.json();
+    const { fileId, targetFolderId } = body;
+
+    if (!fileId || !targetFolderId) {
+      return c.json({ error: "Missing required fields" }, 400);
+    }
+
+    const { error: updateError } = await supabaseClient
+      .schema(org.data?.schema_name.toLowerCase())
+      .from("storage_files")
+      .update({
+        folder_id: targetFolderId,
+      })
+      .eq("id", fileId);
+
+    if (updateError) {
+      return c.json({ success: false, error: updateError.message }, 500);
+    }
+
+    return c.json({ success: true, data: "File moved successfully" });
+  } catch (error: any) {
+    console.error("Move file error:", error);
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
 // Handler functions (same as before)
 
 async function handleFileUpload(
@@ -928,7 +979,7 @@ async function handleDeleteFolder(
     .schema(schema)
     .from("storage_files")
     .select("*")
-    .in("folder_id", folderIds)
+    .in("folder_id", folderIds);
 
   if (filesError) throw filesError;
 
@@ -1298,7 +1349,7 @@ async function handleGetFolders(
     .from("storage_folders")
     .select("*")
     .eq("created_by", userId)
-    .eq("case_id", caseId)
+    .eq("case_id", caseId);
 
   const member = await supabaseClient
     .schema("private")
@@ -1312,7 +1363,7 @@ async function handleGetFolders(
     .schema(schema)
     .from("storage_files")
     .select("*")
-    .eq("uploaded_by", member.data?.id)
+    .eq("uploaded_by", member.data?.id);
 
   // Build tree structure from flat folder and files data
   const buildFolderTree = (

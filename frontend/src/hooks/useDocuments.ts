@@ -88,7 +88,7 @@ export function useUploadDocument() {
     mutationFn: async ({ file, folderId }: UploadDocumentData) => {
       const response = (await StoreDocumentsAPI.uploadDocument(
         file,
-        folderId,
+        folderId
       )) as ApiResponse<any>;
       if (!response.success) {
         throw new Error(response.error || 'Upload failed');
@@ -192,6 +192,33 @@ export function useDeleteFolder() {
     },
     onError: (error) => {
       console.error('Delete folder failed:', error);
+    }
+  });
+}
+
+export function useMoveFile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      fileId,
+      targetFolderId
+    }: {
+      fileId: string;
+      targetFolderId: string;
+    }) => {
+      const response = (await StoreDocumentsAPI.moveFile(
+        fileId,
+        targetFolderId
+      )) as ApiResponse<any>;
+      return response;
+    },
+    onSuccess: () => {
+      // Invalidate and refetch folders
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.folders] });
+    },
+    onError: (error) => {
+      console.error('Move file failed:', error);
     }
   });
 }
