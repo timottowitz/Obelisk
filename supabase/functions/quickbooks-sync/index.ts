@@ -261,6 +261,7 @@ app.post("/quickbooks-sync/expense/:expenseId", async (c) => {
 
     if (updateError) {
       console.error("Failed to update expense record:", updateError);
+      return c.json({ error: "Failed to update expense record" }, 500);
     }
 
     return c.json({
@@ -276,7 +277,7 @@ app.post("/quickbooks-sync/expense/:expenseId", async (c) => {
       .schema(schema)
       .from("case_expenses")
       .update({
-        status: "error",
+        qb_sync_status: "error",
         qb_sync_error: error.message,
         qb_last_sync_at: new Date().toISOString(),
       })
