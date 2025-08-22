@@ -12,7 +12,7 @@ import { extractUserAndOrgId } from "../_shared/index.ts";
 import {
   seedCaseTypes,
   DEFAULT_CASE_TYPES,
-} from "../_shared/default-case-types.ts";
+} from "../_shared/default-types.ts";
 import { GoogleCloudStorageService } from "../_shared/google-storage.ts";
 
 console.log("Hello from Cases Functions!");
