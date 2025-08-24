@@ -80,7 +80,7 @@ export const DEFAULT_CONTACT_TYPES: ContactType[] = [
   { name: "Mediator" },
   { name: "Medical Provider" },
   { name: "Person" },
-  { name: "Plantiff" },
+  { name: "Plaintiff" },
   { name: "PNC" },
   { name: "Staff" },
 ];

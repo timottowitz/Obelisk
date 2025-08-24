@@ -13,9 +13,7 @@ const QUERY_KEYS = {
   caseTypes: ['caseTypes'] as const,
   cases: ['cases'] as const,
   case: ['case'] as const,
-  tasks: ['tasks'] as const,
-  folders: ['folders'] as const,
-  events: ['events'] as const
+  folders: ['folders'] as const
 };
 
 export function useCaseTypes() {
@@ -186,118 +184,6 @@ export function useGetCase(caseId: string) {
   });
 }
 
-export function useGetCaseTasks(caseId: string, page: number) {
-  return useQuery({
-    queryKey: [...QUERY_KEYS.tasks, caseId, page],
-    queryFn: async () => {
-      const response = await CasesAPI.getCaseTasks(caseId, page);
-      return response;
-    },
-    enabled: !!caseId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 2
-  });
-}
-
-export function useCreateCaseTask() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({
-      caseId,
-      formData
-    }: {
-      caseId: string;
-      formData: any;
-    }) => {
-      const response = await CasesAPI.createCaseTask(caseId, formData);
-      return response;
-    },
-    onSuccess: (_, { caseId }) => {
-      queryClient.invalidateQueries({
-        queryKey: [...QUERY_KEYS.tasks, caseId]
-      });
-    },
-    onError: (error) => {
-      console.error('Case task creation failed:', error);
-    }
-  });
-}
-
-export function useUpdateCaseTask() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({
-      caseId,
-      taskId,
-      formData
-    }: {
-      caseId: string;
-      taskId: string;
-      formData: any;
-    }) => {
-      const response = await CasesAPI.updateCaseTask(caseId, taskId, formData);
-      return response;
-    },
-    onSuccess: (_, { caseId }) => {
-      queryClient.invalidateQueries({
-        queryKey: [...QUERY_KEYS.tasks, caseId]
-      });
-    },
-    onError: (error) => {
-      console.error('Case task update failed:', error);
-    }
-  });
-}
-
-export function useDeleteCaseTask() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({
-      caseId,
-      taskId
-    }: {
-      caseId: string;
-      taskId: string;
-    }) => {
-      const response = await CasesAPI.deleteCaseTask(caseId, taskId);
-      return response;
-    },
-    onSuccess: (_, { caseId }) => {
-      queryClient.invalidateQueries({
-        queryKey: [...QUERY_KEYS.tasks, caseId]
-      });
-    },
-    onError: (error) => {
-      console.error('Case task deletion failed:', error);
-    }
-  });
-}
-
-export function useUpdateCaseType() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      caseTypeId,
-      caseType
-    }: {
-      caseTypeId: string;
-      caseType: any;
-    }) => {
-      const response = await CasesAPI.updateCaseType(caseTypeId, caseType);
-      return response;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.caseTypes] });
-    },
-    onError: (error) => {
-      console.error('Case type update failed:', error);
-    }
-  });
-}
-
 export function useUpdateFolderTemplates() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -318,7 +204,7 @@ export function useUpdateFolderTemplates() {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.caseTypes] });
     },
     onError: (error) => {
-      console.error('Case type folder templates update failed:', error);
+      console.error('Folder templates update failed:', error);
     }
   });
 }
@@ -339,19 +225,6 @@ export function useDeleteFolderTemplate() {
   });
 }
 
-export function useGetCaseEvents(caseId: string, page: number = 1) {
-  return useQuery({
-    queryKey: [...QUERY_KEYS.events, caseId, page],
-    queryFn: async () => {
-      const response = await CasesAPI.getCaseEvents(caseId, page);
-      return response;
-    },
-    enabled: !!caseId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 2
-  });
-}
-
 export function useCasesOperations() {
   return {
     //Queries
@@ -361,12 +234,8 @@ export function useCasesOperations() {
     createCase: useCreateCase(),
     updateCase: useUpdateCase(),
     deleteCase: useDeleteCase(),
-    createCaseTask: useCreateCaseTask(),
-    deleteCaseTask: useDeleteCaseTask(),
-    updateCaseTask: useUpdateCaseTask(),
     createCaseType: useCreateCaseType(),
     deleteCaseType: useDeleteCaseType(),
-    updateCaseType: useUpdateCaseType(),
     updateFolderTemplates: useUpdateFolderTemplates(),
     deleteFolderTemplate: useDeleteFolderTemplate()
   };
@@ -376,8 +245,6 @@ export function useCasesOperations() {
 export function useCaseOperations(caseId: string) {
   return {
     //Queries
-    getCase: useGetCase(caseId),
-    getCaseTasks: useGetCaseTasks(caseId, 1),
-    getCaseEvents: useGetCaseEvents(caseId)
+    getCase: useGetCase(caseId)
   };
 }
