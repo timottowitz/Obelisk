@@ -336,7 +336,7 @@ app.put("/contacts/:contactId/archive", async (c) => {
     }
 
     const { data: contact, error: contactError } = await supabaseClient
-      .schema("public")
+      .schema(org.data?.schema_name.toLowerCase())
       .from("contacts")
       .select("*")
       .eq("id", contactId)
@@ -347,7 +347,7 @@ app.put("/contacts/:contactId/archive", async (c) => {
     }
 
     const { error: updateError } = await supabaseClient
-      .schema("public")
+      .schema(org.data?.schema_name.toLowerCase())
       .from("contacts")
       .update({ is_archived: !contact.is_archived })
       .eq("id", contactId);

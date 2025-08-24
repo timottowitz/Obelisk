@@ -496,7 +496,9 @@ export async function seedExpenseTypes(
       const { data: existingExpenseType } = await supabase
         .schema(schema)
         .from("expense_types")
-        .select("id");
+        .select("id")
+        .eq("name", expenseType.name)
+        .single();
 
       if (existingExpenseType) {
         console.log(

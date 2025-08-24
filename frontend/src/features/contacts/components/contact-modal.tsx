@@ -313,7 +313,8 @@ export default function ContactModal({
             street2,
             city,
             st,
-            zip
+            zip,
+            fullAddress: `${street} ${street2} ${city} ${st} ${zip}`
           }))
       )
     );
