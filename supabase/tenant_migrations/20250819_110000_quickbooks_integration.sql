@@ -4,14 +4,14 @@
 CREATE TABLE IF NOT EXISTS {{schema_name}}.qb_account_mappings (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     org_id TEXT NOT NULL,
-    cost_type TEXT NOT NULL,
+    cost_type_id UUID REFERENCES {{schema_name}}.cost_types(id),
     qb_account_id TEXT,
     qb_account_name TEXT,
     qb_class_id TEXT,
     qb_class_name TEXT,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(org_id, cost_type)
+    UNIQUE(org_id, cost_type_id)
 );
 
 -- Vendor reference table (tenant-scoped)

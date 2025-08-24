@@ -184,6 +184,47 @@ export function useGetCase(caseId: string) {
   });
 }
 
+export function useUpdateFolderTemplates() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      caseTypeId,
+      formData
+    }: {
+      caseTypeId: string;
+      formData: any;
+    }) => {
+      const response = await CasesAPI.updateFolderTemplates(
+        caseTypeId,
+        formData
+      );
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.caseTypes] });
+    },
+    onError: (error) => {
+      console.error('Folder templates update failed:', error);
+    }
+  });
+}
+
+export function useDeleteFolderTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (templateId: string) => {
+      const response = await CasesAPI.deleteFolderTemplate(templateId);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.caseTypes] });
+    },
+    onError: (error) => {
+      console.error('Folder template deletion failed:', error);
+    }
+  });
+}
+
 export function useCasesOperations() {
   return {
     //Queries
@@ -195,6 +236,8 @@ export function useCasesOperations() {
     deleteCase: useDeleteCase(),
     createCaseType: useCreateCaseType(),
     deleteCaseType: useDeleteCaseType(),
+    updateFolderTemplates: useUpdateFolderTemplates(),
+    deleteFolderTemplate: useDeleteFolderTemplate()
   };
 }
 
@@ -202,6 +245,6 @@ export function useCasesOperations() {
 export function useCaseOperations(caseId: string) {
   return {
     //Queries
-    getCase: useGetCase(caseId),
+    getCase: useGetCase(caseId)
   };
 }
