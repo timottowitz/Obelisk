@@ -167,7 +167,7 @@ app.delete("/storage/files/:fileId", async (c) => {
       .single();
 
     const result = await handleFileDelete(supabaseClient, gcsService, {
-      userId: user.data?.id,
+      user,
       fileId,
       tenantId: orgId,
       schema: org.data?.schema_name.toLowerCase(),
@@ -776,13 +776,13 @@ async function handleFileDelete(
   supabaseClient: any,
   gcsService: GoogleCloudStorageService,
   params: {
-    userId: string;
+    user: any;
     fileId: string;
     tenantId: string;
     schema: string;
   }
 ) {
-  const { userId, fileId, tenantId, schema } = params;
+  const { user, fileId, tenantId, schema } = params;
 
   // Get file record
   const { data: fileRecord, error } = await supabaseClient
@@ -796,18 +796,6 @@ async function handleFileDelete(
     throw new Error("File not found");
   }
 
-  // Soft delete in database
-  const { error: updateError } = await supabaseClient
-    .schema(schema)
-    .from("storage_files")
-    .delete()
-    .eq("id", fileId);
-
-  if (updateError) throw updateError;
-
-  // Delete from GCS
-  await gcsService.deleteFile(fileRecord.gcs_blob_name);
-
   const { data: folderData, error: folderError } = await supabaseClient
     .schema(schema)
     .from("storage_folders")
@@ -819,12 +807,16 @@ async function handleFileDelete(
     throw new Error("Folder not found");
   }
 
-  const { data: user } = await supabaseClient
-    .schema("private")
-    .from("users")
-    .select("*")
-    .eq("clerk_user_id", userId)
-    .single();
+  // Delete from GCS
+  await gcsService.deleteFile(fileRecord.gcs_blob_name);
+
+  const { error: deleteError } = await supabaseClient
+    .schema(schema)
+    .from("storage_files")
+    .delete()
+    .eq("id", fileId);
+
+  if (deleteError) throw deleteError;
 
   const { error: eventError } = await supabaseClient
     .schema(schema)
@@ -843,7 +835,7 @@ async function handleFileDelete(
 
   // Log activity
   await logStorageActivity(supabaseClient, {
-    userId,
+    userId: user.data?.id,
     action: "delete",
     resourceType: "file",
     resourceId: fileId,
