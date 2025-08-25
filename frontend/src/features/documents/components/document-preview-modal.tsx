@@ -13,7 +13,7 @@ import '@/lib/pdf-setup';
 interface DocumentPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  document: SolarDocumentItem | null;
+  document: SolarDocumentItem ;
   downloadUrl: string | null;
   isLoadingDownloadUrl: boolean;
   onDownload: () => void;
@@ -27,8 +27,6 @@ export function DocumentPreviewModal({
   isLoadingDownloadUrl,
   onDownload
 }: DocumentPreviewModalProps) {
-  if (!document) return null;
-
   const [previewSrc, setPreviewSrc] = useState<string>('');
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
