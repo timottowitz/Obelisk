@@ -1353,14 +1353,14 @@ export default function Documents({
       />
 
       {/* Document Preview Modal */}
-      <DocumentPreviewModal
+      {selectedDocument && <DocumentPreviewModal
         isOpen={isDocumentDialogOpen}
         onClose={() => setIsDocumentDialogOpen(false)}
         document={selectedDocument}
         downloadUrl={downloadUrl}
         isLoadingDownloadUrl={isLoadingDownloadUrl}
         onDownload={handleDownloadFile}
-      />
+      />}
 
       {/* Move File Modal */}
       <MoveFileModal

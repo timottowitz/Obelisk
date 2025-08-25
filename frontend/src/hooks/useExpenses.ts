@@ -5,7 +5,8 @@ const QUERY_KEYS = {
   expenseTypes: ['expenseTypes'],
   costTypes: ['costTypes'],
   initialDocuments: ['initialDocuments'],
-  expenses: ['expenses']
+  expenses: ['expenses'],
+  folders: ['folders']
 };
 
 export const useExpenseTypes = () => {
@@ -69,6 +70,9 @@ export const useCreateExpense = () => {
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.initialDocuments]
       });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.folders]
+      });
     },
     onError: (error) => {
       console.error(error);
@@ -92,6 +96,9 @@ export const useUpdateExpense = () => {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.expenses] });
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.initialDocuments]
+      });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.folders]
       });
     },
     onError: (error) => {
