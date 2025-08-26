@@ -656,10 +656,16 @@ app.post("/storage/onlyoffice-callback", async (c) => {
     const fileId = c.req.query("fileId");
     const orgId = c.req.query("orgId");
     const userId = c.req.query("userId");
+    const caseId = c.req.query("caseId");
 
-    if (!fileId || !orgId || !userId) {
-      console.error("Missing required parameters:", { fileId, orgId, userId });
-      return c.json({ error: 1 }, 400);
+    if (!fileId || !orgId || !userId || !caseId) {
+      console.error("Missing required parameters:", {
+        fileId,
+        orgId,
+        userId,
+        caseId,
+      });
+      return c.json({ error: 1 }, 500);
     }
 
     // OnlyOffice sends status codes:
@@ -782,8 +788,8 @@ app.post("/storage/onlyoffice-callback", async (c) => {
 
         await handleRecordEvent(supabaseClient, {
           eventType: "file_updated",
-          caseId: fileRecord.case_id,
-          description: `${user.data?.email} updated file ${fileRecord.name}`,
+          caseId,
+          description: `${user.email} updated file ${fileRecord.name}`,
           schema: schema,
         });
 

@@ -1465,7 +1465,7 @@ export default function Documents({
       />
 
       {/* Document Edit Modal */}
-      {downloadUrl && selectedDocument && (
+      {downloadUrl && selectedDocument && caseId && (
         <DocumentEditModal
           isOpen={isDocumentEditorOpen}
           onClose={() => setIsDocumentEditorOpen(false)}
@@ -1475,6 +1475,7 @@ export default function Documents({
             // Refresh the folders data to show updated file
             folders.refetch();
           }}
+          caseId={caseId}
         />
       )}
     </Tooltip.Provider>

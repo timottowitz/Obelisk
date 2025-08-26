@@ -39,13 +39,15 @@ export default function DocumentEditModal({
   onClose,
   downloadUrl,
   selectedDocument,
-  onDocumentSaved
+  onDocumentSaved,
+  caseId
 }: {
   isOpen: boolean;
   onClose: () => void;
   downloadUrl: string;
   selectedDocument: SolarDocumentItem;
   onDocumentSaved: () => void;
+  caseId: string;
 }) {
   const [token, setToken] = useState<string | null>(null);
   const { userId } = useAuth();
@@ -80,7 +82,8 @@ export default function DocumentEditModal({
   const callbackParams = new URLSearchParams({
     fileId: selectedDocument.id,
     orgId: orgId || '',
-    userId: userId || ''
+    userId: userId || '',
+    caseId: caseId
   });
   const callbackUrl = `${supabaseUrl}/functions/v1/storage/onlyoffice-callback?${callbackParams}`;
 
