@@ -130,9 +130,9 @@ export default function DocumentEditModal({
     setIsSaving(true);
     setTimeout(() => {
       onDocumentSaved();
-      onClose();
       setIsSaving(false);
-    }, 5 * 1000);
+      onClose();
+    }, 10 * 1000);
   };
 
   const handleDownload = useCallback(async () => {

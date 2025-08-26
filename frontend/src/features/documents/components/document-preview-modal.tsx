@@ -144,6 +144,7 @@ export function DocumentPreviewModal({
                     <DocViewer
                       documents={documents}
                       pluginRenderers={DocViewerRenderers}
+                      className='[&_#html-renderer]:h-[500px]'
                     />
                   )}
                 {!previewLoading &&
