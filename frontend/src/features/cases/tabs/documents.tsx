@@ -23,7 +23,8 @@ import {
   FolderInput,
   MoreVertical,
   Pencil,
-  Eye
+  Eye,
+  Video
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -71,6 +72,7 @@ import { useGetCase } from '@/hooks/useCases';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useOrganization } from '@clerk/nextjs';
 import DocumentEditModal from '@/features/documents/components/document-edit-modal';
+import { useCaseEventsOperations } from '@/hooks/useEvents';
 
 const editableFileTypes = [
   'application/pdf',
@@ -91,6 +93,17 @@ function getFileIcon(type: string, className?: string) {
     case 'doc':
     case 'vnd.openxmlformats-officedocument.wordprocessingml.document':
       return <FileText className={cn(iconClass, 'text-blue-500')} />;
+    case 'vnd.openxmlformats-officedocument.spreadsheetml.sheet': // xlsx
+    case 'vnd.ms-excel.sheet.macroenabled.12': // xlsm
+    case 'ms-excel': // xls
+    case 'xlsx':
+    case 'xls':
+      return <File className={cn(iconClass, 'text-green-600')} />;
+    case 'vnd.openxmlformats-officedocument.presentationml.presentation': // pptx
+    case 'vnd.ms-powerpoint': // ppt
+    case 'pptx':
+    case 'ppt':
+      return <File className={cn(iconClass, 'text-orange-500')} />;
     case 'txt':
       return <FileText className={cn(iconClass, 'text-gray-500')} />;
     case 'jpg':
@@ -98,6 +111,15 @@ function getFileIcon(type: string, className?: string) {
     case 'png':
     case 'gif':
       return <Image className={cn(iconClass, 'text-green-500')} />;
+    case 'mp4':
+    case 'mov':
+    case 'avi':
+    case 'wmv':
+    case 'flv':
+    case 'webm':
+    case 'mkv':
+    case 'm4v':
+      return <Video className={cn(iconClass, 'text-red-500')} />;
     default:
       return <File className={cn(iconClass, 'text-muted-foreground')} />;
   }
@@ -121,6 +143,7 @@ export default function Documents({
     downloadFile
   } = useStorageOperations();
   const { folders } = useFoldersOperations(caseId);
+  const { events } = useCaseEventsOperations(caseId, 1);
   const moveFile = useMoveFile();
 
   // Derive state from React Query data
@@ -478,6 +501,7 @@ export default function Documents({
       setDeleteLoading(true);
       try {
         await deleteFile.mutateAsync(id);
+        events.refetch();
         toast.success('File deleted successfully');
         setDeleteTargetId(null);
         setDeleteTargetType(null);
@@ -525,9 +549,8 @@ export default function Documents({
           fileId: selectedFileToMove.id,
           targetFolderId: targetFolderId
         });
-
+        events.refetch();
         toast.success(`File moved successfully`);
-
         setMoveFileModalOpen(false);
         setSelectedFileToMove(null);
       } catch (error) {
@@ -1465,16 +1488,17 @@ export default function Documents({
       />
 
       {/* Document Edit Modal */}
-      {downloadUrl && selectedDocument && (
+      {downloadUrl && selectedDocument && caseId && (
         <DocumentEditModal
           isOpen={isDocumentEditorOpen}
           onClose={() => setIsDocumentEditorOpen(false)}
           downloadUrl={downloadUrl}
           selectedDocument={selectedDocument}
           onDocumentSaved={() => {
-            // Refresh the folders data to show updated file
             folders.refetch();
+            events.refetch();
           }}
+          caseId={caseId}
         />
       )}
     </Tooltip.Provider>

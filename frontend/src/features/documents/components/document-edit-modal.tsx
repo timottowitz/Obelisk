@@ -39,48 +39,51 @@ export default function DocumentEditModal({
   onClose,
   downloadUrl,
   selectedDocument,
-  onDocumentSaved
+  onDocumentSaved,
+  caseId
 }: {
   isOpen: boolean;
   onClose: () => void;
   downloadUrl: string;
   selectedDocument: SolarDocumentItem;
   onDocumentSaved: () => void;
+  caseId: string;
 }) {
   const [token, setToken] = useState<string | null>(null);
   const { userId } = useAuth();
   const { organization } = useOrganization();
   const orgId = organization?.id;
   const [isSaving, setIsSaving] = useState(false);
-  const onDocumentReady = (event: any) => {
+  const onDocumentReady = useCallback((event: any) => {
     console.log('Document is loaded');
-  };
+  }, []);
 
-  const onLoadComponentError = (
-    errorCode: number,
-    errorDescription: string
-  ) => {
-    switch (errorCode) {
-      case -1: // Unknown error loading component
-        console.log(errorDescription);
-        break;
+  const onLoadComponentError = useCallback(
+    (errorCode: number, errorDescription: string) => {
+      switch (errorCode) {
+        case -1: // Unknown error loading component
+          console.log(errorDescription);
+          break;
 
-      case -2: // Error load DocsAPI from http://documentserver/
-        console.log(errorDescription);
-        break;
+        case -2: // Error load DocsAPI from http://documentserver/
+          console.log(errorDescription);
+          break;
 
-      case -3: // DocsAPI is not defined
-        console.log(errorDescription);
-        break;
-    }
-  };
+        case -3: // DocsAPI is not defined
+          console.log(errorDescription);
+          break;
+      }
+    },
+    []
+  );
 
   // Build callback URL - use Supabase Edge Function directly with metadata
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const callbackParams = new URLSearchParams({
     fileId: selectedDocument.id,
     orgId: orgId || '',
-    userId: userId || ''
+    userId: userId || '',
+    caseId: caseId
   });
   const callbackUrl = `${supabaseUrl}/functions/v1/storage/onlyoffice-callback?${callbackParams}`;
 

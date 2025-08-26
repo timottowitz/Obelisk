@@ -147,10 +147,10 @@ app.get("/events/cases/:caseId", async (c) => {
   try {
     const { supabase, schema } = await getSupabaseAndOrgInfo(orgId, userId);
 
-    const { data, error } = await supabase
+    const { data, count, error } = await supabase
       .schema(schema)
       .from("case_events")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("case_id", caseId)
       .order("created_at", { ascending: false })
       .range(limit * (page - 1), limit * page - 1);
@@ -159,7 +159,7 @@ app.get("/events/cases/:caseId", async (c) => {
       return c.json({ error: error.message }, 500);
     }
 
-    return c.json({ data }, 200);
+    return c.json({ data, count }, 200);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }

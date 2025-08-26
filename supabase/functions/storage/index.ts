@@ -579,22 +579,14 @@ app.post("/storage/upload-direct", async (c) => {
       return c.json({ error: "Folder not found" }, 404);
     }
 
-    const { error: eventError } = await supabaseClient
-      .schema(org.data?.schema_name.toLowerCase())
-      .from("case_events")
-      .insert({
-        case_id: folderData.case_id,
-        event_type: "file_uploaded",
-        description: `${user.data?.email} uploaded file ${
-          file.name || "untitled"
-        }`,
-        date: new Date().toISOString().split("T")[0],
-        time: new Date().toISOString().split("T")[1].split(".")[0],
-      });
-
-    if (eventError) {
-      console.error("Failed to create event:", eventError);
-    }
+    await handleRecordEvent(supabaseClient, {
+      eventType: "file_uploaded",
+      caseId: folderData.case_id,
+      description: `${user.data?.email} uploaded file ${
+        file.name || "untitled"
+      }`,
+      schema: org.data?.schema_name.toLowerCase(),
+    });
 
     return c.json({ success: true, data: result });
   } catch (error: any) {
@@ -635,6 +627,42 @@ app.post("/storage/move", async (c) => {
       return c.json({ error: "Missing required fields" }, 400);
     }
 
+    const { data: fileData, error: fileError } = await supabaseClient
+      .schema(org.data?.schema_name.toLowerCase())
+      .from("storage_files")
+      .select("*")
+      .eq("id", fileId)
+      .single();
+
+    if (fileError || !fileData) {
+      return c.json({ error: "File not found" }, 404);
+    }
+
+    const { data: currentFolderData, error: currentFolderError } =
+      await supabaseClient
+        .schema(org.data?.schema_name.toLowerCase())
+        .from("storage_folders")
+        .select("*")
+        .eq("id", fileData.folder_id)
+        .single();
+
+    if (currentFolderError || !currentFolderData) {
+      return c.json({ error: "Current folder not found" }, 404);
+    }
+
+    const { data: targetFolderData, error: targetFolderError } =
+      await supabaseClient
+
+        .schema(org.data?.schema_name.toLowerCase())
+        .from("storage_folders")
+        .select("*")
+        .eq("id", targetFolderId)
+        .single();
+
+    if (targetFolderError || !targetFolderData) {
+      return c.json({ error: "Target folder not found" }, 404);
+    }
+
     const { error: updateError } = await supabaseClient
       .schema(org.data?.schema_name.toLowerCase())
       .from("storage_files")
@@ -646,6 +674,15 @@ app.post("/storage/move", async (c) => {
     if (updateError) {
       return c.json({ success: false, error: updateError.message }, 500);
     }
+
+    await handleRecordEvent(supabaseClient, {
+      eventType: "file_moved",
+      caseId: currentFolderData.case_id,
+      description: `${user.data?.email} moved file ${
+        fileData.name || "untitled"
+      } from ${currentFolderData.name} to ${targetFolderData.name}`,
+      schema: org.data?.schema_name.toLowerCase(),
+    });
 
     return c.json({ success: true, data: "File moved successfully" });
   } catch (error: any) {
@@ -659,17 +696,23 @@ app.post("/storage/onlyoffice-callback", async (c) => {
   try {
     const body = await c.req.json();
     console.log("OnlyOffice callback received:", body);
-    
+
     // Get parameters from URL query
     const fileId = c.req.query("fileId");
     const orgId = c.req.query("orgId");
     const userId = c.req.query("userId");
-    
-    if (!fileId || !orgId || !userId) {
-      console.error("Missing required parameters:", { fileId, orgId, userId });
-      return c.json({ error: 1 }, 400);
+    const caseId = c.req.query("caseId");
+
+    if (!fileId || !orgId || !userId || !caseId) {
+      console.error("Missing required parameters:", {
+        fileId,
+        orgId,
+        userId,
+        caseId,
+      });
+      return c.json({ error: 1 }, 500);
     }
-    
+
     // OnlyOffice sends status codes:
     // 0 - no document with the key identifier could be found
     // 1 - document being edited
@@ -678,32 +721,34 @@ app.post("/storage/onlyoffice-callback", async (c) => {
     // 4 - document closed with no changes
     // 6 - document being edited, but current document state is being saved
     // 7 - error has occurred while force saving
-    
+
     const { status, url } = body;
-    
+
     // Handle document ready for saving
     if ((status === 2 || status === 6) && url && fileId) {
       try {
         console.log(`Saving document ${fileId} from URL: ${url}`);
-        
+
         // Download the edited document from OnlyOffice
         const response = await fetch(url);
         if (!response.ok) {
-          throw new Error(`Failed to download document: ${response.statusText}`);
+          throw new Error(
+            `Failed to download document: ${response.statusText}`
+          );
         }
-        
+
         const fileBuffer = await response.arrayBuffer();
         const fileData = new Uint8Array(fileBuffer);
-        
+
         if (!fileData?.length) {
           console.error("Empty file data received");
           return c.json({ error: 1 }, 400);
         }
-        
+
         // Get Supabase client and GCS service
         const supabaseClient = await getSupabaseClient();
         const gcsService = getGcsService();
-        
+
         // Get organization to find schema
         const { data: org, error: orgError } = await supabaseClient
           .schema("private")
@@ -711,14 +756,21 @@ app.post("/storage/onlyoffice-callback", async (c) => {
           .select("*")
           .eq("clerk_organization_id", orgId)
           .single();
-        
-        if (orgError || !org) {
-          console.error("Organization not found:", orgError);
+
+        const { data: user, error: userError } = await supabaseClient
+          .schema("private")
+          .from("users")
+          .select("*")
+          .eq("clerk_user_id", userId)
+          .single();
+
+        if (orgError || !org || userError || !user) {
+          console.error("Organization or user not found:", orgError, userError);
           return c.json({ error: 1 }, 404);
         }
-        
+
         const schema = org.schema_name.toLowerCase();
-        
+
         // Get file metadata
         const { data: fileRecord, error: fileError } = await supabaseClient
           .schema(schema)
@@ -726,12 +778,12 @@ app.post("/storage/onlyoffice-callback", async (c) => {
           .select("*")
           .eq("id", fileId)
           .single();
-        
+
         if (fileError || !fileRecord) {
           console.error("File not found:", fileError);
           return c.json({ error: 1 }, 404);
         }
-        
+
         // Delete old file from GCS
         try {
           await gcsService.deleteFile(fileRecord.gcs_blob_name);
@@ -739,15 +791,15 @@ app.post("/storage/onlyoffice-callback", async (c) => {
         } catch (error) {
           console.error("Error deleting old file:", error);
         }
-        
+
         // Calculate new checksum
         const checksum = await calculateChecksum(fileData);
-        
+
         // Get folder path
         const folderPath = fileRecord.folder_id
           ? await getFolderPath(supabaseClient, fileRecord.folder_id, schema)
           : "root";
-        
+
         // Upload new version to GCS
         const uploadResult = await gcsService.uploadFile(
           orgId,
@@ -758,7 +810,7 @@ app.post("/storage/onlyoffice-callback", async (c) => {
           fileRecord.mime_type,
           { checksum, uploadedBy: fileRecord.uploaded_by }
         );
-        
+
         // Update file metadata in database
         const { error: updateError } = await supabaseClient
           .schema(schema)
@@ -771,33 +823,30 @@ app.post("/storage/onlyoffice-callback", async (c) => {
             updated_at: new Date().toISOString(),
           })
           .eq("id", fileId);
-        
+
         if (updateError) {
           console.error("Failed to update file metadata:", updateError);
           return c.json({ error: 1 }, 500);
         }
-        
-        console.log(`Document ${fileRecord.name} successfully saved`);
-        
-        // Log activity
-        await logStorageActivity(supabaseClient, {
-          userId: fileRecord.uploaded_by,
-          action: "update_via_editor",
-          resourceType: "file",
-          resourceId: fileId,
-          details: { fileName: fileRecord.name, size: fileData.length },
+
+        console.log(`Document ${fileRecord.name} successfully updated`);
+
+        await handleRecordEvent(supabaseClient, {
+          eventType: "file_updated",
+          caseId,
+          description: `${user.email} updated file ${fileRecord.name}`,
           schema: schema,
         });
-        
+
+        return c.json({ error: 0 });
       } catch (error) {
         console.error("Error saving document:", error);
         return c.json({ error: 1 }, 500);
       }
     }
-    
+
     // OnlyOffice expects error: 0 for success
     return c.json({ error: 0 });
-    
   } catch (error: any) {
     console.error("OnlyOffice callback error:", error);
     return c.json({ error: 1 }, 500);
@@ -861,16 +910,6 @@ async function handleFileUpload(
 
   if (error) throw error;
 
-  // Log activity
-  await logStorageActivity(supabaseClient, {
-    userId,
-    action: "upload",
-    resourceType: "file",
-    resourceId: fileRecord.id,
-    details: { fileName, size: fileData.length, mimeType },
-    schema,
-  });
-
   return fileRecord;
 }
 
@@ -905,16 +944,6 @@ async function handleFileDownload(
     fileRecord.gcs_blob_name,
     1
   );
-
-  // Log activity
-  await logStorageActivity(supabaseClient, {
-    userId,
-    action: "download",
-    resourceType: "file",
-    resourceId: fileId,
-    details: { fileName: fileRecord.name },
-    schema,
-  });
 
   return {
     signedUrl,
@@ -968,29 +997,11 @@ async function handleFileDelete(
 
   if (deleteError) throw deleteError;
 
-  const { error: eventError } = await supabaseClient
-    .schema(schema)
-    .from("case_events")
-    .insert({
-      case_id: folderData.case_id,
-      event_type: "file_deleted",
-      description: `${user.data?.email} deleted file ${fileRecord.name}`,
-      date: new Date().toISOString().split("T")[0],
-      time: new Date().toISOString().split("T")[1].split(".")[0],
-    });
-
-  if (eventError) {
-    throw eventError;
-  }
-
-  // Log activity
-  await logStorageActivity(supabaseClient, {
-    userId: user.data?.id,
-    action: "delete",
-    resourceType: "file",
-    resourceId: fileId,
-    details: { fileName: fileRecord.name },
-    schema,
+  await handleRecordEvent(supabaseClient, {
+    eventType: "file_deleted",
+    caseId: folderData.case_id,
+    description: `${user.data?.email} deleted file ${fileRecord.name}`,
+    schema: schema,
   });
 
   return { success: true };
@@ -1072,6 +1083,7 @@ async function handleCreateFolder(
       name: folderName,
       parent_folder_id: folderId,
       case_id: folder.case_id,
+      case_type_id: folder.case_type_id,
       path: newPath,
       created_by: userId,
     })
@@ -1079,16 +1091,6 @@ async function handleCreateFolder(
     .single();
 
   if (error) throw error;
-
-  // Log activity
-  await logStorageActivity(supabaseClient, {
-    userId,
-    action: "create_folder",
-    resourceType: "folder",
-    resourceId: folderRecord.id,
-    details: { folderName, path: newPath },
-    schema,
-  });
 
   return folderRecord;
 }
@@ -1151,16 +1153,6 @@ async function handleDeleteFolder(
     }
   }
 
-  // Log activity
-  await logStorageActivity(supabaseClient, {
-    userId,
-    action: "delete_folder",
-    resourceType: "folder",
-    resourceId: folderId,
-    details: { folderCount: folderIds.length, fileCount: files.length },
-    schema,
-  });
-
   return {
     success: true,
     deletedFolders: folderIds.length,
@@ -1209,16 +1201,6 @@ async function handleShareResource(
 
   if (error) throw error;
 
-  // Log activity
-  await logStorageActivity(supabaseClient, {
-    userId,
-    action: "share",
-    resourceType: resourceType,
-    resourceId: resourceId,
-    details: { sharedWith: shareWith, permission },
-    schema: tenantId,
-  });
-
   return shareRecord;
 }
 
@@ -1255,16 +1237,6 @@ async function handleUnshareResource(
     .eq("shared_with", targetUser.id);
 
   if (error) throw error;
-
-  // Log activity
-  await logStorageActivity(supabaseClient, {
-    userId,
-    action: "unshare",
-    resourceType: resourceType,
-    resourceId: resourceId,
-    details: { unsharedWith: shareWith },
-    schema: tenantId,
-  });
 
   return { success: true };
 }
@@ -1369,31 +1341,6 @@ async function calculateChecksum(data: Uint8Array): Promise<string> {
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function logStorageActivity(
-  supabaseClient: any,
-  params: {
-    userId: string;
-    action: string;
-    resourceType: string;
-    resourceId: string;
-    details?: any;
-    schema: string;
-  }
-) {
-  const { userId, action, resourceType, resourceId, details, schema } = params;
-
-  await supabaseClient
-    .schema(schema)
-    .from("storage_activity_log")
-    .insert({
-      user_id: userId,
-      action: action,
-      resource_type: resourceType,
-      resource_id: resourceId,
-      details: details || {},
-    });
-}
-
 // Direct file upload handler (no base64 conversion)
 async function handleDirectFileUpload(
   supabaseClient: any,
@@ -1460,20 +1407,6 @@ async function handleDirectFileUpload(
   if (error) {
     console.error("Error saving file metadata:", error);
     throw error;
-  }
-
-  // Log activity
-  try {
-    await logStorageActivity(supabaseClient, {
-      userId,
-      action: "upload",
-      resourceType: "file",
-      resourceId: fileRecord.id,
-      details: { fileName, size: fileData.length, mimeType },
-      schema,
-    });
-  } catch (error) {
-    console.error("Error logging activity:", error);
   }
 
   return fileRecord;
@@ -1651,6 +1584,35 @@ async function handleGetFolderIds(
   }
 
   return folderIds;
+}
+
+async function handleRecordEvent(
+  supabaseClient: any,
+  params: {
+    eventType: string;
+    caseId: string;
+    description: string;
+    schema: string;
+  }
+) {
+  const { eventType, caseId, description, schema } = params;
+  const date = new Date();
+
+  const { error: eventError } = await supabaseClient
+    .schema(schema)
+    .from("case_events")
+    .insert({
+      case_id: caseId,
+      event_type: eventType,
+      description: description,
+      date: date.toISOString().split("T")[0],
+      time: date.toISOString().split("T")[1].split(".")[0],
+    });
+
+  if (eventError) {
+    console.error("Failed to create event:", eventError);
+    throw eventError;
+  }
 }
 
 export default app;
