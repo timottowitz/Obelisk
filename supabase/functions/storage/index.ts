@@ -627,6 +627,42 @@ app.post("/storage/move", async (c) => {
       return c.json({ error: "Missing required fields" }, 400);
     }
 
+    const { data: fileData, error: fileError } = await supabaseClient
+      .schema(org.data?.schema_name.toLowerCase())
+      .from("storage_files")
+      .select("*")
+      .eq("id", fileId)
+      .single();
+
+    if (fileError || !fileData) {
+      return c.json({ error: "File not found" }, 404);
+    }
+
+    const { data: currentFolderData, error: currentFolderError } =
+      await supabaseClient
+        .schema(org.data?.schema_name.toLowerCase())
+        .from("storage_folders")
+        .select("*")
+        .eq("id", fileData.folder_id)
+        .single();
+
+    if (currentFolderError || !currentFolderData) {
+      return c.json({ error: "Current folder not found" }, 404);
+    }
+
+    const { data: targetFolderData, error: targetFolderError } =
+      await supabaseClient
+
+        .schema(org.data?.schema_name.toLowerCase())
+        .from("storage_folders")
+        .select("*")
+        .eq("id", targetFolderId)
+        .single();
+
+    if (targetFolderError || !targetFolderData) {
+      return c.json({ error: "Target folder not found" }, 404);
+    }
+
     const { error: updateError } = await supabaseClient
       .schema(org.data?.schema_name.toLowerCase())
       .from("storage_files")
@@ -638,6 +674,15 @@ app.post("/storage/move", async (c) => {
     if (updateError) {
       return c.json({ success: false, error: updateError.message }, 500);
     }
+
+    await handleRecordEvent(supabaseClient, {
+      eventType: "file_moved",
+      caseId: currentFolderData.case_id,
+      description: `${user.data?.email} moved file ${
+        fileData.name || "untitled"
+      } from ${currentFolderData.name} to ${targetFolderData.name}`,
+      schema: org.data?.schema_name.toLowerCase(),
+    });
 
     return c.json({ success: true, data: "File moved successfully" });
   } catch (error: any) {
@@ -1038,6 +1083,7 @@ async function handleCreateFolder(
       name: folderName,
       parent_folder_id: folderId,
       case_id: folder.case_id,
+      case_type_id: folder.case_type_id,
       path: newPath,
       created_by: userId,
     })

@@ -18,3 +18,9 @@ export function useCaseEvents(caseId: string, page: number) {
     retry: 2
   });
 }
+
+export function useCaseEventsOperations(caseId: string, page: number) {
+  return {
+    events: useCaseEvents(caseId, page)
+  };
+}

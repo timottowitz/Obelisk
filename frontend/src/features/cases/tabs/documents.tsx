@@ -71,6 +71,7 @@ import { useGetCase } from '@/hooks/useCases';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useOrganization } from '@clerk/nextjs';
 import DocumentEditModal from '@/features/documents/components/document-edit-modal';
+import { useCaseEventsOperations } from '@/hooks/useEvents';
 
 const editableFileTypes = [
   'application/pdf',
@@ -121,6 +122,7 @@ export default function Documents({
     downloadFile
   } = useStorageOperations();
   const { folders } = useFoldersOperations(caseId);
+  const { events } = useCaseEventsOperations(caseId, 1);
   const moveFile = useMoveFile();
 
   // Derive state from React Query data
@@ -478,6 +480,7 @@ export default function Documents({
       setDeleteLoading(true);
       try {
         await deleteFile.mutateAsync(id);
+        events.refetch();
         toast.success('File deleted successfully');
         setDeleteTargetId(null);
         setDeleteTargetType(null);
@@ -525,9 +528,8 @@ export default function Documents({
           fileId: selectedFileToMove.id,
           targetFolderId: targetFolderId
         });
-
+        events.refetch();
         toast.success(`File moved successfully`);
-
         setMoveFileModalOpen(false);
         setSelectedFileToMove(null);
       } catch (error) {
@@ -1472,8 +1474,8 @@ export default function Documents({
           downloadUrl={downloadUrl}
           selectedDocument={selectedDocument}
           onDocumentSaved={() => {
-            // Refresh the folders data to show updated file
             folders.refetch();
+            events.refetch();
           }}
           caseId={caseId}
         />
