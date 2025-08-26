@@ -88,10 +88,11 @@ export default function DocumentEditModal({
   });
   const callbackUrl = `${supabaseUrl}/functions/v1/storage/onlyoffice-callback?${callbackParams}`;
 
+
   const config = {
     document: {
       fileType: fileTypes[selectedDocument.mime_type as keyof typeof fileTypes],
-      key: `${selectedDocument.id}-${Date.now()}`, // Use just the file ID as key
+      key: `${selectedDocument.id}-${selectedDocument.updated_at.toString().replaceAll(" ", "-").replaceAll(":", "-")}`,
       title: selectedDocument.name,
       url: downloadUrl,
       permissions: {
@@ -155,7 +156,6 @@ export default function DocumentEditModal({
       document.body.appendChild(a);
       a.click();
       a.remove();
-      toast.success('Download started');
     } catch (err) {
       console.error('Error downloading file:', err);
       toast.error('Failed to download file');

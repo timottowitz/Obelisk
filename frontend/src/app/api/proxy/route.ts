@@ -1,11 +1,10 @@
 export const dynamic = 'force-dynamic';
+import mailparser from 'mailparser';
 
 function isAllowedUrl(urlString: string): boolean {
   try {
     const url = new URL(urlString);
-    const allowedHosts = new Set([
-      'storage.googleapis.com'
-    ]);
+    const allowedHosts = new Set(['storage.googleapis.com']);
     return allowedHosts.has(url.hostname);
   } catch {
     return false;
@@ -15,6 +14,7 @@ function isAllowedUrl(urlString: string): boolean {
 export async function GET(req: Request): Promise<Response> {
   const { searchParams } = new URL(req.url);
   const target = searchParams.get('url');
+  const type = searchParams.get('type');
   if (!target) {
     return new Response('Missing url', { status: 400 });
   }
@@ -24,7 +24,7 @@ export async function GET(req: Request): Promise<Response> {
 
   const range = req.headers.get('range') ?? undefined;
 
-  const upstream = await fetch(target, {
+  let upstream = await fetch(target, {
     headers: range ? { Range: range } : undefined,
     cache: 'no-store'
   });
@@ -45,10 +45,21 @@ export async function GET(req: Request): Promise<Response> {
     const value = upstream.headers.get(name);
     if (value) headers.set(name, value);
   }
+  if (type === 'eml') {
+    const mail = await mailparser.simpleParser(await upstream.text());
+    return new Response(mail.html || (mail.text as any), {
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers: {
+        ...headers,
+        'Content-Type': 'text/html'
+      }
+    });
+  }
 
   return new Response(upstream.body, {
     status: upstream.status,
     statusText: upstream.statusText,
     headers
   });
-} 
+}

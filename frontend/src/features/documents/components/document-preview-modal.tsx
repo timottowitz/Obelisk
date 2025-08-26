@@ -44,12 +44,22 @@ export function DocumentPreviewModal({
       setPreviewError(null);
 
       let objectUrl: string | null = null;
+      let proxied = `/api/proxy?url=${encodeURIComponent(downloadUrl)}`;
+      let res: Response;
       try {
-        const proxied = `/api/proxy?url=${encodeURIComponent(downloadUrl)}`;
-        const res = await fetch(proxied, {
-          signal: controller.signal,
-          cache: 'no-store'
-        });
+        if (fileExt !== 'eml') {
+          res = await fetch(proxied, {
+            signal: controller.signal,
+            cache: 'no-store'
+          });
+        } else {
+          proxied = `/api/proxy?url=${encodeURIComponent(downloadUrl)}&type=eml`;
+          res = await fetch(proxied, {
+            signal: controller.signal,
+            cache: 'no-store'
+          });
+        }
+
         if (!res.ok) {
           throw new Error(`Preview fetch failed: ${res.status}`);
         }
@@ -76,6 +86,16 @@ export function DocumentPreviewModal({
       Promise.resolve(cleanup).catch(() => {});
     };
   }, [isOpen, downloadUrl, fileExt]);
+
+  const documents = useMemo(() => {
+    return [
+      {
+        uri: previewSrc,
+        fileName: document.name,
+        fileType: fileExt === 'eml' ? 'text/html' : fileExt
+      }
+    ];
+  }, [previewSrc, document.name, fileExt]);
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose}>
@@ -122,13 +142,7 @@ export function DocumentPreviewModal({
                   previewSrc &&
                   fileExt !== 'mp4' && (
                     <DocViewer
-                      documents={[
-                        {
-                          uri: previewSrc,
-                          fileName: document.name,
-                          fileType: fileExt
-                        }
-                      ]}
+                      documents={documents}
                       pluginRenderers={DocViewerRenderers}
                     />
                   )}

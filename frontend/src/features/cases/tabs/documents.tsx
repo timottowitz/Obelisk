@@ -480,7 +480,6 @@ export default function Documents({
       document.body.appendChild(a);
       a.click();
       a.remove();
-      toast.success('Download started');
     } catch (error) {
       console.error('Error downloading file:', error);
       toast.error('Failed to download file');
