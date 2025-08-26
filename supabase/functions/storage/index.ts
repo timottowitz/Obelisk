@@ -654,6 +654,156 @@ app.post("/storage/move", async (c) => {
   }
 });
 
+// OnlyOffice callback endpoint
+app.post("/storage/onlyoffice-callback", async (c) => {
+  try {
+    const body = await c.req.json();
+    console.log("OnlyOffice callback received:", body);
+    
+    // Get parameters from URL query
+    const fileId = c.req.query("fileId");
+    const orgId = c.req.query("orgId");
+    const userId = c.req.query("userId");
+    
+    if (!fileId || !orgId || !userId) {
+      console.error("Missing required parameters:", { fileId, orgId, userId });
+      return c.json({ error: 1 }, 400);
+    }
+    
+    // OnlyOffice sends status codes:
+    // 0 - no document with the key identifier could be found
+    // 1 - document being edited
+    // 2 - document is ready for saving
+    // 3 - document saving error occurred
+    // 4 - document closed with no changes
+    // 6 - document being edited, but current document state is being saved
+    // 7 - error has occurred while force saving
+    
+    const { status, url } = body;
+    
+    // Handle document ready for saving
+    if ((status === 2 || status === 6) && url && fileId) {
+      try {
+        console.log(`Saving document ${fileId} from URL: ${url}`);
+        
+        // Download the edited document from OnlyOffice
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Failed to download document: ${response.statusText}`);
+        }
+        
+        const fileBuffer = await response.arrayBuffer();
+        const fileData = new Uint8Array(fileBuffer);
+        
+        if (!fileData?.length) {
+          console.error("Empty file data received");
+          return c.json({ error: 1 }, 400);
+        }
+        
+        // Get Supabase client and GCS service
+        const supabaseClient = await getSupabaseClient();
+        const gcsService = getGcsService();
+        
+        // Get organization to find schema
+        const { data: org, error: orgError } = await supabaseClient
+          .schema("private")
+          .from("organizations")
+          .select("*")
+          .eq("clerk_organization_id", orgId)
+          .single();
+        
+        if (orgError || !org) {
+          console.error("Organization not found:", orgError);
+          return c.json({ error: 1 }, 404);
+        }
+        
+        const schema = org.schema_name.toLowerCase();
+        
+        // Get file metadata
+        const { data: fileRecord, error: fileError } = await supabaseClient
+          .schema(schema)
+          .from("storage_files")
+          .select("*")
+          .eq("id", fileId)
+          .single();
+        
+        if (fileError || !fileRecord) {
+          console.error("File not found:", fileError);
+          return c.json({ error: 1 }, 404);
+        }
+        
+        // Delete old file from GCS
+        try {
+          await gcsService.deleteFile(fileRecord.gcs_blob_name);
+          console.log("Old file deleted from GCS");
+        } catch (error) {
+          console.error("Error deleting old file:", error);
+        }
+        
+        // Calculate new checksum
+        const checksum = await calculateChecksum(fileData);
+        
+        // Get folder path
+        const folderPath = fileRecord.folder_id
+          ? await getFolderPath(supabaseClient, fileRecord.folder_id, schema)
+          : "root";
+        
+        // Upload new version to GCS
+        const uploadResult = await gcsService.uploadFile(
+          orgId,
+          userId,
+          folderPath,
+          fileRecord.name,
+          fileData,
+          fileRecord.mime_type,
+          { checksum, uploadedBy: fileRecord.uploaded_by }
+        );
+        
+        // Update file metadata in database
+        const { error: updateError } = await supabaseClient
+          .schema(schema)
+          .from("storage_files")
+          .update({
+            gcs_blob_name: uploadResult.blobName,
+            gcs_blob_url: uploadResult.blobUrl,
+            size_bytes: fileData.length,
+            checksum: checksum,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", fileId);
+        
+        if (updateError) {
+          console.error("Failed to update file metadata:", updateError);
+          return c.json({ error: 1 }, 500);
+        }
+        
+        console.log(`Document ${fileRecord.name} successfully saved`);
+        
+        // Log activity
+        await logStorageActivity(supabaseClient, {
+          userId: fileRecord.uploaded_by,
+          action: "update_via_editor",
+          resourceType: "file",
+          resourceId: fileId,
+          details: { fileName: fileRecord.name, size: fileData.length },
+          schema: schema,
+        });
+        
+      } catch (error) {
+        console.error("Error saving document:", error);
+        return c.json({ error: 1 }, 500);
+      }
+    }
+    
+    // OnlyOffice expects error: 0 for success
+    return c.json({ error: 0 });
+    
+  } catch (error: any) {
+    console.error("OnlyOffice callback error:", error);
+    return c.json({ error: 1 }, 500);
+  }
+});
+
 // Handler functions (same as before)
 
 async function handleFileUpload(

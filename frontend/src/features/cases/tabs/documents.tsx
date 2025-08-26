@@ -21,7 +21,9 @@ import {
   FolderPlus,
   UploadIcon,
   FolderInput,
-  MoreVertical
+  MoreVertical,
+  Pencil,
+  Eye
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -68,6 +70,16 @@ import { MoveFileModal } from '@/features/documents/components/move-file-modal';
 import { useGetCase } from '@/hooks/useCases';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useOrganization } from '@clerk/nextjs';
+import DocumentEditModal from '@/features/documents/components/document-edit-modal';
+
+const editableFileTypes = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel.sheet.macroenabled.12',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+];
 
 // Get file icon
 function getFileIcon(type: string, className?: string) {
@@ -126,8 +138,8 @@ export default function Documents({
     id: '',
     name: ''
   });
-  const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
-
+  const [isDocumentPreviewOpen, setIsDocumentPreviewOpen] = useState(false);
+  const [isDocumentEditorOpen, setIsDocumentEditorOpen] = useState(false);
   // Create folder state
   const [isCreateFolderDialogOpen, setIsCreateFolderDialogOpen] =
     useState(false);
@@ -690,11 +702,6 @@ export default function Documents({
                           <div className='bg-border absolute top-8 left-6 h-full w-px' />
                         )}
                         <div
-                          onClick={() => {
-                            handleGetDownloadUrl(document);
-                            setSelectedDocument(document);
-                            setIsDocumentDialogOpen(true);
-                          }}
                           className='hover:bg-accent/60 flex h-auto w-full items-center justify-start gap-3 p-3 text-left transition-colors'
                           role='treeitem'
                           aria-label={`${document.name}, ${document.mime_type.toUpperCase()}, ${formatFileSize(document.size_bytes)}, modified ${formatDate(document.created_at)}`}
@@ -743,6 +750,35 @@ export default function Documents({
                               </div>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align='end' className='w-44'>
+                              {editableFileTypes.includes(
+                                document.mime_type
+                              ) ? (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedDocument(document);
+                                    handleGetDownloadUrl(document);
+                                    setIsDocumentEditorOpen(true);
+                                  }}
+                                  className='flex items-center gap-3 px-3 py-2'
+                                >
+                                  <Pencil className='h-4 w-4 text-blue-600' />
+                                  <span>Edit and Preview</span>
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedDocument(document);
+                                    handleGetDownloadUrl(document);
+                                    setIsDocumentPreviewOpen(true);
+                                  }}
+                                  className='flex items-center gap-3 px-3 py-2'
+                                >
+                                  <Eye className='h-4 w-4 text-blue-600' />
+                                  <span>View Document</span>
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -990,11 +1026,6 @@ export default function Documents({
                                       className='relative mb-2'
                                     >
                                       <div
-                                        onClick={() => {
-                                          handleGetDownloadUrl(document);
-                                          setSelectedDocument(document);
-                                          setIsDocumentDialogOpen(true);
-                                        }}
                                         className='hover:bg-accent/60 flex h-auto w-full items-center justify-start gap-3 p-3 text-left transition-colors'
                                         role='treeitem'
                                         aria-label={`${document.name}, ${document.mime_type.toUpperCase()}, ${formatFileSize(document.size_bytes)}, modified ${formatDate(document.created_at)}`}
@@ -1048,6 +1079,41 @@ export default function Documents({
                                             align='end'
                                             className='w-44'
                                           >
+                                            {editableFileTypes.includes(
+                                              document.mime_type
+                                            ) ? (
+                                              <DropdownMenuItem
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setSelectedDocument(document);
+                                                  handleGetDownloadUrl(
+                                                    document
+                                                  );
+                                                  setIsDocumentEditorOpen(true);
+                                                }}
+                                                className='flex items-center gap-3 px-3 py-2'
+                                              >
+                                                <Pencil className='h-4 w-4 text-blue-600' />
+                                                <span>Edit and Preview</span>
+                                              </DropdownMenuItem>
+                                            ) : (
+                                              <DropdownMenuItem
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setSelectedDocument(document);
+                                                  handleGetDownloadUrl(
+                                                    document
+                                                  );
+                                                  setIsDocumentPreviewOpen(
+                                                    true
+                                                  );
+                                                }}
+                                                className='flex items-center gap-3 px-3 py-2'
+                                              >
+                                                <Eye className='h-4 w-4 text-blue-600' />
+                                                <span>View Document</span>
+                                              </DropdownMenuItem>
+                                            )}
                                             <DropdownMenuItem
                                               onClick={(e) => {
                                                 e.stopPropagation();
@@ -1353,14 +1419,16 @@ export default function Documents({
       />
 
       {/* Document Preview Modal */}
-      {selectedDocument && <DocumentPreviewModal
-        isOpen={isDocumentDialogOpen}
-        onClose={() => setIsDocumentDialogOpen(false)}
-        document={selectedDocument}
-        downloadUrl={downloadUrl}
-        isLoadingDownloadUrl={isLoadingDownloadUrl}
-        onDownload={handleDownloadFile}
-      />}
+      {selectedDocument && (
+        <DocumentPreviewModal
+          isOpen={isDocumentPreviewOpen}
+          onClose={() => setIsDocumentPreviewOpen(false)}
+          document={selectedDocument}
+          downloadUrl={downloadUrl}
+          isLoadingDownloadUrl={isLoadingDownloadUrl}
+          onDownload={handleDownloadFile}
+        />
+      )}
 
       {/* Move File Modal */}
       <MoveFileModal
@@ -1395,6 +1463,20 @@ export default function Documents({
         }}
         loading={deleteLoading}
       />
+
+      {/* Document Edit Modal */}
+      {downloadUrl && selectedDocument && (
+        <DocumentEditModal
+          isOpen={isDocumentEditorOpen}
+          onClose={() => setIsDocumentEditorOpen(false)}
+          downloadUrl={downloadUrl}
+          selectedDocument={selectedDocument}
+          onDocumentSaved={() => {
+            // Refresh the folders data to show updated file
+            folders.refetch();
+          }}
+        />
+      )}
     </Tooltip.Provider>
   );
 }

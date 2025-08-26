@@ -11,6 +11,10 @@ export const extractUserAndOrgId: MiddlewareHandler = async (
   c: Context,
   next
 ) => {
+  if (c.req.path.includes("/storage/onlyoffice-callback")) {
+    await next();
+  }
+
   const authHeader = c.req.header("Authorization");
   if (!authHeader) {
     return c.json({ error: "Authorization header missing" }, 401);
