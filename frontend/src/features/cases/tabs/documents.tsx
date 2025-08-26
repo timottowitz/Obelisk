@@ -466,8 +466,6 @@ export default function Documents({
       const filename =
         (selectedDocument && selectedDocument.name) || 'document';
 
-      window.open(downloadUrl, '_blank', 'noopener,noreferrer');
-
       const url = new URL(downloadUrl);
       url.searchParams.set(
         'response-content-disposition',
