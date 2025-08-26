@@ -9,8 +9,9 @@ import {
   DialogTitle
 } from '@/components/ui/dialog';
 import { SolarDocumentItem } from '@/types/documents';
-import { Loader2 } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 const documentTypes = {
   'application/pdf': 'pdf',
@@ -133,6 +134,34 @@ export default function DocumentEditModal({
     }, 5 * 1000);
   };
 
+  const handleDownload = useCallback(async () => {
+    if (!downloadUrl) {
+      toast.error('No download URL found');
+      return;
+    }
+    try {
+      const filename = selectedDocument?.name || 'document';
+      const url = new URL(downloadUrl);
+      url.searchParams.set(
+        'response-content-disposition',
+        `attachment; filename="${encodeURIComponent(filename)}"`
+      );
+      url.searchParams.set('response-content-type', 'application/octet-stream');
+
+      const a = document.createElement('a');
+      a.href = url.toString();
+      a.download = filename;
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      toast.success('Download started');
+    } catch (err) {
+      console.error('Error downloading file:', err);
+      toast.error('Failed to download file');
+    }
+  }, [downloadUrl, selectedDocument]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className='h-[85vh] max-w-6xl! overflow-hidden p-0 sm:rounded-lg'>
@@ -164,6 +193,10 @@ export default function DocumentEditModal({
         <DialogFooter className='mr-4 mb-4 flex justify-end gap-2'>
           <Button variant='outline' onClick={onClose} disabled={isSaving}>
             Cancel
+          </Button>
+          <Button onClick={handleDownload}>
+            <Download className='h-4 w-4' />
+            Download
           </Button>
           <Button
             onClick={handleSave}
