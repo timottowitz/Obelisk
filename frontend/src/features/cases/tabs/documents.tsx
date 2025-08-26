@@ -92,6 +92,17 @@ function getFileIcon(type: string, className?: string) {
     case 'doc':
     case 'vnd.openxmlformats-officedocument.wordprocessingml.document':
       return <FileText className={cn(iconClass, 'text-blue-500')} />;
+    case 'vnd.openxmlformats-officedocument.spreadsheetml.sheet': // xlsx
+    case 'vnd.ms-excel.sheet.macroenabled.12': // xlsm
+    case 'ms-excel': // xls
+    case 'xlsx':
+    case 'xls':
+      return <File className={cn(iconClass, 'text-green-600')} />;
+    case 'vnd.openxmlformats-officedocument.presentationml.presentation': // pptx
+    case 'vnd.ms-powerpoint': // ppt
+    case 'pptx':
+    case 'ppt':
+      return <File className={cn(iconClass, 'text-orange-500')} />;
     case 'txt':
       return <FileText className={cn(iconClass, 'text-gray-500')} />;
     case 'jpg':

@@ -54,28 +54,28 @@ export default function DocumentEditModal({
   const { organization } = useOrganization();
   const orgId = organization?.id;
   const [isSaving, setIsSaving] = useState(false);
-  const onDocumentReady = (event: any) => {
+  const onDocumentReady = useCallback((event: any) => {
     console.log('Document is loaded');
-  };
+  }, []);
 
-  const onLoadComponentError = (
-    errorCode: number,
-    errorDescription: string
-  ) => {
-    switch (errorCode) {
-      case -1: // Unknown error loading component
-        console.log(errorDescription);
-        break;
+  const onLoadComponentError = useCallback(
+    (errorCode: number, errorDescription: string) => {
+      switch (errorCode) {
+        case -1: // Unknown error loading component
+          console.log(errorDescription);
+          break;
 
-      case -2: // Error load DocsAPI from http://documentserver/
-        console.log(errorDescription);
-        break;
+        case -2: // Error load DocsAPI from http://documentserver/
+          console.log(errorDescription);
+          break;
 
-      case -3: // DocsAPI is not defined
-        console.log(errorDescription);
-        break;
-    }
-  };
+        case -3: // DocsAPI is not defined
+          console.log(errorDescription);
+          break;
+      }
+    },
+    []
+  );
 
   // Build callback URL - use Supabase Edge Function directly with metadata
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
