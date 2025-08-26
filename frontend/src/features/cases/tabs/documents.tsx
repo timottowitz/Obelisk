@@ -23,7 +23,8 @@ import {
   FolderInput,
   MoreVertical,
   Pencil,
-  Eye
+  Eye,
+  Video
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -110,6 +111,15 @@ function getFileIcon(type: string, className?: string) {
     case 'png':
     case 'gif':
       return <Image className={cn(iconClass, 'text-green-500')} />;
+    case 'mp4':
+    case 'mov':
+    case 'avi':
+    case 'wmv':
+    case 'flv':
+    case 'webm':
+    case 'mkv':
+    case 'm4v':
+      return <Video className={cn(iconClass, 'text-red-500')} />;
     default:
       return <File className={cn(iconClass, 'text-muted-foreground')} />;
   }
