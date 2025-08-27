@@ -9,10 +9,7 @@ import { Hono } from "jsr:@hono/hono";
 import { cors } from "jsr:@hono/hono/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
 import { extractUserAndOrgId } from "../_shared/index.ts";
-import {
-  seedCaseTypes,
-  DEFAULT_CASE_TYPES,
-} from "../_shared/default-types.ts";
+import { seedCaseTypes, DEFAULT_CASE_TYPES } from "../_shared/default-types.ts";
 import { GoogleCloudStorageService } from "../_shared/google-storage.ts";
 
 console.log("Hello from Cases Functions!");
@@ -1166,54 +1163,89 @@ async function createFoldersFromTemplates(
     throw new Error("Failed to fetch folder templates", templatesError);
   }
 
-  const { data: parentFolder, error: parentFolderError } = await supabase
-    .schema(schema)
-    .from("storage_folders")
-    .insert({
-      name: caseName, //format "Bennet Legal"
-      path: `/${caseName.toLowerCase().replace(/ /g, "-")}`,
-      parent_folder_id: null,
-      case_type_id: caseTypeId,
-      case_id: caseId,
-      created_by: userId,
-    })
-    .select()
-    .single();
+  const { data: parentRootFolder, error: parentRootFolderError } =
+    await supabase
+      .schema(schema)
+      .from("storage_folders")
+      .insert({
+        name: caseName, //format "Bennet Legal"
+        path: `/${caseName.toLowerCase().replace(/ /g, "-")}`,
+        parent_folder_id: null,
+        case_type_id: caseTypeId,
+        case_id: caseId,
+        created_by: userId,
+      })
+      .select()
+      .single();
 
-  if (parentFolderError) {
-    console.error("Failed to fetch parent folder:", parentFolderError);
-    throw new Error("Failed to fetch parent folder", parentFolderError);
+  if (parentRootFolderError) {
+    console.error("Failed to fetch parent folder:", parentRootFolderError);
+    throw new Error("Failed to fetch parent folder", parentRootFolderError);
   }
 
   // Create folders from templates
   for (const template of templates) {
     try {
-      const { data: folder, error: folderError } = await supabase
-        .schema(schema)
-        .from("storage_folders")
-        .insert({
-          name: template.name,
-          path: `${parentFolder.path}${template.path}`,
-          case_id: caseId,
-          case_type_id: caseTypeId,
-          created_by: userId,
-          parent_folder_id: parentFolder.id,
-        })
-        .select()
-        .single();
-      if (folderError) {
-        console.error("Failed to create folder:", folderError);
-        throw new Error("Failed to create folder", folderError);
-      }
-      console.log("Folder created:", folder);
+      if (!template.parent_path) {
+        const { data: folder, error: folderError } = await supabase
+          .schema(schema)
+          .from("storage_folders")
+          .insert({
+            name: template.name,
+            path: `${parentRootFolder.path}${template.path}`,
+            case_id: caseId,
+            case_type_id: caseTypeId,
+            created_by: userId,
+            parent_folder_id: parentRootFolder.id,
+          })
+          .select()
+          .single();
+        if (folderError) {
+          console.error("Failed to create folder:", folderError);
+          throw new Error("Failed to create folder", folderError);
+        }
+        console.log("Folder created:", folder);
+      } else {
+        const { data: parentFolder, error: parentFolderError } = await supabase
+          .schema(schema)
+          .from("storage_folders")
+          .select("*")
+          .eq("path", `${parentRootFolder.path}${template.parent_path}`)
+          .eq("case_type_id", caseTypeId)
+          .single();
 
+        if (parentFolderError) {
+          console.error("Failed to fetch parent folder:", parentFolderError);
+          throw new Error("Failed to fetch parent folder", parentFolderError);
+        }
+
+        const { data: folder, error: folderError } = await supabase
+          .schema(schema)
+          .from("storage_folders")
+          .insert({
+            name: template.name,
+            path: `${parentRootFolder.path}${template.path}`,
+            case_id: caseId,
+            case_type_id: caseTypeId,
+            created_by: userId,
+            parent_folder_id: parentFolder.id,
+          })
+          .select()
+          .single();
+
+        if (folderError) {
+          console.error("Failed to create folder:", folderError);
+          throw new Error("Failed to create folder", folderError);
+        }
+        console.log("Folder created:", folder);
+      }
     } catch (error: any) {
       console.error(`Failed to create folder ${template.name}:`, error);
       throw new Error(`Failed to create folder ${template.name}`, error);
     }
   }
 
-  return parentFolder.id;
+  return parentRootFolder.id;
 }
 
 // POST /cases - Create new case with automatic folder structure
@@ -1323,7 +1355,7 @@ app.post("/cases", async (c) => {
     }
 
     // Create folder structure from template
-    const parentFolderId = await createFoldersFromTemplates(
+    const parentRootFolderId = await createFoldersFromTemplates(
       supabase,
       schema,
       case_type_id as string,
@@ -1341,7 +1373,7 @@ app.post("/cases", async (c) => {
         documents,
         orgId,
         member,
-        parentFolderId
+        parentRootFolderId
       );
     } catch (error: any) {
       console.error("Failed to upload initial documents:", error);
@@ -1595,7 +1627,7 @@ async function uploadInitialDocuments(
   documents: any[],
   orgId: string,
   member: any,
-  parentFolderId: string
+  parentRootFolderId: string
 ) {
   try {
     // Skip if no documents
@@ -1628,7 +1660,7 @@ async function uploadInitialDocuments(
           const checksum = await calculateChecksum(fileData);
           const folderPath = await getFolderPath(
             supabase,
-            parentFolderId,
+            parentRootFolderId,
             schema
           );
 
@@ -1653,7 +1685,7 @@ async function uploadInitialDocuments(
             .insert({
               name: document.name,
               original_name: document.name,
-              folder_id: parentFolderId,
+              folder_id: parentRootFolderId,
               gcs_blob_name: uploadResult.blobName,
               gcs_blob_url: uploadResult.blobUrl,
               mime_type: document.type || "application/pdf",
