@@ -2,6 +2,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Mail, Phone, MapPin } from 'lucide-react';
 import dayjs from 'dayjs';
 import { Case } from '@/types/cases';
+import Link from 'next/link';
 
 export default function CaseInfo({ caseData }: { caseData: Case }) {
   return (
@@ -121,7 +122,9 @@ export default function CaseInfo({ caseData }: { caseData: Case }) {
                   <div className='flex items-start gap-2'>
                     <Phone className='mt-0.5 h-3 w-3 flex-shrink-0 text-muted-foreground' />
                     <span className='text-foreground'>
-                      {caseData.claimant.phones.map((phone: any) => phone.number).join(', ')}
+                      {caseData.claimant.phones.map((phone: any) => (
+                        <Link href={`tel:${phone.number}`} key={phone.id} className='text-primary underline hover:opacity-90 phone-number_dynamic-number dynamicNumber'>{phone.number}</Link>
+                      ))}
                     </span>
                   </div>
                 )}
@@ -169,7 +172,9 @@ export default function CaseInfo({ caseData }: { caseData: Case }) {
                   <div className='flex items-start gap-2'>
                     <Phone className='mt-0.5 h-3 w-3 flex-shrink-0 text-muted-foreground' />
                     <span className='text-foreground'>
-                      {caseData.respondent.phones.map((phone: any) => phone.number).join(', ')}
+                      {caseData.respondent.phones.map((phone: any) => (
+                          <Link href={`tel:${phone.number}`} key={phone.id} className='text-primary underline hover:opacity-90 phone-number_dynamic-number dynamicNumber'>{phone.number}</Link>
+                      ))}
                     </span>
                   </div>
                 )}
