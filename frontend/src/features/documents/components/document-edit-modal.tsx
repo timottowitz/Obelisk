@@ -12,6 +12,7 @@ import { SolarDocumentItem } from '@/types/documents';
 import { Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import 'dotenv/config';
 
 const documentTypes = {
   'application/pdf': 'pdf',
@@ -88,10 +89,11 @@ export default function DocumentEditModal({
   });
   const callbackUrl = `${supabaseUrl}/functions/v1/storage/onlyoffice-callback?${callbackParams}`;
 
+
   const config = {
     document: {
       fileType: fileTypes[selectedDocument.mime_type as keyof typeof fileTypes],
-      key: `${selectedDocument.id}-${Date.now()}`, // Use just the file ID as key
+      key: `${selectedDocument.id}-${selectedDocument.updated_at.toString().replaceAll(" ", "-").replaceAll(":", "-")}`,
       title: selectedDocument.name,
       url: downloadUrl,
       permissions: {
@@ -129,9 +131,9 @@ export default function DocumentEditModal({
     setIsSaving(true);
     setTimeout(() => {
       onDocumentSaved();
-      onClose();
       setIsSaving(false);
-    }, 5 * 1000);
+      onClose();
+    }, 10 * 1000);
   };
 
   const handleDownload = useCallback(async () => {
@@ -155,12 +157,15 @@ export default function DocumentEditModal({
       document.body.appendChild(a);
       a.click();
       a.remove();
-      toast.success('Download started');
     } catch (err) {
       console.error('Error downloading file:', err);
       toast.error('Failed to download file');
     }
   }, [downloadUrl, selectedDocument]);
+
+  if (process.env.NEXT_PUBLIC_ONLYOFFICE_URL === undefined) {
+    return <div>OnlyOffice URL is not set</div>;
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -176,7 +181,7 @@ export default function DocumentEditModal({
                 <div className='h-full w-full'>
                   <DocumentEditor
                     id='docxEditor'
-                    documentServerUrl='https://d5ff58a9.docs.onlyoffice.com'
+                    documentServerUrl={process.env.NEXT_PUBLIC_ONLYOFFICE_URL!}
                     config={{ ...config, token: token }}
                     onLoadComponentError={onLoadComponentError}
                   />
