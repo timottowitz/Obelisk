@@ -92,7 +92,7 @@ export function DocumentPreviewModal({
       {
         uri: previewSrc,
         fileName: document.name,
-        fileType: fileExt === 'eml' ? 'text/html' : fileExt
+        fileType: fileExt
       }
     ];
   }, [previewSrc, document.name, fileExt]);
@@ -140,11 +140,22 @@ export function DocumentPreviewModal({
                 {!previewLoading &&
                   !previewError &&
                   previewSrc &&
-                  fileExt !== 'mp4' && (
+                  fileExt !== 'mp4' &&
+                  fileExt !== 'eml' && (
                     <DocViewer
                       documents={documents}
                       pluginRenderers={DocViewerRenderers}
                       className='[&_#html-renderer]:h-[500px]'
+                    />
+                  )}
+                {!previewLoading &&
+                  !previewError &&
+                  previewSrc &&
+                  fileExt === 'eml' && (
+                    <iframe
+                      src={previewSrc}
+                      className='h-[500px] w-full border-0 bg-white'
+                      title='Email Preview'
                     />
                   )}
                 {!previewLoading &&
