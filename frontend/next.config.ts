@@ -12,7 +12,7 @@ const baseConfig: NextConfig = {
       }
     ]
   },
-  transpilePackages: ['geist']
+  transpilePackages: ['geist', '@microsoft/microsoft-graph-client', '@azure/msal-browser', '@azure/msal-react']
 };
 
 let configWithPlugins = baseConfig;
