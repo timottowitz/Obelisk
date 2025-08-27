@@ -22,8 +22,8 @@ export interface Folder {
   case_id: string;
   case_type_id: string;
   createdAt: string;
-  children?: Folder[];
-  documents?: Document[];
+  children: Folder[];
+  documents: Document[];
 }
 
 export interface UploadDocumentData {
