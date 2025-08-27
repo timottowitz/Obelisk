@@ -12,6 +12,7 @@ import { SolarDocumentItem } from '@/types/documents';
 import { Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import 'dotenv/config';
 
 const documentTypes = {
   'application/pdf': 'pdf',
@@ -162,6 +163,10 @@ export default function DocumentEditModal({
     }
   }, [downloadUrl, selectedDocument]);
 
+  if (process.env.NEXT_PUBLIC_ONLYOFFICE_URL === undefined) {
+    return <div>OnlyOffice URL is not set</div>;
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className='h-[85vh] max-w-6xl! overflow-hidden p-0 sm:rounded-lg'>
@@ -176,7 +181,7 @@ export default function DocumentEditModal({
                 <div className='h-full w-full'>
                   <DocumentEditor
                     id='docxEditor'
-                    documentServerUrl='https://d5ff58a9.docs.onlyoffice.com'
+                    documentServerUrl={process.env.NEXT_PUBLIC_ONLYOFFICE_URL!}
                     config={{ ...config, token: token }}
                     onLoadComponentError={onLoadComponentError}
                   />

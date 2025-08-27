@@ -55,16 +55,16 @@ export async function GET(req: Request): Promise<Response> {
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#39;');
 
-    const from = mail.from ? (mail.from.text || '') : '';
+    const from = mail.from ? (mail.from.text.replaceAll('"', '') || '') : '';
     const to = mail.to
       ? (Array.isArray(mail.to)
-          ? mail.to.map((t: any) => t.text).join('; ')
-          : (mail.to as any).text)
+          ? mail.to.map((t: any) => t.text).join('; ').replaceAll('"', '')
+          : (mail.to as any).text.replaceAll('"', ''))
       : '';
     const cc = mail.cc
       ? (Array.isArray(mail.cc)
-          ? mail.cc.map((t: any) => t.text).join('; ')
-          : (mail.cc as any).text)
+          ? mail.cc.map((t: any) => t.text).join('; ').replaceAll('"', '')
+          : (mail.cc as any).text.replaceAll('"', ''))
       : '';
     const sent = mail.date ? new Date(mail.date as any).toLocaleString() : '';
     const subject = mail.subject || '';
@@ -126,7 +126,7 @@ export async function GET(req: Request): Promise<Response> {
       statusText: upstream.statusText,
       headers: {
         ...headers,
-        'Content-Type': 'text/html'
+        'Content-Type': 'text/html; charset=utf-8'
       }
     });
   }

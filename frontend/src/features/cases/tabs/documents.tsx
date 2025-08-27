@@ -715,9 +715,7 @@ export default function Documents({
                         transition={{ duration: 0.2 }}
                         className='relative'
                       >
-                        {/* Horizontal line for documents */}
                         <div className='bg-border absolute top-1/2 left-0 h-px w-6 -translate-y-1/2' />
-                        {/* Vertical line for non-last documents */}
                         {!isLastDocument && (
                           <div className='bg-border absolute top-8 left-6 h-full w-px' />
                         )}
@@ -725,6 +723,16 @@ export default function Documents({
                           className='hover:bg-accent/60 flex h-auto w-full items-center justify-start gap-3 p-3 text-left transition-colors'
                           role='treeitem'
                           aria-label={`${document.name}, ${document.mime_type.toUpperCase()}, ${formatFileSize(document.size_bytes)}, modified ${formatDate(document.created_at)}`}
+                          onClick={() => {
+                            setSelectedDocument(document);
+                            if (editableFileTypes.includes(document.mime_type)) {
+                              handleGetDownloadUrl(document);
+                              setIsDocumentEditorOpen(true);
+                            } else {
+                              handleGetDownloadUrl(document);
+                              setIsDocumentPreviewOpen(true);
+                            }
+                          }}
                         >
                           <div className='flex flex-shrink-0 items-center gap-2'>
                             {getFileIcon(document.mime_type)}
@@ -757,8 +765,6 @@ export default function Documents({
                               </span>
                             </div>
                           </div>
-
-                          {/* Document actions dropdown */}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <div
@@ -770,35 +776,6 @@ export default function Documents({
                               </div>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align='end' className='w-44'>
-                              {editableFileTypes.includes(
-                                document.mime_type
-                              ) ? (
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedDocument(document);
-                                    handleGetDownloadUrl(document);
-                                    setIsDocumentEditorOpen(true);
-                                  }}
-                                  className='flex items-center gap-3 px-3 py-2'
-                                >
-                                  <Pencil className='h-4 w-4 text-blue-600' />
-                                  <span>Edit and Preview</span>
-                                </DropdownMenuItem>
-                              ) : (
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedDocument(document);
-                                    handleGetDownloadUrl(document);
-                                    setIsDocumentPreviewOpen(true);
-                                  }}
-                                  className='flex items-center gap-3 px-3 py-2'
-                                >
-                                  <Eye className='h-4 w-4 text-blue-600' />
-                                  <span>View Document</span>
-                                </DropdownMenuItem>
-                              )}
                               <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1049,6 +1026,20 @@ export default function Documents({
                                         className='hover:bg-accent/60 flex h-auto w-full items-center justify-start gap-3 p-3 text-left transition-colors'
                                         role='treeitem'
                                         aria-label={`${document.name}, ${document.mime_type.toUpperCase()}, ${formatFileSize(document.size_bytes)}, modified ${formatDate(document.created_at)}`}
+                                        onClick={() => {
+                                          setSelectedDocument(document);
+                                          if (
+                                            editableFileTypes.includes(
+                                              document.mime_type
+                                            )
+                                          ) {
+                                            handleGetDownloadUrl(document);
+                                            setIsDocumentEditorOpen(true);
+                                          } else {
+                                            handleGetDownloadUrl(document);
+                                            setIsDocumentPreviewOpen(true);
+                                          }
+                                        }}
                                       >
                                         <div className='flex flex-shrink-0 items-center gap-2'>
                                           {getFileIcon(document.mime_type)}
@@ -1099,41 +1090,6 @@ export default function Documents({
                                             align='end'
                                             className='w-44'
                                           >
-                                            {editableFileTypes.includes(
-                                              document.mime_type
-                                            ) ? (
-                                              <DropdownMenuItem
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  setSelectedDocument(document);
-                                                  handleGetDownloadUrl(
-                                                    document
-                                                  );
-                                                  setIsDocumentEditorOpen(true);
-                                                }}
-                                                className='flex items-center gap-3 px-3 py-2'
-                                              >
-                                                <Pencil className='h-4 w-4 text-blue-600' />
-                                                <span>Edit and Preview</span>
-                                              </DropdownMenuItem>
-                                            ) : (
-                                              <DropdownMenuItem
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  setSelectedDocument(document);
-                                                  handleGetDownloadUrl(
-                                                    document
-                                                  );
-                                                  setIsDocumentPreviewOpen(
-                                                    true
-                                                  );
-                                                }}
-                                                className='flex items-center gap-3 px-3 py-2'
-                                              >
-                                                <Eye className='h-4 w-4 text-blue-600' />
-                                                <span>View Document</span>
-                                              </DropdownMenuItem>
-                                            )}
                                             <DropdownMenuItem
                                               onClick={(e) => {
                                                 e.stopPropagation();
@@ -1439,7 +1395,7 @@ export default function Documents({
       />
 
       {/* Document Preview Modal */}
-      {selectedDocument && (
+      {selectedDocument && downloadUrl && (
         <DocumentPreviewModal
           isOpen={isDocumentPreviewOpen}
           onClose={() => setIsDocumentPreviewOpen(false)}
@@ -1485,7 +1441,7 @@ export default function Documents({
       />
 
       {/* Document Edit Modal */}
-      {downloadUrl && selectedDocument && caseId && (
+      {selectedDocument && downloadUrl && caseId && (
         <DocumentEditModal
           isOpen={isDocumentEditorOpen}
           onClose={() => setIsDocumentEditorOpen(false)}
