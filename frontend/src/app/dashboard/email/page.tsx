@@ -52,9 +52,22 @@ export default function EmailDashboard() {
         const data = await response.json();
         setStatus(data);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to check email status:', err);
-      setError('Failed to check email connection status');
+      
+      // Provide specific error messages based on error type
+      if (err?.message?.includes('not authenticated')) {
+        setError('Please sign in to check your email connection status.');
+      } else if (err?.message?.includes('not connected')) {
+        setError('No email account connected. Click "Connect Outlook" to get started.');
+      } else if (err?.message?.includes('Microsoft')) {
+        setError('There was an issue with your Microsoft account connection. Please try reconnecting.');
+      } else if (err?.message?.includes('permission')) {
+        setError('You don\\'t have permission to access email features. Please contact your administrator.');
+      } else {
+        setError('Unable to check email connection status. Please refresh the page or contact support.');
+      }
+      
       setStatus({ connected: false });
     } finally {
       setLoading(false);

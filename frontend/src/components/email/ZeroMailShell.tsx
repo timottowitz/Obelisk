@@ -25,13 +25,13 @@ import {
   Search, 
   Inbox, 
   Send, 
-  Draft, 
+  FileText as Draft, 
   Trash, 
   Archive,
   Star,
   MoreHorizontal,
-  Refresh,
-  Compose,
+  RefreshCw as Refresh,
+  Edit as Compose,
   ChevronRight,
   ChevronDown,
   Paperclip,
@@ -79,17 +79,27 @@ export function ZeroMailShell({
   const [showMessageDetail, setShowMessageDetail] = useState(false);
 
   // Mail driver configuration
-  const mailConfig: ZeroMailConfig | undefined = useMemo(() => {
-    if (!accountId && auth.isAuthenticated()) {
-      return {
-        provider: 'microsoft',
-        accountId: auth.getUserId() || ''
-      };
-    }
-    return accountId ? {
-      provider: 'microsoft',
-      accountId
-    } : undefined;
+  const [mailConfig, setMailConfig] = useState<ZeroMailConfig | undefined>(undefined);
+  
+  useEffect(() => {
+    const setupConfig = async () => {
+      if (!accountId && (await auth.isAuthenticated())) {
+        const userId = await auth.getUserId();
+        setMailConfig({
+          provider: 'microsoft',
+          accountId: userId || ''
+        });
+      } else if (accountId) {
+        setMailConfig({
+          provider: 'microsoft',
+          accountId
+        });
+      } else {
+        setMailConfig(undefined);
+      }
+    };
+    
+    setupConfig();
   }, [accountId, auth]);
 
   const { driver, isConfigured, error: driverError } = useZeroMailDriver(mailConfig);

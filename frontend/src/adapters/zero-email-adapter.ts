@@ -5,14 +5,15 @@
  * Clerk-based authentication system for email integration.
  */
 
+import { randomUUID } from 'node:crypto';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { EmailAccount } from '@/types/email';
 
 // Zero-compatible interfaces (mocked since Zero submodule wasn't available)
 export interface ZeroAuth {
   getAccessToken(provider: string): Promise<string | null>;
-  getUserId(): string | null;
-  isAuthenticated(): boolean;
+  getUserId(): Promise<string | null>;
+  isAuthenticated(): Promise<boolean>;
   refreshToken(provider: string): Promise<string | null>;
 }
 
@@ -46,18 +47,33 @@ export class ClerkZeroEmailAdapter implements ZeroEmailAuth {
   };
 
   /**
+   * Validate and normalize provider input
+   */
+  private validateProvider(provider: 'microsoft' | 'google'): 'microsoft' {
+    if (provider === 'google') {
+      throw new Error('Google provider is not yet supported. Only Microsoft is currently available.');
+    }
+    
+    if (provider !== 'microsoft') {
+      throw new Error(`Unsupported provider: ${provider}. Only Microsoft is currently supported.`);
+    }
+    
+    return 'microsoft';
+  }
+
+  /**
    * Get access token for the specified provider
    */
   async getAccessToken(provider: string): Promise<string | null> {
     try {
-      const { userId } = auth();
+      const { userId } = await auth();
       if (!userId) return null;
 
       if (provider === 'microsoft') {
         // Get the user's OAuth tokens from Clerk
-        const user = await clerkClient.users.getUser(userId);
+        const user = await (await clerkClient()).users.getUser(userId);
         const oauthAccount = user.externalAccounts.find(
-          account => account.provider === 'oauth_microsoft'
+          (account: any) => account.provider === 'oauth_microsoft'
         );
 
         if (!oauthAccount || !oauthAccount.publicMetadata) {
@@ -71,9 +87,9 @@ export class ClerkZeroEmailAdapter implements ZeroEmailAuth {
 
       if (provider === 'google') {
         // Similar logic for Google
-        const user = await clerkClient.users.getUser(userId);
+        const user = await (await clerkClient()).users.getUser(userId);
         const oauthAccount = user.externalAccounts.find(
-          account => account.provider === 'oauth_google'
+          (account: any) => account.provider === 'oauth_google'
         );
 
         if (!oauthAccount || !oauthAccount.publicMetadata) {
@@ -93,17 +109,25 @@ export class ClerkZeroEmailAdapter implements ZeroEmailAuth {
   /**
    * Get the current user ID
    */
-  getUserId(): string | null {
-    const { userId } = auth();
-    return userId;
+  async getUserId(): Promise<string | null> {
+    try {
+      const { userId } = await auth();
+      return userId || null;
+    } catch {
+      return null;
+    }
   }
 
   /**
    * Check if user is authenticated
    */
-  isAuthenticated(): boolean {
-    const { userId } = auth();
-    return !!userId;
+  async isAuthenticated(): Promise<boolean> {
+    try {
+      const { userId } = await auth();
+      return !!userId;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -111,7 +135,7 @@ export class ClerkZeroEmailAdapter implements ZeroEmailAuth {
    */
   async refreshToken(provider: string): Promise<string | null> {
     try {
-      const { userId } = auth();
+      const { userId } = await auth();
       if (!userId) return null;
 
       // In a real implementation, you'd use the refresh token to get a new access token
@@ -139,16 +163,16 @@ export class ClerkZeroEmailAdapter implements ZeroEmailAuth {
    */
   async disconnectProvider(provider: 'microsoft' | 'google'): Promise<void> {
     try {
-      const { userId } = auth();
+      const { userId } = await auth();
       if (!userId) throw new Error('User not authenticated');
 
-      const user = await clerkClient.users.getUser(userId);
+      const user = await (await clerkClient()).users.getUser(userId);
       const oauthAccount = user.externalAccounts.find(
-        account => account.provider === `oauth_${provider}`
+        (account: any) => account.provider === `oauth_${provider}`
       );
 
       if (oauthAccount) {
-        await clerkClient.users.deleteExternalAccount({
+        await (await clerkClient()).users.deleteUserExternalAccount({
           userId,
           externalAccountId: oauthAccount.id
         });
@@ -169,14 +193,14 @@ export class ClerkZeroEmailAdapter implements ZeroEmailAuth {
     error?: string;
   }> {
     try {
-      const { userId } = auth();
+      const { userId } = await auth();
       if (!userId) {
         return { connected: false, scopes: [] };
       }
 
-      const user = await clerkClient.users.getUser(userId);
+      const user = await (await clerkClient()).users.getUser(userId);
       const oauthAccount = user.externalAccounts.find(
-        account => account.provider === `oauth_${provider}`
+        (account: any) => account.provider === `oauth_${provider}`
       );
 
       if (!oauthAccount) {
@@ -229,15 +253,15 @@ export class ClerkZeroEmailAdapter implements ZeroEmailAuth {
    */
   async createEmailAccount(provider: 'microsoft' | 'google'): Promise<EmailAccount | null> {
     try {
-      const { userId } = auth();
+      const { userId } = await auth();
       if (!userId) return null;
 
       const status = await this.getProviderStatus(provider);
       if (!status.connected) return null;
 
-      const user = await clerkClient.users.getUser(userId);
+      const user = await (await clerkClient()).users.getUser(userId);
       const oauthAccount = user.externalAccounts.find(
-        account => account.provider === `oauth_${provider}`
+        (account: any) => account.provider === `oauth_${provider}`
       );
 
       if (!oauthAccount) return null;
@@ -247,11 +271,11 @@ export class ClerkZeroEmailAdapter implements ZeroEmailAuth {
       if (!emailAddress) return null;
 
       return {
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         user_id: userId,
-        organization_id: user.organizationMemberships?.[0]?.organization.id || '',
-        provider: provider === 'microsoft' ? 'microsoft' : 'microsoft', // We only support Microsoft for now
-        provider_account_id: oauthAccount.providerUserId || oauthAccount.id,
+        organization_id: (user as any).organizationMemberships?.[0]?.organization.id || '',
+        provider: this.validateProvider(provider),
+        provider_account_id: (oauthAccount as any).providerUserId || oauthAccount.id,
         email_address: emailAddress,
         display_name: user.fullName || user.firstName || emailAddress,
         scopes: status.scopes,

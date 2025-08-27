@@ -454,6 +454,18 @@ export function useEmailSystem(folderId?: string) {
 
   const isReady = connection.status.isConnected && connection.status.isConfigured && !!driver;
 
+  // Create stable functions using useCallback
+  const searchEmails = useCallback((query: string, options?: UseEmailSearchOptions) => {
+    // Return a function that consumers can use to create the search hook
+    // This avoids calling hooks conditionally
+    return { query, options: { ...options, enabled: !!query.trim() } };
+  }, []);
+
+  const getMessage = useCallback((messageId: string) => {
+    // Return a function that consumers can use to create the message hook
+    return { messageId };
+  }, []);
+
   return {
     // Connection
     connection,
@@ -468,10 +480,9 @@ export function useEmailSystem(folderId?: string) {
     sendEmail,
     sync,
     
-    // Utilities
-    searchEmails: (query: string, options?: UseEmailSearchOptions) => 
-      useEmailSearch(query, { ...options, enabled: !!query.trim() }),
-    getMessage: (messageId: string) => useEmailMessage(messageId),
+    // Utilities - these now return parameters for hook creation
+    searchEmails,
+    getMessage,
     
     // State
     loading: connection.loading || folders.isLoading || emails.isLoading,

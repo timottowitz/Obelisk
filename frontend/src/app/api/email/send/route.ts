@@ -36,7 +36,7 @@ function validateRecipients(recipients: EmailRecipient[], field: string): string
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -154,9 +154,9 @@ export async function POST(request: NextRequest) {
     }
 
     const sendRequest: SendEmailRequest = {
-      to: to.map(r => ({ address: r.address.trim(), name: r.name?.trim() })),
-      cc: cc?.map(r => ({ address: r.address.trim(), name: r.name?.trim() })),
-      bcc: bcc?.map(r => ({ address: r.address.trim(), name: r.name?.trim() })),
+      to: to.map((r: any) => ({ address: r.address.trim(), name: r.name?.trim() })),
+      cc: cc?.map((r: any) => ({ address: r.address.trim(), name: r.name?.trim() })),
+      bcc: bcc?.map((r: any) => ({ address: r.address.trim(), name: r.name?.trim() })),
       subject: subject.trim(),
       body: messageBody,
       body_type,
@@ -221,7 +221,7 @@ export async function POST(request: NextRequest) {
 // GET method to retrieve draft or template information (optional)
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

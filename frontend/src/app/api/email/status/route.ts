@@ -5,7 +5,7 @@ import { EmailStatusResponse } from '@/types/email';
 
 export async function GET() {
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -50,18 +50,37 @@ export async function GET() {
       return NextResponse.json(statusResponse);
     }
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error checking email status:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    
+    // Handle specific error types
+    if (error?.message?.includes('not authenticated')) {
+      return NextResponse.json(
+        { error: 'User not authenticated' },
+        { status: 401 }
+      );
+    } else if (error?.message?.includes('not connected')) {
+      return NextResponse.json(
+        { error: 'Microsoft account not connected', connected: false },
+        { status: 404 }
+      );
+    } else if (error?.message?.includes('Graph')) {
+      return NextResponse.json(
+        { error: 'Microsoft Graph API error. Please try reconnecting your account.' },
+        { status: 503 }
+      );
+    } else {
+      return NextResponse.json(
+        { error: 'Failed to check email connection status' },
+        { status: 500 }
+      );
+    }
   }
 }
 
 export async function POST() {
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -105,10 +124,10 @@ export async function POST() {
       );
     }
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error syncing email status:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error?.message || 'Failed to sync email status' },
       { status: 500 }
     );
   }
@@ -117,7 +136,7 @@ export async function POST() {
 // Handle disconnection
 export async function DELETE() {
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -131,10 +150,10 @@ export async function DELETE() {
     // For now, just return success
     return NextResponse.json({ success: true, message: 'Email account disconnected' });
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error disconnecting email account:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error?.message || 'Failed to disconnect email account' },
       { status: 500 }
     );
   }

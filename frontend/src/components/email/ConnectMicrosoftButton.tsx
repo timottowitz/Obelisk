@@ -23,9 +23,20 @@ export function ConnectMicrosoftButton() {
         redirectUrl: '/sso-callback',
         redirectUrlComplete: '/dashboard/email',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to initiate Microsoft connection:', error);
-      toast.error('Failed to connect to Microsoft. Please try again.');
+      
+      // Handle specific error cases
+      if (error?.code === 'oauth_error') {
+        toast.error('Microsoft OAuth is not properly configured. Please contact support.');
+      } else if (error?.message?.includes('redirect_uri')) {
+        toast.error('OAuth redirect configuration error. Please contact support.');
+      } else if (error?.message?.includes('unauthorized')) {
+        toast.error('You don\'t have permission to connect Microsoft accounts.');
+      } else {
+        toast.error('Failed to connect to Microsoft. Please try again or contact support.');
+      }
+      
       setIsConnecting(false);
     }
   };

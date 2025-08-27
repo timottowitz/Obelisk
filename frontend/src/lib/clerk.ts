@@ -19,17 +19,17 @@ export async function getMicrosoftAccessToken(): Promise<string> {
   }
 
   try {
-    const tokens = await clerkClient().users.getUserOauthAccessToken(
+    const tokens = await (await clerkClient()).users.getUserOauthAccessToken(
       userId,
       'oauth_microsoft'
     );
 
-    if (!tokens || tokens.length === 0) {
+    if (!tokens || tokens.data.length === 0) {
       throw new Error('Microsoft account not connected. Please connect your Microsoft account first.');
     }
 
     // Get the first valid token (Clerk handles rotation)
-    const validToken = tokens.find(t => t.token);
+    const validToken = tokens.data.find((t: any) => t.token);
     
     if (!validToken) {
       throw new Error('No valid Microsoft access token found');
@@ -58,12 +58,12 @@ export async function hasMicrosoftConnection(): Promise<boolean> {
   }
 
   try {
-    const tokens = await clerkClient().users.getUserOauthAccessToken(
+    const tokens = await (await clerkClient()).users.getUserOauthAccessToken(
       userId,
       'oauth_microsoft'
     );
     
-    return tokens && tokens.length > 0;
+    return tokens && tokens.data.length > 0;
   } catch {
     return false;
   }
@@ -79,7 +79,7 @@ export async function getMicrosoftAccountInfo() {
     throw new Error('User not authenticated');
   }
 
-  const user = await clerkClient().users.getUser(userId);
+  const user = await (await clerkClient()).users.getUser(userId);
   
   // Find Microsoft account in external accounts
   const microsoftAccount = user.externalAccounts.find(

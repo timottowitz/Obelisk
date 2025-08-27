@@ -145,7 +145,7 @@ export class MicrosoftGraphZeroMailDriver implements ZeroMailDriver {
 
     try {
       // Validate authentication
-      if (!this.auth.isAuthenticated()) {
+      if (!(await this.auth.isAuthenticated())) {
         throw new Error('User not authenticated');
       }
 
@@ -154,7 +154,7 @@ export class MicrosoftGraphZeroMailDriver implements ZeroMailDriver {
         throw new Error(`No access token found for ${config.provider}`);
       }
 
-      const userId = this.auth.getUserId();
+      const userId = await this.auth.getUserId();
       if (!userId) {
         throw new Error('User ID not found');
       }
@@ -167,7 +167,7 @@ export class MicrosoftGraphZeroMailDriver implements ZeroMailDriver {
       }
 
       // Get account information
-      this.account = await this.auth.createEmailAccount(config.provider);
+      this.account = (await this.auth.createEmailAccount(config.provider)) || undefined;
     } catch (error) {
       console.error('Error configuring Zero mail driver:', error);
       throw error;
