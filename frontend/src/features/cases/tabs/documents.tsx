@@ -720,12 +720,14 @@ export default function Documents({
                           <div className='bg-border absolute top-8 left-6 h-full w-px' />
                         )}
                         <div
-                          className='hover:bg-accent/60 flex h-auto w-full items-center justify-start gap-3 p-3 text-left transition-colors'
+                          className='hover:bg-accent hover:bg-opacity-60 flex h-auto w-full cursor-pointer items-center justify-start gap-3 p-3 text-left transition-colors'
                           role='treeitem'
                           aria-label={`${document.name}, ${document.mime_type.toUpperCase()}, ${formatFileSize(document.size_bytes)}, modified ${formatDate(document.created_at)}`}
                           onClick={() => {
                             setSelectedDocument(document);
-                            if (editableFileTypes.includes(document.mime_type)) {
+                            if (
+                              editableFileTypes.includes(document.mime_type)
+                            ) {
                               handleGetDownloadUrl(document);
                               setIsDocumentEditorOpen(true);
                             } else {
@@ -840,7 +842,7 @@ export default function Documents({
           <main className='flex min-h-0 flex-1 flex-col overflow-y-auto'>
             {/* Solar Case Information Header */}
             <section
-              className='border-b bg-gradient-to-r from-orange-50 to-yellow-50 p-6 dark:from-orange-950/20 dark:to-yellow-950/20'
+              className='dark:border-muted dark:bg-muted border-b border-orange-100 bg-orange-50/60 p-6'
               aria-labelledby='case-header'
             >
               {/* Case Navigation Breadcrumb */}
@@ -894,7 +896,9 @@ export default function Documents({
                         ) : (
                           countAllDocuments(foldersList)
                         )}{' '}
-                        documents
+                        {countAllDocuments(foldersList) > 1
+                          ? 'documents'
+                          : 'document'}
                       </span>
                     </div>
                     <div className='flex items-center gap-1'>
@@ -903,9 +907,12 @@ export default function Documents({
                         {isLoadingFolders ? (
                           <Loader2 className='h-3 w-3 animate-spin' />
                         ) : (
-                          foldersList.length
-                        )}{' '}
-                        categories
+                          `${foldersList[0].children.length} ${
+                            foldersList[0].children.length > 1
+                              ? 'categories'
+                              : 'category'
+                          }`
+                        )}
                       </span>
                     </div>
                     <div className='flex items-center gap-1'>
@@ -1023,7 +1030,7 @@ export default function Documents({
                                       className='relative mb-2'
                                     >
                                       <div
-                                        className='hover:bg-accent/60 flex h-auto w-full items-center justify-start gap-3 p-3 text-left transition-colors'
+                                        className='hover:bg-accent hover:bg-opacity-60 flex h-auto w-full cursor-pointer items-center justify-start gap-3 p-3 text-left transition-colors'
                                         role='treeitem'
                                         aria-label={`${document.name}, ${document.mime_type.toUpperCase()}, ${formatFileSize(document.size_bytes)}, modified ${formatDate(document.created_at)}`}
                                         onClick={() => {
@@ -1160,7 +1167,7 @@ export default function Documents({
             aria-label='Solar AI Assistant'
           >
             {/* Agent Panel Header - Always visible */}
-            <div className='flex min-h-[73px] items-center justify-between border-b bg-orange-50/50 p-4 dark:bg-orange-950/20'>
+            <div className='flex min-h-[73px] items-center justify-between border-b border-orange-100 bg-orange-50/60 p-4 dark:border-orange-900/40 dark:bg-orange-900/30'>
               {!isAgentPanelCollapsed ? (
                 <div className='flex items-center gap-3'>
                   <div className='flex items-center gap-2'>
@@ -1271,7 +1278,7 @@ export default function Documents({
                       >
                         <Avatar className='h-7 w-7 flex-shrink-0'>
                           {message.type === 'agent' ? (
-                            <AvatarFallback className='bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400'>
+                            <AvatarFallback className='bg-orange-100 text-orange-600 dark:bg-orange-900/60 dark:text-orange-300'>
                               <Bot className='h-4 w-4' />
                             </AvatarFallback>
                           ) : (
@@ -1291,7 +1298,7 @@ export default function Documents({
                             className={cn(
                               'rounded-lg px-3 py-2 text-sm',
                               message.type === 'agent'
-                                ? 'text-foreground border border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/30'
+                                ? 'text-foreground border border-orange-200 bg-orange-50 dark:border-orange-700/60 dark:bg-orange-900/30'
                                 : 'bg-primary text-primary-foreground'
                             )}
                           >
@@ -1323,11 +1330,11 @@ export default function Documents({
                         className='flex gap-3'
                       >
                         <Avatar className='h-7 w-7 flex-shrink-0'>
-                          <AvatarFallback className='bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400'>
+                          <AvatarFallback className='bg-orange-100 text-orange-600 dark:bg-orange-900/60 dark:text-orange-300'>
                             <Bot className='h-4 w-4' />
                           </AvatarFallback>
                         </Avatar>
-                        <div className='rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 dark:border-orange-800 dark:bg-orange-950/30'>
+                        <div className='rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 dark:border-orange-700/60 dark:bg-orange-900/30'>
                           <div className='flex items-center gap-1'>
                             <div className='flex gap-1'>
                               <div className='h-2 w-2 animate-bounce rounded-full bg-orange-400 dark:bg-orange-500' />

@@ -13,7 +13,7 @@ export default function CaseInfo({ caseData }: { caseData: Case }) {
           <h3 className='mb-3 text-sm font-semibold text-foreground'>
             Case Details
           </h3>
-          <div className='space-y-0 text-xs'>
+          <div className='space-y-0 text-sm'>
             {/* ADR Process */}
             <div className='grid grid-cols-2 border-b border-border py-4'>
               <span className='font-medium text-muted-foreground'>ADR Process</span>
@@ -55,12 +55,12 @@ export default function CaseInfo({ caseData }: { caseData: Case }) {
                   {caseData.claim_amount}
                 </span>
                 <br />
-                <a
+                {caseData.claim_amount && <a
                   href='#'
                   className='text-xs text-primary underline hover:opacity-90'
                 >
                   (View Document)
-                </a>
+                </a>}
               </div>
             </div>
 
@@ -91,19 +91,19 @@ export default function CaseInfo({ caseData }: { caseData: Case }) {
       {/* Parties Section */}
       <Card className='border-border bg-white shadow-sm dark:bg-card'>
         <CardContent>
-          <h3 className='mb-4 text-sm font-semibold text-foreground'>Parties</h3>
+          <h3 className='mb-4 text-md font-semibold text-foreground'>Parties</h3>
 
           <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
             {/* Claimant */}
             <div className='space-y-3'>
               <div className='flex items-center gap-2 border-b border-border pb-2'>
                 <div className='h-2 w-2 rounded-full bg-blue-500'></div>
-                <h4 className='text-sm font-semibold text-foreground'>Claimant</h4>
+                <h4 className='text-md font-semibold text-foreground'>Claimant</h4>
               </div>
 
-              <div className='text-xs'>
+              <div className='text-sm'>
                 <div className='flex items-start gap-2'>
-                  <span className='min-w-[60px] font-medium text-muted-foreground'>Name:</span>
+                  <span className='font-medium text-muted-foreground'>Name:</span>
                   <span className='font-medium text-foreground'>
                     {caseData.claimant?.full_name || 'N/A'}
                   </span>
@@ -123,7 +123,7 @@ export default function CaseInfo({ caseData }: { caseData: Case }) {
                     <Phone className='mt-0.5 h-3 w-3 flex-shrink-0 text-muted-foreground' />
                     <span className='text-foreground'>
                       {caseData.claimant.phones.map((phone: any) => (
-                        <Link href={`tel:${phone.number}`} key={phone.id} className='text-primary underline hover:opacity-90 phone-number_dynamic-number dynamicNumber'>{phone.number}</Link>
+                        <Link href={`tel:${phone.number}`} key={phone.id} className='text-primary underline hover:opacity-90 phone-number_dynamic-number dynamicNumber mr-4'>{phone.number}</Link>
                       ))}
                     </span>
                   </div>
@@ -139,7 +139,7 @@ export default function CaseInfo({ caseData }: { caseData: Case }) {
                 )}
 
                 {(!caseData.claimant?.emails?.length && !caseData.claimant?.phones?.length && !caseData.claimant?.addresses?.length) && (
-                  <p className='text-xs italic text-muted-foreground'>No contact information available</p>
+                  <p className='text-md italic text-muted-foreground'>No contact information available</p>
                 )}
               </div>
             </div>
@@ -148,12 +148,12 @@ export default function CaseInfo({ caseData }: { caseData: Case }) {
             <div className='space-y-3'>
               <div className='flex items-center gap-2 border-b border-border pb-2'>
                 <div className='h-2 w-2 rounded-full bg-red-500'></div>
-                <h4 className='text-sm font-semibold text-foreground'>Respondent</h4>
+                <h4 className='text-md font-semibold text-foreground'>Respondent</h4>
               </div>
 
-              <div className='text-xs'>
+              <div className='text-sm'>
                 <div className='flex items-start gap-2'>
-                  <span className='min-w-[60px] font-medium text-muted-foreground'>Name:</span>
+                  <span className='font-medium text-muted-foreground'>Name:</span>
                   <span className='font-medium text-foreground'>
                     {caseData.respondent?.full_name || 'N/A'}
                   </span>
@@ -173,7 +173,7 @@ export default function CaseInfo({ caseData }: { caseData: Case }) {
                     <Phone className='mt-0.5 h-3 w-3 flex-shrink-0 text-muted-foreground' />
                     <span className='text-foreground'>
                       {caseData.respondent.phones.map((phone: any) => (
-                          <Link href={`tel:${phone.number}`} key={phone.id} className='text-primary underline hover:opacity-90 phone-number_dynamic-number dynamicNumber'>{phone.number}</Link>
+                          <Link href={`tel:${phone.number}`} key={phone.id} className='text-primary underline hover:opacity-90 phone-number_dynamic-number dynamicNumber mr-4'>{phone.number}</Link>
                       ))}
                     </span>
                   </div>
@@ -189,7 +189,7 @@ export default function CaseInfo({ caseData }: { caseData: Case }) {
                 )}
 
                 {(!caseData.respondent?.emails?.length && !caseData.respondent?.phones?.length && !caseData.respondent?.addresses?.length) && (
-                  <p className='text-xs italic text-muted-foreground'>No contact information available</p>
+                  <p className='text-md italic text-muted-foreground'>No contact information available</p>
                 )}
               </div>
             </div>
