@@ -31,6 +31,7 @@ interface FolderTemplate {
   parent_path?: string | null;
   sort_order: number;
   is_required?: boolean;
+  children?: FolderTemplate[];
 }
 
 interface CaseTypeConfig {
@@ -177,39 +178,232 @@ export const DEFAULT_CASE_TYPES: CaseTypeConfig[] = [
   {
     name: "litigation",
     display_name: "Litigation",
-    description: "Court cases and legal disputes",
-    color: "#EF4444",
-    icon: "court-hammer",
+    description: "Litigation matters and consultations",
+    color: "#000000",
+    icon: "case",
     folder_templates: [
       {
-        name: "Pleadings",
-        path: "/pleadings",
-        sort_order: 1,
+        name: "Administrative",
+        path: "/administrative",
+        sort_order: 18,
+      },
+      {
+        name: "Correspondence",
+        path: "/correspondence",
+        sort_order: 19,
+        children: [
+          {
+            name: "Drafts",
+            path: "/correspondence/drafts",
+            parent_path: "/correspondence",
+            sort_order: 20,
+          },
+        ],
+      },
+      {
+        name: "Demands",
+        path: "/demands",
+        sort_order: 21,
+        children: [
+          {
+            name: "Drafts",
+            path: "/demands/drafts",
+            parent_path: "/demands",
+            sort_order: 22,
+          },
+        ],
+      },
+      {
+        name: "Depo Prep",
+        path: "/depo-prep",
+        sort_order: 23,
+      },
+      {
+        name: "Depositions",
+        path: "/depositions",
+        sort_order: 24,
       },
       {
         name: "Discovery",
         path: "/discovery",
-        sort_order: 2,
+        sort_order: 25,
+        children: [
+          {
+            name: "Defendant Produced",
+            path: "/discovery/defendant-produced",
+            parent_path: "/discovery",
+            sort_order: 26,
+            children: [
+              {
+                name: "Drafts",
+                path: "/discovery/defendant-produced/drafts",
+                parent_path: "/discovery/defendant-produced",
+                sort_order: 27,
+              },
+              {
+                name: "Plaintiff Produced",
+                path: "/discovery/defendant-produced/plaintiff-produced",
+                parent_path: "/discovery/defendant-produced",
+                sort_order: 28,
+              },
+            ],
+          },
+        ],
       },
       {
-        name: "Evidence",
-        path: "/evidence",
-        sort_order: 3,
+        name: "Expenses",
+        path: "/expenses",
+        sort_order: 29,
       },
       {
-        name: "Court Filings",
-        path: "/court-filings",
-        sort_order: 4,
+        name: "Experts",
+        path: "/experts",
+        sort_order: 30,
+        children: [
+          {
+            name: "Defendant Experts",
+            path: "/experts/defendant-experts",
+            parent_path: "/experts",
+            sort_order: 31,
+            children: [
+              {
+                name: "Plaintiff Experts",
+                path: "/experts/defendant-experts/plaintiff-experts",
+                parent_path: "/experts/defendant-experts",
+                sort_order: 32,
+              },
+            ],
+          },
+        ],
       },
       {
-        name: "Witness Documents",
-        path: "/witness-documents",
-        sort_order: 5,
+        name: "Insurance",
+        path: "/insurance",
+        sort_order: 33,
+        children: [
+          {
+            name: "Correspondence",
+            path: "/insurance/correspondence",
+            parent_path: "/insurance",
+            sort_order: 34,
+          },
+        ],
       },
       {
-        name: "Expert Reports",
-        path: "/expert-reports",
-        sort_order: 6,
+        name: "Work Product",
+        path: "/work-product",
+        sort_order: 35,
+      },
+      {
+        name: "Lop and Liens",
+        path: "/lop-and-liens",
+        sort_order: 36,
+        children: [
+          {
+            name: "Drafts",
+            path: "/lop-and-liens/drafts",
+            parent_path: "/lop-and-liens",
+            sort_order: 37,
+            children: [
+              {
+                name: "Correspondence",
+                path: "/lop-and-liens/drafts/correspondence",
+                parent_path: "/lop-and-liens/drafts",
+                sort_order: 38,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: "Mediation",
+        path: "/mediation",
+        sort_order: 39,
+        children: [
+          {
+            name: "Correspondence",
+            path: "/mediation/correspondence",
+            parent_path: "/mediation",
+            sort_order: 40,
+          },
+        ],
+      },
+      {
+        name: "Medical",
+        path: "/medical",
+        sort_order: 41,
+        children: [
+          {
+            name: "Native",
+            path: "/medical/native",
+            parent_path: "/medical",
+            sort_order: 42,
+            children: [
+              {
+                name: "Request",
+                path: "/medical/native/request",
+                parent_path: "/medical/native",
+                sort_order: 43,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: "Photos",
+        path: "/photos",
+        sort_order: 44,
+      },
+      {
+        name: "Pleadings",
+        path: "/pleadings",
+        sort_order: 45,
+        children: [
+          {
+            name: "Drafts",
+            path: "/pleadings/drafts",
+            parent_path: "/pleadings",
+            sort_order: 46,
+          },
+        ],
+      },
+      {
+        name: "Settlement",
+        path: "/settlement",
+        sort_order: 47,
+        children: [
+          {
+            name: "Correspondence",
+            path: "/settlement/correspondence",
+            parent_path: "/settlement",
+            sort_order: 48,
+            children: [
+              {
+                name: "Disbursement",
+                path: "/settlement/correspondence/disbursement",
+                parent_path: "/settlement/correspondence",
+                sort_order: 49,
+              },
+              {
+                name: "Agreements",
+                path: "/settlement/correspondence/agreements",
+                parent_path: "/settlement/correspondence",
+                sort_order: 50,
+              },
+              {
+                name: "Offers",
+                path: "/settlement/correspondence/offers",
+                parent_path: "/settlement/correspondence",
+                sort_order: 51,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: "Trial",
+        path: "/trial",
+        sort_order: 52,
       },
     ],
   },
@@ -223,62 +417,62 @@ export const DEFAULT_CASE_TYPES: CaseTypeConfig[] = [
       {
         name: "Medicals",
         path: "/medicals",
-        sort_order: 1,
+        sort_order: 53,
       },
       {
         name: "Mediation",
         path: "/mediation",
-        sort_order: 2,
+        sort_order: 54,
       },
       {
         name: "Pleadings",
         path: "/pleadings",
-        sort_order: 3,
+        sort_order: 55,
       },
       {
         name: "Lop and Liens",
         path: "/lop-and-liens",
-        sort_order: 4,
+        sort_order: 56,
       },
       {
         name: "Investigation",
         path: "/investigation",
-        sort_order: 5,
+        sort_order: 57,
       },
       {
         name: "Experts",
         path: "/experts",
-        sort_order: 6,
+        sort_order: 58,
       },
       {
         name: "Expenses",
         path: "/expenses",
-        sort_order: 7,
+        sort_order: 59,
       },
       {
         name: "Discovery",
         path: "/discovery",
-        sort_order: 8,
+        sort_order: 60,
       },
       {
         name: "Depositions",
         path: "/depositions",
-        sort_order: 9,
+        sort_order: 61,
       },
       {
         name: "Depo Prep",
         path: "/depo-prep",
-        sort_order: 10,
+        sort_order: 62,
       },
       {
         name: "Correspondence",
         path: "/correspondence",
-        sort_order: 11,
+        sort_order: 63,
       },
       {
         name: "Administrative",
         path: "/administrative",
-        sort_order: 12,
+        sort_order: 64,
       },
     ],
   },
@@ -435,8 +629,8 @@ CONFIGURATION FILE FORMAT:
 
     const orgStats: OrgStats = { caseTypes: 0, templates: 0, errors: 0 };
 
-    await this.client.query(`DELETE FROM ${schema}.folder_templates`);
-    await this.client.query(`DELETE FROM ${schema}.case_types`);
+    // await this.client.query(`DELETE FROM ${schema}.folder_templates`);
+    // await this.client.query(`DELETE FROM ${schema}.case_types`);
 
     for (const caseTypeConfig of caseTypesConfig) {
       try {
@@ -505,19 +699,8 @@ CONFIGURATION FILE FORMAT:
               );
             } else {
               // Create new template
-              await this.client.query(
-                `INSERT INTO ${schema}.folder_templates 
-                 (case_type_id, name, path, parent_path, sort_order, is_required) 
-                 VALUES ($1, $2, $3, $4, $5, $6)`,
-                [
-                  caseTypeId,
-                  template.name,
-                  template.path,
-                  template.parent_path || null,
-                  template.sort_order,
-                  template.is_required !== false,
-                ]
-              );
+              await this.createFolderTemplate(caseTypeId, template, schema);
+
               orgStats.templates++;
             }
           } catch (templateError) {
@@ -552,6 +735,32 @@ CONFIGURATION FILE FORMAT:
     this.stats.caseTypes += orgStats.caseTypes;
     this.stats.templates += orgStats.templates;
     this.stats.errors += orgStats.errors;
+  }
+
+  private async createFolderTemplate(
+    caseTypeId: string,
+    template: FolderTemplate,
+    schema: string
+  ) {
+    await this.client.query(
+      `INSERT INTO ${schema}.folder_templates 
+       (case_type_id, name, path, parent_path, sort_order, is_required) 
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        caseTypeId,
+        template.name,
+        template.path,
+        template.parent_path || null,
+        template.sort_order,
+        template.is_required !== false,
+      ]
+    );
+
+    if (template.children) {
+      for (const child of template.children) {
+        await this.createFolderTemplate(caseTypeId, child, schema);
+      }
+    }
   }
 
   private async preview(
