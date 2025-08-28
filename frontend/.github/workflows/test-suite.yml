@@ -1,0 +1,506 @@
+name: Comprehensive Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  NODE_VERSION: '18'
+  PNPM_VERSION: '8'
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      cache-hit: ${{ steps.cache-deps.outputs.cache-hit }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Get PNPM store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup PNPM cache
+        uses: actions/cache@v3
+        id: cache-deps
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+
+  lint-and-format:
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js and PNPM
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Restore dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        run: pnpm lint:strict
+
+      - name: Check Prettier formatting
+        run: pnpm format:check
+
+      - name: Type check
+        run: pnpm tsc --noEmit
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    needs: setup
+    strategy:
+      matrix:
+        test-group: [components, services, api, utils]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js and PNPM
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Restore dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run unit tests
+        run: |
+          case "${{ matrix.test-group }}" in
+            components)
+              pnpm test src/components --coverage --coverageDirectory=coverage/components
+              ;;
+            services)
+              pnpm test src/lib/services --coverage --coverageDirectory=coverage/services
+              ;;
+            api)
+              pnpm test src/app/api --coverage --coverageDirectory=coverage/api
+              ;;
+            utils)
+              pnpm test src/lib --coverage --coverageDirectory=coverage/utils
+              ;;
+          esac
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/${{ matrix.test-group }}/lcov.info
+          flags: ${{ matrix.test-group }}
+          name: ${{ matrix.test-group }}-coverage
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: setup
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_USER: testuser
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js and PNPM
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Restore dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup test environment
+        run: |
+          cp .env.example .env.test.local
+          echo "DATABASE_URL=postgresql://testuser:testpass@localhost:5432/testdb" >> .env.test.local
+          echo "REDIS_URL=redis://localhost:6379" >> .env.test.local
+
+      - name: Run database migrations
+        run: pnpm db:migrate
+
+      - name: Run integration tests
+        run: pnpm test src/__tests__/integration --coverage --coverageDirectory=coverage/integration
+
+      - name: Upload integration coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/integration/lcov.info
+          flags: integration
+          name: integration-coverage
+
+  performance-tests:
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js and PNPM
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Restore dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run performance tests
+        run: pnpm test src/__tests__/performance --testTimeout=60000
+
+      - name: Generate performance report
+        run: |
+          mkdir -p reports
+          pnpm test src/__tests__/performance --reporters=jest-junit --testTimeout=60000
+        env:
+          JEST_JUNIT_OUTPUT_DIR: ./reports
+          JEST_JUNIT_OUTPUT_NAME: performance-results.xml
+
+      - name: Upload performance report
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-report
+          path: reports/performance-results.xml
+
+  security-tests:
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js and PNPM
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Restore dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run security tests
+        run: pnpm test src/__tests__/security
+
+      - name: Run npm audit
+        run: pnpm audit --audit-level=moderate
+
+      - name: Run Snyk security scan
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+  accessibility-tests:
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js and PNPM
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Restore dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run accessibility tests
+        run: pnpm test src/__tests__/accessibility --coverage --coverageDirectory=coverage/accessibility
+
+      - name: Upload accessibility coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/accessibility/lcov.info
+          flags: accessibility
+          name: accessibility-coverage
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    needs: setup
+    strategy:
+      matrix:
+        browser: [chromium, firefox, webkit]
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_USER: testuser
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js and PNPM
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Restore dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Setup test environment
+        run: |
+          cp .env.example .env.local
+          echo "DATABASE_URL=postgresql://testuser:testpass@localhost:5432/testdb" >> .env.local
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Run E2E tests
+        run: pnpm test:e2e --project=${{ matrix.browser }}
+        env:
+          CI: true
+
+      - name: Upload E2E test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: e2e-results-${{ matrix.browser }}
+          path: |
+            e2e/test-results/
+            e2e/test-results/html/
+
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    needs: [lint-and-format, unit-tests, integration-tests, security-tests, accessibility-tests]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js and PNPM
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Restore dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Run build tests
+        run: |
+          # Test that build is functional
+          pnpm start &
+          SERVER_PID=$!
+          sleep 10
+          curl -f http://localhost:3000 || exit 1
+          kill $SERVER_PID
+
+  generate-reports:
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, accessibility-tests, e2e-tests]
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Generate comprehensive test report
+        run: |
+          mkdir -p final-reports
+          
+          # Combine coverage reports
+          echo "# Test Coverage Report" > final-reports/coverage-summary.md
+          echo "" >> final-reports/coverage-summary.md
+          
+          # Component coverage
+          if [ -f components-coverage/lcov.info ]; then
+            echo "## Component Coverage" >> final-reports/coverage-summary.md
+            echo "\`\`\`" >> final-reports/coverage-summary.md
+            tail -n 10 components-coverage/lcov.info >> final-reports/coverage-summary.md
+            echo "\`\`\`" >> final-reports/coverage-summary.md
+          fi
+          
+          # Create test summary
+          echo "# Test Execution Summary" > final-reports/test-summary.md
+          echo "" >> final-reports/test-summary.md
+          echo "**Test Run Date:** $(date)" >> final-reports/test-summary.md
+          echo "" >> final-reports/test-summary.md
+          echo "## Test Results" >> final-reports/test-summary.md
+          echo "- Unit Tests: ${{ needs.unit-tests.result }}" >> final-reports/test-summary.md
+          echo "- Integration Tests: ${{ needs.integration-tests.result }}" >> final-reports/test-summary.md
+          echo "- Accessibility Tests: ${{ needs.accessibility-tests.result }}" >> final-reports/test-summary.md
+          echo "- E2E Tests: ${{ needs.e2e-tests.result }}" >> final-reports/test-summary.md
+
+      - name: Upload final reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: comprehensive-test-report
+          path: final-reports/
+
+      - name: Comment PR with test results
+        uses: actions/github-script@v6
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const fs = require('fs');
+            
+            let comment = '## 🧪 Test Results\n\n';
+            comment += `- **Unit Tests:** ${{ needs.unit-tests.result }}\n`;
+            comment += `- **Integration Tests:** ${{ needs.integration-tests.result }}\n`;
+            comment += `- **Security Tests:** ${{ needs.security-tests.result }}\n`;
+            comment += `- **Accessibility Tests:** ${{ needs.accessibility-tests.result }}\n`;
+            comment += `- **E2E Tests:** ${{ needs.e2e-tests.result }}\n\n`;
+            
+            comment += 'View detailed reports in the Actions artifacts.\n\n';
+            comment += '*Generated by GitHub Actions*';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });

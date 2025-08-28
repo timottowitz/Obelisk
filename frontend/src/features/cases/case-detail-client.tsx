@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CaseInfo from '@/features/cases/tabs/case-info';
-import { ArrowLeft, Upload, FileText, Scale, Loader2 } from 'lucide-react';
+import { ArrowLeft, Upload, FileText, Scale, Loader2, Mail } from 'lucide-react';
 import Link from 'next/link';
 import Tasks from '@/features/cases/tabs/tasks';
 import Events from '@/features/cases/tabs/events';
@@ -14,6 +14,7 @@ import Documents from '@/features/cases/tabs/documents';
 import HearingExhibits from '@/features/cases/tabs/hearing-exhibits';
 import Finances from '@/features/cases/tabs/finances';
 import OfferHistory from '@/features/cases/tabs/offer-history';
+import CaseEmailArchive from '@/components/email/CaseEmailArchive';
 import { useGetCase } from '@/hooks/useCases';
 
 interface CaseDetail {
@@ -39,6 +40,15 @@ interface CaseDetailClientProps {
 export default function CaseDetailClient({ caseId }: CaseDetailClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('case-information');
+  
+  // Check for email tab in URL params
+  React.useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab');
+    if (tab === 'emails') {
+      setActiveTab('emails');
+    }
+  }, []);
   const {
     data: caseData,
     isLoading: caseDataLoading,
@@ -173,6 +183,13 @@ export default function CaseDetailClient({ caseId }: CaseDetailClientProps) {
               >
                 View Offer History
               </TabsTrigger>
+              <TabsTrigger
+                value='emails'
+                className='data-[state=active]:border-bottom data-[state=active]:text-bold data-[state=active]:border-b-blue-600'
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                Emails
+              </TabsTrigger>
             </TabsList>
             {/* Content Area */}
             {caseDataLoading ? (
@@ -222,6 +239,10 @@ export default function CaseDetailClient({ caseId }: CaseDetailClientProps) {
 
                 <TabsContent value='view-offer-history' className='space-y-6'>
                   <OfferHistory />
+                </TabsContent>
+
+                <TabsContent value='emails' className='h-[calc(100vh-16rem)] p-0'>
+                  <CaseEmailArchive caseId={caseId} className="h-full" />
                 </TabsContent>
               </div>
             )}

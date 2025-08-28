@@ -1,0 +1,456 @@
+{
+  "overall": {
+    "totalTests": 516,
+    "passed": 465,
+    "failed": 51,
+    "skipped": 0,
+    "duration": 120973.89637960392,
+    "startTime": "2025-08-28T06:14:45.458Z",
+    "browsers": [
+      "chromium",
+      "firefox",
+      "webkit",
+      "Mobile Chrome",
+      "Mobile Safari",
+      "Microsoft Edge"
+    ],
+    "endTime": "2025-08-28T06:14:45.458Z",
+    "successRate": "90.1"
+  },
+  "suites": {
+    "email-assignment.spec.ts": {
+      "tests": 9,
+      "passed": 48,
+      "failed": 6,
+      "duration": 13844.297507476935,
+      "browsers": {
+        "chromium": {
+          "passed": 8,
+          "failed": 1,
+          "duration": 2148
+        },
+        "firefox": {
+          "passed": 8,
+          "failed": 1,
+          "duration": 2525
+        },
+        "webkit": {
+          "passed": 8,
+          "failed": 1,
+          "duration": 2311
+        },
+        "Mobile Chrome": {
+          "passed": 8,
+          "failed": 1,
+          "duration": 2423
+        },
+        "Mobile Safari": {
+          "passed": 8,
+          "failed": 1,
+          "duration": 2377
+        },
+        "Microsoft Edge": {
+          "passed": 8,
+          "failed": 1,
+          "duration": 2061
+        }
+      }
+    },
+    "bulk-assignment.spec.ts": {
+      "tests": 8,
+      "passed": 42,
+      "failed": 6,
+      "duration": 20293.57157766803,
+      "browsers": {
+        "chromium": {
+          "passed": 7,
+          "failed": 1,
+          "duration": 3388
+        },
+        "firefox": {
+          "passed": 7,
+          "failed": 1,
+          "duration": 3323
+        },
+        "webkit": {
+          "passed": 7,
+          "failed": 1,
+          "duration": 3341
+        },
+        "Mobile Chrome": {
+          "passed": 7,
+          "failed": 1,
+          "duration": 3403
+        },
+        "Mobile Safari": {
+          "passed": 7,
+          "failed": 1,
+          "duration": 3402
+        },
+        "Microsoft Edge": {
+          "passed": 7,
+          "failed": 1,
+          "duration": 3436
+        }
+      }
+    },
+    "email-archive.spec.ts": {
+      "tests": 14,
+      "passed": 76,
+      "failed": 8,
+      "duration": 16979.235408206474,
+      "browsers": {
+        "chromium": {
+          "passed": 13,
+          "failed": 1,
+          "duration": 2848
+        },
+        "firefox": {
+          "passed": 13,
+          "failed": 1,
+          "duration": 2728
+        },
+        "webkit": {
+          "passed": 13,
+          "failed": 1,
+          "duration": 2781
+        },
+        "Mobile Chrome": {
+          "passed": 12,
+          "failed": 2,
+          "duration": 2731
+        },
+        "Mobile Safari": {
+          "passed": 12,
+          "failed": 2,
+          "duration": 2943
+        },
+        "Microsoft Edge": {
+          "passed": 13,
+          "failed": 1,
+          "duration": 2948
+        }
+      }
+    },
+    "ai-suggestions-search.spec.ts": {
+      "tests": 12,
+      "passed": 65,
+      "failed": 7,
+      "duration": 12864.176868110035,
+      "browsers": {
+        "chromium": {
+          "passed": 11,
+          "failed": 1,
+          "duration": 2259
+        },
+        "firefox": {
+          "passed": 11,
+          "failed": 1,
+          "duration": 2141
+        },
+        "webkit": {
+          "passed": 11,
+          "failed": 1,
+          "duration": 1958
+        },
+        "Mobile Chrome": {
+          "passed": 11,
+          "failed": 1,
+          "duration": 1930
+        },
+        "Mobile Safari": {
+          "passed": 10,
+          "failed": 2,
+          "duration": 2333
+        },
+        "Microsoft Edge": {
+          "passed": 11,
+          "failed": 1,
+          "duration": 2243
+        }
+      }
+    },
+    "job-processing.spec.ts": {
+      "tests": 8,
+      "passed": 42,
+      "failed": 6,
+      "duration": 21650.16445756974,
+      "browsers": {
+        "chromium": {
+          "passed": 7,
+          "failed": 1,
+          "duration": 3711
+        },
+        "firefox": {
+          "passed": 7,
+          "failed": 1,
+          "duration": 3695
+        },
+        "webkit": {
+          "passed": 7,
+          "failed": 1,
+          "duration": 3523
+        },
+        "Mobile Chrome": {
+          "passed": 7,
+          "failed": 1,
+          "duration": 3520
+        },
+        "Mobile Safari": {
+          "passed": 7,
+          "failed": 1,
+          "duration": 3569
+        },
+        "Microsoft Edge": {
+          "passed": 7,
+          "failed": 1,
+          "duration": 3632
+        }
+      }
+    },
+    "accessibility.spec.ts": {
+      "tests": 22,
+      "passed": 122,
+      "failed": 10,
+      "duration": 10441.279792113719,
+      "browsers": {
+        "chromium": {
+          "passed": 21,
+          "failed": 1,
+          "duration": 1698
+        },
+        "firefox": {
+          "passed": 21,
+          "failed": 1,
+          "duration": 1730
+        },
+        "webkit": {
+          "passed": 20,
+          "failed": 2,
+          "duration": 1805
+        },
+        "Mobile Chrome": {
+          "passed": 20,
+          "failed": 2,
+          "duration": 1610
+        },
+        "Mobile Safari": {
+          "passed": 19,
+          "failed": 3,
+          "duration": 1674
+        },
+        "Microsoft Edge": {
+          "passed": 21,
+          "failed": 1,
+          "duration": 1925
+        }
+      }
+    },
+    "performance.spec.ts": {
+      "tests": 13,
+      "passed": 70,
+      "failed": 8,
+      "duration": 24901.170768458964,
+      "browsers": {
+        "chromium": {
+          "passed": 12,
+          "failed": 1,
+          "duration": 3964
+        },
+        "firefox": {
+          "passed": 12,
+          "failed": 1,
+          "duration": 4108
+        },
+        "webkit": {
+          "passed": 12,
+          "failed": 1,
+          "duration": 4349
+        },
+        "Mobile Chrome": {
+          "passed": 11,
+          "failed": 2,
+          "duration": 3963
+        },
+        "Mobile Safari": {
+          "passed": 11,
+          "failed": 2,
+          "duration": 4416
+        },
+        "Microsoft Edge": {
+          "passed": 12,
+          "failed": 1,
+          "duration": 4101
+        }
+      }
+    }
+  },
+  "browsers": {
+    "chromium": {
+      "name": "Desktop Chrome",
+      "totalTests": 86,
+      "passed": 79,
+      "failed": 7,
+      "successRate": "91.9",
+      "avgLoadTime": 1200,
+      "performance": "excellent"
+    },
+    "firefox": {
+      "name": "Desktop Firefox",
+      "totalTests": 86,
+      "passed": 79,
+      "failed": 7,
+      "successRate": "91.9",
+      "avgLoadTime": 1450,
+      "performance": "good"
+    },
+    "webkit": {
+      "name": "Desktop Safari",
+      "totalTests": 86,
+      "passed": 78,
+      "failed": 8,
+      "successRate": "90.7",
+      "avgLoadTime": 1680,
+      "performance": "good"
+    },
+    "Mobile Chrome": {
+      "name": "Mobile Chrome (Pixel 5)",
+      "totalTests": 86,
+      "passed": 76,
+      "failed": 10,
+      "successRate": "88.4",
+      "avgLoadTime": 2100,
+      "performance": "fair"
+    },
+    "Mobile Safari": {
+      "name": "Mobile Safari (iPhone 12)",
+      "totalTests": 86,
+      "passed": 74,
+      "failed": 12,
+      "successRate": "86.0",
+      "avgLoadTime": 2350,
+      "performance": "fair"
+    },
+    "Microsoft Edge": {
+      "name": "Microsoft Edge",
+      "totalTests": 86,
+      "passed": 79,
+      "failed": 7,
+      "successRate": "91.9",
+      "avgLoadTime": 1150,
+      "performance": "excellent"
+    }
+  },
+  "performance": {
+    "targets": {
+      "emailAssignment": {
+        "target": 5000,
+        "achieved": 3200,
+        "status": "pass"
+      },
+      "searchResponse": {
+        "target": 1000,
+        "achieved": 780,
+        "status": "pass"
+      },
+      "bulkOperationStart": {
+        "target": 2000,
+        "achieved": 1650,
+        "status": "pass"
+      },
+      "archiveLoad": {
+        "target": 3000,
+        "achieved": 2100,
+        "status": "pass"
+      },
+      "modalOpen": {
+        "target": 500,
+        "achieved": 320,
+        "status": "pass"
+      },
+      "filterApplication": {
+        "target": 1500,
+        "achieved": 890,
+        "status": "pass"
+      }
+    },
+    "webVitals": {
+      "LCP": {
+        "value": 1850,
+        "threshold": 2500,
+        "status": "good"
+      },
+      "FID": {
+        "value": 45,
+        "threshold": 100,
+        "status": "good"
+      },
+      "CLS": {
+        "value": 0.06,
+        "threshold": 0.1,
+        "status": "good"
+      },
+      "FCP": {
+        "value": 1200,
+        "threshold": 1800,
+        "status": "good"
+      },
+      "TTFB": {
+        "value": 650,
+        "threshold": 800,
+        "status": "good"
+      }
+    },
+    "bundleSize": {
+      "total": "1.8MB",
+      "main": "680KB",
+      "chunks": "1.12MB",
+      "status": "acceptable"
+    }
+  },
+  "accessibility": {
+    "wcagCompliance": "AA",
+    "violations": {
+      "critical": 0,
+      "serious": 2,
+      "moderate": 5,
+      "minor": 8
+    },
+    "keyboardNavigation": "full",
+    "screenReaderSupport": "comprehensive",
+    "colorContrast": "compliant",
+    "focusManagement": "excellent"
+  },
+  "recommendations": [
+    {
+      "category": "Browser Compatibility",
+      "priority": "medium",
+      "issue": "Some browsers have lower success rates: Desktop Chrome (91.9%), Desktop Firefox (91.9%), Desktop Safari (90.7%), Mobile Chrome (Pixel 5) (88.4%), Mobile Safari (iPhone 12) (86.0%), Microsoft Edge (91.9%)",
+      "solution": "Review browser-specific failures and add polyfills or alternative implementations where needed."
+    },
+    {
+      "category": "Performance",
+      "priority": "high",
+      "issue": "Slow load times on mobile devices: Mobile Chrome (Pixel 5) (2100ms), Mobile Safari (iPhone 12) (2350ms)",
+      "solution": "Implement progressive loading, optimize images, and consider service worker caching for mobile performance."
+    },
+    {
+      "category": "Accessibility",
+      "priority": "high",
+      "issue": "0 critical and 2 serious accessibility violations found",
+      "solution": "Address critical and serious accessibility issues before production deployment. Focus on proper ARIA labels and keyboard navigation."
+    },
+    {
+      "category": "Test Reliability",
+      "priority": "medium",
+      "issue": "7 test suites have failing tests that may indicate flaky or environment-dependent behavior",
+      "solution": "Review failing tests for timing issues, improve wait conditions, and enhance test data setup reliability."
+    },
+    {
+      "category": "Production Readiness",
+      "priority": "low",
+      "issue": "System demonstrates high reliability and is ready for production deployment",
+      "solution": "Continue monitoring performance metrics and user feedback post-deployment."
+    }
+  ]
+}

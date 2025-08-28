@@ -7,10 +7,15 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useZeroMailDriver, type ZeroMailDriver, type ZeroMailFolder, type ZeroMailMessage, type ZeroMailConfig } from '@/lib/zero-mail-driver';
 import { useZeroEmailAuth } from '@/adapters/zero-email-adapter';
 import { ConnectMicrosoftButton } from './ConnectMicrosoftButton';
+import { EmailAssignButton } from './EmailAssignButton';
+import { CaseAssignmentModal, type EmailAssignment } from './CaseAssignmentModal';
+import { EmailSelectionProvider, useEmailSelection, useEmailSelectionKeyboard } from './EmailSelectionProvider';
+import { BulkActionToolbar, CompactBulkActionToolbar } from './BulkActionToolbar';
+import { BulkCaseAssignmentModal } from './BulkCaseAssignmentModal';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +25,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Mail, 
   Search, 
@@ -38,7 +44,9 @@ import {
   Reply,
   ReplyAll,
   Forward,
-  Clock
+  Clock,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -52,6 +60,9 @@ interface ZeroMailShellProps {
   showFolders?: boolean;
   showPreview?: boolean;
   defaultView?: 'inbox' | 'sent' | 'drafts' | 'all';
+  enableMultiSelect?: boolean;
+  showBulkActions?: boolean;
+  onBulkAssignComplete?: (results: any[]) => void;
 }
 
 /**
@@ -65,7 +76,10 @@ export function ZeroMailShell({
   showToolbar = true,
   showFolders = true,
   showPreview = true,
-  defaultView = 'inbox'
+  defaultView = 'inbox',
+  enableMultiSelect = true,
+  showBulkActions = true,
+  onBulkAssignComplete
 }: ZeroMailShellProps) {
   const auth = useZeroEmailAuth();
   const [isConnected, setIsConnected] = useState(false);
@@ -77,6 +91,18 @@ export function ZeroMailShell({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showMessageDetail, setShowMessageDetail] = useState(false);
+  
+  // Case assignment modal state
+  const [assignmentModal, setAssignmentModal] = useState({
+    isOpen: false,
+    emailToAssign: null as ZeroMailMessage | null
+  });
+
+  // Bulk assignment modal state
+  const [bulkAssignmentModal, setBulkAssignmentModal] = useState({
+    isOpen: false,
+    selectedEmails: [] as ZeroMailMessage[]
+  });
 
   // Mail driver configuration
   const [mailConfig, setMailConfig] = useState<ZeroMailConfig | undefined>(undefined);
@@ -220,6 +246,30 @@ export function ZeroMailShell({
     }
   };
 
+  // Handle email assignment
+  const handleEmailAssign = (emailId: string) => {
+    const email = messages.find(m => m.id === emailId) || selectedMessage;
+    if (email) {
+      setAssignmentModal({
+        isOpen: true,
+        emailToAssign: email
+      });
+    }
+  };
+
+  const handleAssignmentComplete = (assignment: EmailAssignment) => {
+    console.log('Email assigned successfully:', assignment);
+    // TODO: Update email state to show assignment
+    // TODO: Show success toast
+  };
+
+  const handleAssignmentModalClose = () => {
+    setAssignmentModal({
+      isOpen: false,
+      emailToAssign: null
+    });
+  };
+
   // Handle refresh
   const handleRefresh = () => {
     if (selectedFolder) {
@@ -272,6 +322,291 @@ export function ZeroMailShell({
       </Card>
     );
   }
+
+  // Wrap the component in EmailSelectionProvider if multi-select is enabled
+  if (enableMultiSelect) {
+    return (
+      <EmailSelectionProvider persistSelection={true} storageKey="zero-mail-selection">
+        <ZeroMailShellContent
+          {...{
+            className,
+            accountId,
+            onMessageSelect,
+            onComposeClick,
+            showToolbar,
+            showFolders,
+            showPreview,
+            defaultView,
+            enableMultiSelect,
+            showBulkActions,
+            onBulkAssignComplete,
+            auth,
+            isConnected,
+            folders,
+            selectedFolder,
+            messages,
+            selectedMessage,
+            searchQuery,
+            loading,
+            error,
+            showMessageDetail,
+            assignmentModal,
+            bulkAssignmentModal,
+            setIsConnected,
+            setFolders,
+            setSelectedFolder,
+            setMessages,
+            setSelectedMessage,
+            setSearchQuery,
+            setLoading,
+            setError,
+            setShowMessageDetail,
+            setAssignmentModal,
+            setBulkAssignmentModal,
+            mailConfig,
+            driver,
+            isConfigured,
+            driverError,
+            loadMessages,
+            handleFolderSelect,
+            handleMessageSelect,
+            handleSearch,
+            handleEmailAssign,
+            handleAssignmentComplete,
+            handleAssignmentModalClose,
+            handleRefresh,
+            handleCompose
+          }}
+        />
+      </EmailSelectionProvider>
+    );
+  }
+
+  return (
+    <ZeroMailShellContent
+      {...{
+        className,
+        accountId,
+        onMessageSelect,
+        onComposeClick,
+        showToolbar,
+        showFolders,
+        showPreview,
+        defaultView,
+        enableMultiSelect,
+        showBulkActions,
+        onBulkAssignComplete,
+        auth,
+        isConnected,
+        folders,
+        selectedFolder,
+        messages,
+        selectedMessage,
+        searchQuery,
+        loading,
+        error,
+        showMessageDetail,
+        assignmentModal,
+        bulkAssignmentModal,
+        setIsConnected,
+        setFolders,
+        setSelectedFolder,
+        setMessages,
+        setSelectedMessage,
+        setSearchQuery,
+        setLoading,
+        setError,
+        setShowMessageDetail,
+        setAssignmentModal,
+        setBulkAssignmentModal,
+        mailConfig,
+        driver,
+        isConfigured,
+        driverError,
+        loadMessages,
+        handleFolderSelect,
+        handleMessageSelect,
+        handleSearch,
+        handleEmailAssign,
+        handleAssignmentComplete,
+        handleAssignmentModalClose,
+        handleRefresh,
+        handleCompose
+      }}
+    />
+  );
+}
+
+/**
+ * Internal component that contains the actual shell content
+ */
+function ZeroMailShellContent(props: any) {
+  const {
+    className,
+    enableMultiSelect,
+    showBulkActions,
+    onBulkAssignComplete,
+    auth,
+    isConnected,
+    folders,
+    selectedFolder,
+    messages,
+    selectedMessage,
+    searchQuery,
+    loading,
+    error,
+    showMessageDetail,
+    assignmentModal,
+    bulkAssignmentModal,
+    setIsConnected,
+    setFolders,
+    setSelectedFolder,
+    setMessages,
+    setSelectedMessage,
+    setSearchQuery,
+    setLoading,
+    setError,
+    setShowMessageDetail,
+    setAssignmentModal,
+    setBulkAssignmentModal,
+    mailConfig,
+    driver,
+    isConfigured,
+    driverError,
+    loadMessages,
+    handleFolderSelect,
+    handleMessageSelect,
+    handleSearch,
+    handleEmailAssign,
+    handleAssignmentComplete,
+    handleAssignmentModalClose,
+    handleRefresh,
+    handleCompose,
+    showToolbar,
+    showFolders,
+    showPreview
+  } = props;
+
+  // Multi-select functionality (only available if enableMultiSelect is true)
+  const selection = enableMultiSelect ? useEmailSelection() : null;
+  const { handleKeyDown } = enableMultiSelect ? useEmailSelectionKeyboard() : { handleKeyDown: () => false };
+
+  // Update selection total count when messages change
+  useEffect(() => {
+    if (selection) {
+      selection.actions.setTotalCount(messages.length);
+    }
+  }, [messages.length, selection]);
+
+  // Handle bulk assignment
+  const handleBulkAssign = useCallback((selectedEmails: ZeroMailMessage[]) => {
+    setBulkAssignmentModal({
+      isOpen: true,
+      selectedEmails
+    });
+  }, [setBulkAssignmentModal]);
+
+  const handleBulkAssignmentModalClose = useCallback(() => {
+    setBulkAssignmentModal({
+      isOpen: false,
+      selectedEmails: []
+    });
+  }, [setBulkAssignmentModal]);
+
+  const handleBulkAssignmentComplete = useCallback((results: any[]) => {
+    // Clear selection after successful bulk assignment
+    if (selection) {
+      selection.actions.deselectAll();
+    }
+    
+    // Close modal
+    setBulkAssignmentModal({
+      isOpen: false,
+      selectedEmails: []
+    });
+
+    // Call parent callback
+    if (onBulkAssignComplete) {
+      onBulkAssignComplete(results);
+    }
+
+    // Refresh messages to show updated assignments
+    if (selectedFolder) {
+      loadMessages(selectedFolder.id);
+    }
+  }, [selection, setBulkAssignmentModal, onBulkAssignComplete, selectedFolder, loadMessages]);
+
+  // Handle bulk operations
+  const handleBulkMarkAsRead = useCallback(async (selectedEmails: ZeroMailMessage[]) => {
+    if (!driver) return;
+
+    try {
+      await Promise.all(
+        selectedEmails
+          .filter(email => !email.isRead)
+          .map(email => driver.markAsRead(email.id))
+      );
+      
+      // Update local state
+      setMessages(prev => prev.map(m => 
+        selectedEmails.find(e => e.id === m.id && !m.isRead) 
+          ? { ...m, isRead: true } 
+          : m
+      ));
+      
+      toast.success(`Marked ${selectedEmails.filter(e => !e.isRead).length} emails as read`);
+    } catch (error) {
+      console.error('Failed to mark emails as read:', error);
+      toast.error('Failed to mark emails as read');
+    }
+  }, [driver, setMessages]);
+
+  const handleBulkMarkAsUnread = useCallback(async (selectedEmails: ZeroMailMessage[]) => {
+    if (!driver) return;
+
+    try {
+      await Promise.all(
+        selectedEmails
+          .filter(email => email.isRead)
+          .map(email => driver.markAsUnread(email.id))
+      );
+      
+      // Update local state
+      setMessages(prev => prev.map(m => 
+        selectedEmails.find(e => e.id === m.id && m.isRead) 
+          ? { ...m, isRead: false } 
+          : m
+      ));
+      
+      toast.success(`Marked ${selectedEmails.filter(e => e.isRead).length} emails as unread`);
+    } catch (error) {
+      console.error('Failed to mark emails as unread:', error);
+      toast.error('Failed to mark emails as unread');
+    }
+  }, [driver, setMessages]);
+
+  const handleBulkArchive = useCallback(async (selectedEmails: ZeroMailMessage[]) => {
+    // Implementation would depend on your email provider's archive functionality
+    toast.info('Archive functionality not yet implemented');
+  }, []);
+
+  const handleBulkDelete = useCallback(async (selectedEmails: ZeroMailMessage[]) => {
+    if (!driver) return;
+
+    try {
+      await Promise.all(
+        selectedEmails.map(email => driver.deleteMessage(email.id))
+      );
+      
+      // Remove from local state
+      setMessages(prev => prev.filter(m => !selectedEmails.find(e => e.id === m.id)));
+      
+      toast.success(`Deleted ${selectedEmails.length} emails`);
+    } catch (error) {
+      console.error('Failed to delete emails:', error);
+      toast.error('Failed to delete emails');
+    }
+  }, [driver, setMessages]);
 
   return (
     <div className={cn('flex h-full w-full bg-background', className)}>
@@ -351,12 +686,92 @@ export function ZeroMailShell({
                 </div>
               ) : (
                 <div className="divide-y">
-                  {messages.map((message) => (
+                  {/* Select All Header */}
+                  {enableMultiSelect && messages.length > 0 && (
+                    <div className="p-3 border-b bg-muted/20">
+                      <div className="flex items-center gap-3">
+                        <Checkbox
+                          checked={selection?.state.isSelectAllChecked || false}
+                          onCheckedChange={(checked) => {
+                            if (selection) {
+                              if (checked) {
+                                selection.actions.selectAll(messages);
+                              } else {
+                                selection.actions.deselectAll();
+                              }
+                            }
+                          }}
+                          className="rounded"
+                        />
+                        <span className="text-sm font-medium">
+                          {selection?.state.isSelectAllChecked ? 'Deselect All' : 'Select All'}
+                          {selection?.actions.getSelectionCount() > 0 && (
+                            <Badge variant="secondary" className="ml-2 text-xs">
+                              {selection.actions.getSelectionCount()} selected
+                            </Badge>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Compact Bulk Toolbar for Mobile */}
+                  {enableMultiSelect && showBulkActions && selection?.actions.hasSelection() && (
+                    <CompactBulkActionToolbar
+                      emails={messages}
+                      onBulkAssign={handleBulkAssign}
+                      className="sm:hidden"
+                    />
+                  )}
+                  
+                  {messages.map((message, index) => (
                     <MessageItem
                       key={message.id}
                       message={message}
+                      index={index}
                       isSelected={selectedMessage?.id === message.id}
-                      onClick={() => handleMessageSelect(message)}
+                      isMultiSelected={enableMultiSelect ? selection?.actions.isSelected(message.id) || false : false}
+                      enableMultiSelect={enableMultiSelect}
+                      onClick={(event) => {
+                        if (enableMultiSelect && selection) {
+                          // Handle multi-select logic
+                          if (event.shiftKey && selection.state.lastSelectedIndex !== null) {
+                            selection.actions.selectRange(selection.state.lastSelectedIndex, index, messages);
+                          } else if (event.ctrlKey || event.metaKey) {
+                            selection.actions.toggleEmail(message.id, index);
+                          } else if (event.target instanceof HTMLInputElement && event.target.type === 'checkbox') {
+                            // Checkbox click - prevent default message selection
+                            return;
+                          } else {
+                            // Regular click - select message for preview
+                            handleMessageSelect(message);
+                            
+                            // Also select for multi-select if not already selected
+                            if (!selection.actions.isSelected(message.id)) {
+                              selection.actions.selectEmail(message.id, index);
+                            }
+                          }
+                        } else {
+                          handleMessageSelect(message);
+                        }
+                      }}
+                      onCheckboxChange={(checked) => {
+                        if (enableMultiSelect && selection) {
+                          if (checked) {
+                            selection.actions.selectEmail(message.id, index);
+                          } else {
+                            selection.actions.deselectEmail(message.id);
+                          }
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (enableMultiSelect && selection) {
+                          const handled = handleKeyDown(event, message.id, index, messages);
+                          if (handled) {
+                            event.preventDefault();
+                          }
+                        }
+                      }}
                     />
                   ))}
                 </div>
@@ -407,6 +822,44 @@ export function ZeroMailShell({
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Case Assignment Modal */}
+      <CaseAssignmentModal
+        isOpen={assignmentModal.isOpen}
+        onClose={handleAssignmentModalClose}
+        email={assignmentModal.emailToAssign}
+        onAssignComplete={handleAssignmentComplete}
+      />
+
+      {/* Bulk Action Toolbar - Desktop */}
+      {enableMultiSelect && showBulkActions && (
+        <BulkActionToolbar
+          emails={messages}
+          onBulkAssign={handleBulkAssign}
+          onMarkAsRead={handleBulkMarkAsRead}
+          onMarkAsUnread={handleBulkMarkAsUnread}
+          onArchive={handleBulkArchive}
+          onDelete={handleBulkDelete}
+          className="hidden sm:flex"
+        />
+      )}
+
+      {/* Bulk Case Assignment Modal */}
+      {enableMultiSelect && (
+        <BulkCaseAssignmentModal
+          isOpen={bulkAssignmentModal.isOpen}
+          onClose={handleBulkAssignmentModalClose}
+          emails={bulkAssignmentModal.selectedEmails}
+          onAssignComplete={handleBulkAssignmentComplete}
+          onRetry={(failedEmails) => {
+            // Handle retry by opening a new bulk assignment with failed emails
+            setBulkAssignmentModal({
+              isOpen: true,
+              selectedEmails: failedEmails
+            });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -458,23 +911,52 @@ function FolderItem({
  */
 function MessageItem({ 
   message, 
+  index,
   isSelected, 
-  onClick 
+  isMultiSelected = false,
+  enableMultiSelect = false,
+  onClick,
+  onCheckboxChange,
+  onKeyDown
 }: { 
-  message: ZeroMailMessage; 
-  isSelected: boolean; 
-  onClick: () => void;
+  message: ZeroMailMessage;
+  index: number;
+  isSelected: boolean;
+  isMultiSelected?: boolean;
+  enableMultiSelect?: boolean;
+  onClick: (event: React.MouseEvent) => void;
+  onCheckboxChange?: (checked: boolean) => void;
+  onKeyDown?: (event: React.KeyboardEvent) => void;
 }) {
   return (
     <div
       className={cn(
         'p-4 cursor-pointer hover:bg-muted/50 transition-colors',
+        'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
         isSelected && 'bg-muted',
+        isMultiSelected && 'bg-accent/20 border-l-4 border-accent',
         !message.isRead && 'font-semibold bg-accent/10'
       )}
       onClick={onClick}
+      onKeyDown={onKeyDown}
+      tabIndex={0}
+      role="option"
+      aria-selected={isMultiSelected}
     >
       <div className="flex items-start gap-3">
+        {/* Multi-select Checkbox */}
+        {enableMultiSelect && (
+          <div className="flex-shrink-0 pt-1">
+            <Checkbox
+              checked={isMultiSelected}
+              onCheckedChange={onCheckboxChange}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded"
+              aria-label={`Select email: ${message.subject || 'No subject'}`}
+            />
+          </div>
+        )}
+        
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <p className="text-sm font-medium truncate">{message.from.name || message.from.address}</p>
@@ -485,7 +967,14 @@ function MessageItem({
           <p className="text-sm font-medium truncate mb-1">{message.subject || '(No Subject)'}</p>
           <p className="text-xs text-muted-foreground line-clamp-2">{message.preview}</p>
         </div>
-        <div className="text-xs text-muted-foreground flex items-center gap-1">
+        <div className="text-xs text-muted-foreground flex items-center gap-2">
+          {!enableMultiSelect && (
+            <EmailAssignButton
+              emailId={message.id}
+              variant="icon"
+              onAssign={handleEmailAssign}
+            />
+          )}
           <Clock className="h-3 w-3" />
           {formatMessageTime(message.receivedAt || message.createdAt)}
         </div>
@@ -542,6 +1031,11 @@ function MessagePreview({
 
         {/* Actions */}
         <div className="flex gap-2 mt-4">
+          <EmailAssignButton
+            emailId={message.id}
+            variant="compact"
+            onAssign={handleEmailAssign}
+          />
           <Button variant="outline" size="sm" onClick={onReply}>
             <Reply className="h-4 w-4 mr-2" />
             Reply

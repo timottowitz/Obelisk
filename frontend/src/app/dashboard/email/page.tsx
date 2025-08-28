@@ -63,7 +63,7 @@ export default function EmailDashboard() {
       } else if (err?.message?.includes('Microsoft')) {
         setError('There was an issue with your Microsoft account connection. Please try reconnecting.');
       } else if (err?.message?.includes('permission')) {
-        setError('You don\\'t have permission to access email features. Please contact your administrator.');
+        setError('You don\'t have permission to access email features. Please contact your administrator.');
       } else {
         setError('Unable to check email connection status. Please refresh the page or contact support.');
       }
