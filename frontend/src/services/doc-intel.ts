@@ -293,6 +293,25 @@ export default class DocIntelAPI {
   }
 
   /**
+   * Get a signed download URL for a document
+   */
+  static async getSignedDownloadUrl(documentId: string): Promise<string> {
+    const headers = await getAuthHeaders();
+
+    const response = await fetch(`${DOC_INTEL_BASE_URL}/documents/${documentId}/download`, {
+      method: 'GET',
+      headers
+    });
+
+    const result = await handleApiResponse<{
+      success: boolean;
+      download_url: string;
+    }>(response);
+
+    return result.download_url;
+  }
+
+  /**
    * Search documents and entities by text content
    */
   static async searchContent(

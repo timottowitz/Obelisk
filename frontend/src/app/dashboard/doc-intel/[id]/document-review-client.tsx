@@ -8,7 +8,7 @@ import { Heading } from '@/components/ui/heading';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useDocument, useDocumentEntities, useUpdateEntityStatus, useUpdateEntity, useUpdateDocument } from '@/hooks/useDocIntel';
+import { useDocument, useDocumentEntities, useUpdateEntityStatus, useUpdateEntity, useUpdateDocument, useDownloadDocument } from '@/hooks/useDocIntel';
 import { VerificationWorkbench, DocumentViewer, EntityEditModal } from '@/features/doc-intel/components';
 import { cn, formatStatusLabel } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -47,6 +47,7 @@ export default function DocumentReviewClient({ id }: DocumentReviewClientProps) 
   const updateEntityStatus = useUpdateEntityStatus();
   const updateEntity = useUpdateEntity();
   const updateDocument = useUpdateDocument();
+  const downloadDocument = useDownloadDocument();
   
   const document = documentQuery.data;
   const entities = entitiesQuery.data?.entities || [];
@@ -103,6 +104,35 @@ export default function DocumentReviewClient({ id }: DocumentReviewClientProps) 
       setIsFinalizingReview(false);
     }
   }, [canFinalizeReview, document, updateDocument]);
+
+  const handleDownload = useCallback(async () => {
+    if (!document) return;
+    
+    try {
+      const downloadUrl = await downloadDocument.mutateAsync(document.id);
+      // Open the signed URL in a new tab to trigger download
+      window.open(downloadUrl, '_blank');
+      toast.success('Download started successfully!');
+    } catch (error) {
+      console.error('Failed to download document:', error);
+      toast.error('Failed to download document. Please try again.');
+    }
+  }, [document, downloadDocument]);
+
+  const handleRetryProcessing = useCallback(async () => {
+    if (!document) return;
+    
+    try {
+      await updateDocument.mutateAsync({ 
+        documentId: document.id, 
+        updates: { status: 'processing' }
+      });
+      toast.success('Retrying document processing...');
+    } catch (error) {
+      console.error('Failed to retry processing:', error);
+      toast.error('Failed to retry processing. Please try again.');
+    }
+  }, [document, updateDocument]);
 
   if (documentQuery.isLoading) {
     return (
@@ -181,9 +211,14 @@ export default function DocumentReviewClient({ id }: DocumentReviewClientProps) 
                 {isFinalizingReview ? 'Finalizing...' : 'Finalize Review'}
               </Button>
             )}
-            <Button variant="outline" size="sm">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleDownload}
+              disabled={downloadDocument.isPending}
+            >
               <Download className="mr-2 h-4 w-4" />
-              Download
+              {downloadDocument.isPending ? 'Downloading...' : 'Download'}
             </Button>
           </div>
         </div>
@@ -194,8 +229,10 @@ export default function DocumentReviewClient({ id }: DocumentReviewClientProps) 
         {/* Left Sidebar - Entity Verification Workbench */}
         <VerificationWorkbench
           entities={entities}
+          document={document}
           onEntityStatusChange={handleEntityStatusChange}
           onEntityEdit={handleEntityEdit}
+          onRetryProcessing={handleRetryProcessing}
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}
           entityFilter={entityFilter}

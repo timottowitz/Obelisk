@@ -172,6 +172,16 @@ export function useSetEntityObjectiveTruth() {
   });
 }
 
+// Download hook
+export function useDownloadDocument() {
+  return useMutation({
+    mutationFn: (documentId: string) => DocIntelAPI.getSignedDownloadUrl(documentId),
+    onError: (error) => {
+      console.error('Document download failed:', error);
+    }
+  });
+}
+
 // Bulk operations hooks
 export function useBulkUpdateEntities() {
   const queryClient = useQueryClient();
