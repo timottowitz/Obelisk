@@ -93,6 +93,14 @@ export const navItems: NavItem[] = [
     isActive: false,
     shortcut: ['p', 'r'],
     items: []
+  },
+  {
+    title: 'Doc Intel',
+    url: '/dashboard/doc-intel',
+    icon: 'fileText',
+    isActive: false,
+    shortcut: ['d', 'i'],
+    items: []
   }
 ];
 
