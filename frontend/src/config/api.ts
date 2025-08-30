@@ -49,6 +49,10 @@ export const API_CONFIG = {
     ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/quickbooks-sync`
     : 'https://rnmjwdxqtsvsbelcftzg.supabase.co/functions/v1/quickbooks-sync',
 
+  DOC_INTEL_BASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL
+    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/doc-intel`
+    : 'https://rnmjwdxqtsvsbelcftzg.supabase.co/functions/v1/doc-intel',
+
   // Default pagination settings
   DEFAULT_LIMIT: 50,
   DEFAULT_ORDER_BY: 'start_time',

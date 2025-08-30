@@ -1,0 +1,17 @@
+{
+  "imports": {
+    "@hono/hono": "jsr:@hono/hono@^4.6.3",
+    "@supabase/functions-js": "jsr:@supabase/functions-js@^2.4.2",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.51.0"
+  },
+  "tasks": {
+    "serve": "deno run --allow-net --allow-env --allow-read --allow-write --watch index.ts"
+  },
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "checkJs": false,
+    "strict": false,
+    "jsx": "react-jsx"
+  }
+}

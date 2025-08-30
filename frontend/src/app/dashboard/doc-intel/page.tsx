@@ -1,391 +1,281 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { PageContainer } from '@/components/layout/page-container';
 import { Heading } from '@/components/ui/heading';
 import { Separator } from '@/components/ui/separator';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  IconUpload, 
-  IconFileText, 
-  IconSearch, 
-  IconBrain,
-  IconFileAnalytics,
-  IconChartBar,
-  IconAlertCircle,
-  IconCheckCircle
-} from '@tabler/icons-react';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious
+} from '@/components/ui/pagination';
+import { Search, Filter } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useDocuments } from '@/hooks/useDocIntel';
+import { useDebounce } from '@/hooks/use-debounce';
+import { DocumentsTable } from '@/features/doc-intel/documents-table';
+import { DocumentUpload } from '@/features/doc-intel/document-upload';
+import { DocumentStatus } from '@/types/doc-intel';
 
 export default function DocIntelPage() {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [queryParams, setQueryParams] = useState({
+    page: 1,
+    search: '',
+    status: 'all' as DocumentStatus | 'all',
+    sortBy: 'uploaded_at',
+    order: 'desc' as 'asc' | 'desc'
+  });
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      // Here you would trigger the document analysis
-      simulateAnalysis();
+  const debouncedSearchValue = useDebounce(queryParams.search, 500);
+  const itemsPerPage = 10;
+
+  // Fetch documents with current filters
+  const documentsQuery = useDocuments({
+    limit: itemsPerPage,
+    offset: (queryParams.page - 1) * itemsPerPage,
+    search: debouncedSearchValue || undefined,
+    status: queryParams.status === 'all' ? undefined : queryParams.status
+  });
+
+  const documents = documentsQuery.data?.documents || [];
+  const totalDocuments = documentsQuery.data?.total || 0;
+  const totalPages = Math.ceil(totalDocuments / itemsPerPage);
+
+  // Handle sorting
+  const handleChangeSort = useCallback((sort: string) => {
+    setQueryParams(prev => ({
+      ...prev,
+      sortBy: sort,
+      order: prev.sortBy === sort ? (prev.order === 'asc' ? 'desc' : 'asc') : 'asc'
+    }));
+  }, []);
+
+  // Handle pagination
+  const handlePageChange = useCallback((page: number) => {
+    setQueryParams(prev => ({ ...prev, page }));
+  }, []);
+
+  const handlePreviousPage = useCallback(() => {
+    if (queryParams.page > 1) {
+      setQueryParams(prev => ({ ...prev, page: prev.page - 1 }));
     }
-  };
+  }, [queryParams.page]);
 
-  const simulateAnalysis = () => {
-    setIsAnalyzing(true);
-    setAnalysisProgress(0);
-    
-    const interval = setInterval(() => {
-      setAnalysisProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsAnalyzing(false);
-          return 100;
+  const handleNextPage = useCallback(() => {
+    if (queryParams.page < totalPages) {
+      setQueryParams(prev => ({ ...prev, page: prev.page + 1 }));
+    }
+  }, [queryParams.page, totalPages]);
+
+  // Generate page numbers for pagination
+  const getPageNumbers = useMemo(() => {
+    const pages = [];
+    const maxVisiblePages = 5;
+
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (queryParams.page <= 3) {
+        for (let i = 1; i <= 5; i++) {
+          pages.push(i);
         }
-        return prev + 10;
-      });
-    }, 500);
-  };
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (queryParams.page >= totalPages - 2) {
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPages - 4; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        pages.push(1);
+        pages.push('...');
+        for (let i = queryParams.page - 1; i <= queryParams.page + 1; i++) {
+          pages.push(i);
+        }
+        pages.push('...');
+        pages.push(totalPages);
+      }
+    }
+
+    return pages;
+  }, [queryParams.page, totalPages]);
+
+  // Handle upload complete
+  const handleUploadComplete = useCallback(() => {
+    documentsQuery.refetch();
+  }, [documentsQuery]);
+
+  // Reset page when search/filter changes
+  useEffect(() => {
+    setQueryParams(prev => ({ ...prev, page: 1 }));
+  }, [debouncedSearchValue, queryParams.status]);
 
   return (
-    <PageContainer scrollable>
-      <div className="space-y-4">
-        <div className="flex items-start justify-between">
+    <div className='min-h-screen bg-background p-8'>
+      <div className='mx-auto max-w-7xl'>
+        {/* Page Header */}
+        <div className='mb-8'>
           <Heading
             title="Document Intelligence"
             description="AI-powered document analysis and insights extraction"
           />
         </div>
-        <Separator />
+        <Separator className="mb-6" />
 
-        <Tabs defaultValue="upload" className="space-y-4">
+        <Tabs defaultValue="documents" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="upload">Upload & Analyze</TabsTrigger>
-            <TabsTrigger value="library">Document Library</TabsTrigger>
-            <TabsTrigger value="insights">Extracted Insights</TabsTrigger>
-            <TabsTrigger value="search">Intelligent Search</TabsTrigger>
+            <TabsTrigger value="documents">Document Library</TabsTrigger>
+            <TabsTrigger value="upload">Upload Documents</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="upload" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Upload Document for Analysis</CardTitle>
-                <CardDescription>
-                  Upload legal documents to extract key information, clauses, and insights using AI
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                  <IconUpload className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="mt-4">
-                    <label htmlFor="file-upload" className="cursor-pointer">
-                      <span className="mt-2 block text-sm font-medium text-gray-900">
-                        Click to upload or drag and drop
-                      </span>
-                      <span className="mt-1 block text-xs text-gray-500">
-                        PDF, DOCX, TXT up to 50MB
-                      </span>
-                      <input
-                        id="file-upload"
-                        name="file-upload"
-                        type="file"
-                        className="sr-only"
-                        onChange={handleFileUpload}
-                        accept=".pdf,.docx,.txt"
-                      />
-                      <Button className="mt-4" variant="outline">
-                        <IconUpload className="mr-2 h-4 w-4" />
-                        Select Document
-                      </Button>
-                    </label>
-                  </div>
+          <TabsContent value="documents" className="space-y-6">
+            {/* Search and Filter Bar */}
+            <div className='border-border bg-card rounded-xl border p-6 shadow'>
+              <div className='flex flex-col items-start gap-4 sm:flex-row sm:items-center'>
+                {/* Search Input */}
+                <div className='relative max-w-md flex-1'>
+                  <Search className='text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform' />
+                  <Input
+                    type='text'
+                    placeholder='Search documents by filename...'
+                    value={queryParams.search}
+                    onChange={(e) =>
+                      setQueryParams(prev => ({
+                        ...prev,
+                        search: e.target.value
+                      }))
+                    }
+                    className='border-input focus:ring-ring w-full rounded-lg border py-2.5 pr-4 pl-10 text-sm focus:border-transparent focus:ring-2'
+                  />
                 </div>
 
-                {selectedFile && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <IconFileText className="h-8 w-8 text-blue-500" />
-                        <div>
-                          <p className="font-medium">{selectedFile.name}</p>
-                          <p className="text-sm text-gray-500">
-                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                          </p>
-                        </div>
-                      </div>
-                      {isAnalyzing ? (
-                        <Badge variant="secondary">Analyzing...</Badge>
-                      ) : analysisProgress === 100 ? (
-                        <Badge className="bg-green-500">Complete</Badge>
-                      ) : (
-                        <Badge variant="outline">Ready</Badge>
-                      )}
-                    </div>
+                {/* Status Filter */}
+                <Select
+                  onValueChange={(value) =>
+                    setQueryParams(prev => ({
+                      ...prev,
+                      status: value as DocumentStatus | 'all'
+                    }))
+                  }
+                  value={queryParams.status}
+                >
+                  <SelectTrigger className='flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent/60 hover:text-accent-foreground min-w-[150px]'>
+                    <Filter className='h-4 w-4 text-muted-foreground' />
+                    <SelectValue placeholder='Filter by status' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='all'>All Documents</SelectItem>
+                    <SelectItem value='complete'>Complete</SelectItem>
+                    <SelectItem value='processing'>Processing</SelectItem>
+                    <SelectItem value='needs_review'>Needs Review</SelectItem>
+                    <SelectItem value='in_review'>In Review</SelectItem>
+                    <SelectItem value='failed'>Failed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-                    {isAnalyzing && (
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Analysis Progress</span>
-                          <span>{analysisProgress}%</span>
-                        </div>
-                        <Progress value={analysisProgress} />
-                      </div>
-                    )}
-                  </div>
+            {/* Documents Table */}
+            <DocumentsTable
+              documents={documents}
+              isLoading={documentsQuery.isLoading}
+              onChangeSort={handleChangeSort}
+              queryParams={queryParams}
+            />
+
+            {/* Pagination */}
+            <div className='mt-6 flex items-center justify-between text-sm text-foreground'>
+              <div className='flex items-center gap-4'>
+                {totalDocuments > 0 && (
+                  <p>
+                    Showing{' '}
+                    {(queryParams.page - 1) * itemsPerPage + 1} -{' '}
+                    {Math.min(queryParams.page * itemsPerPage, totalDocuments)}{' '}
+                    of {totalDocuments} documents
+                  </p>
                 )}
+              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="flex items-center space-x-2">
-                        <IconBrain className="h-5 w-5 text-purple-500" />
-                        <span className="text-sm font-medium">Entity Extraction</span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-2">
-                        Identify parties, dates, amounts, and key terms
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="flex items-center space-x-2">
-                        <IconFileAnalytics className="h-5 w-5 text-blue-500" />
-                        <span className="text-sm font-medium">Clause Detection</span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-2">
-                        Find and categorize important contract clauses
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="flex items-center space-x-2">
-                        <IconAlertCircle className="h-5 w-5 text-orange-500" />
-                        <span className="text-sm font-medium">Risk Analysis</span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-2">
-                        Identify potential risks and compliance issues
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="library" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Document Library</CardTitle>
-                <CardDescription>
-                  Browse and manage your analyzed documents
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Sample document entries */}
-                  {[
-                    { name: 'Service Agreement - ABC Corp.pdf', date: '2024-01-15', status: 'analyzed' },
-                    { name: 'NDA - XYZ Partners.docx', date: '2024-01-14', status: 'analyzed' },
-                    { name: 'Lease Agreement - Office Space.pdf', date: '2024-01-13', status: 'processing' },
-                  ].map((doc, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center space-x-3">
-                        <IconFileText className="h-6 w-6 text-gray-400" />
-                        <div>
-                          <p className="font-medium">{doc.name}</p>
-                          <p className="text-sm text-gray-500">Uploaded on {doc.date}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        {doc.status === 'analyzed' ? (
-                          <Badge className="bg-green-100 text-green-800">
-                            <IconCheckCircle className="mr-1 h-3 w-3" />
-                            Analyzed
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">Processing</Badge>
-                        )}
-                        <Button variant="ghost" size="sm">View</Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="insights" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Extracted Insights</CardTitle>
-                <CardDescription>
-                  Key information and patterns discovered across your documents
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Common Clauses</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-sm">Confidentiality</span>
-                          <Badge variant="outline">15 docs</Badge>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm">Termination</span>
-                          <Badge variant="outline">12 docs</Badge>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm">Indemnification</span>
-                          <Badge variant="outline">10 docs</Badge>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Risk Indicators</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <IconAlertCircle className="h-4 w-4 text-orange-500" />
-                          <span className="text-sm">3 contracts with unlimited liability</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <IconAlertCircle className="h-4 w-4 text-yellow-500" />
-                          <span className="text-sm">5 contracts expiring within 30 days</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <IconCheckCircle className="h-4 w-4 text-green-500" />
-                          <span className="text-sm">All NDAs properly executed</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">Entity Statistics</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div>
-                        <div className="flex justify-between mb-1">
-                          <span className="text-sm">Organizations Mentioned</span>
-                          <span className="text-sm font-medium">47</span>
-                        </div>
-                        <Progress value={75} className="h-2" />
-                      </div>
-                      <div>
-                        <div className="flex justify-between mb-1">
-                          <span className="text-sm">Individuals Referenced</span>
-                          <span className="text-sm font-medium">28</span>
-                        </div>
-                        <Progress value={45} className="h-2" />
-                      </div>
-                      <div>
-                        <div className="flex justify-between mb-1">
-                          <span className="text-sm">Jurisdictions</span>
-                          <span className="text-sm font-medium">5</span>
-                        </div>
-                        <Progress value={20} className="h-2" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="search" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Intelligent Document Search</CardTitle>
-                <CardDescription>
-                  Search across all your documents using natural language queries
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex space-x-2">
-                  <div className="flex-1">
-                    <Input
-                      placeholder="e.g., 'Find all contracts with termination clauses expiring in 2024'"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full"
-                    />
-                  </div>
-                  <Button>
-                    <IconSearch className="mr-2 h-4 w-4" />
-                    Search
-                  </Button>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-500">Example searches:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      'Contracts with ABC Corp',
-                      'Payment terms over 30 days',
-                      'Non-compete clauses',
-                      'California jurisdiction',
-                    ].map((example, index) => (
-                      <Button
-                        key={index}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSearchQuery(example)}
-                      >
-                        {example}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                {searchQuery && (
-                  <div className="space-y-3 mt-6">
-                    <p className="text-sm font-medium">Search Results</p>
-                    {/* Sample search results */}
-                    {[
-                      { title: 'Service Agreement - Section 4.2', snippet: '...termination may occur with 30 days written notice...', relevance: 95 },
-                      { title: 'Master Services Agreement - Article 7', snippet: '...either party may terminate this agreement...', relevance: 88 },
-                      { title: 'Partnership Agreement - Clause 12.1', snippet: '...dissolution and termination procedures...', relevance: 76 },
-                    ].map((result, index) => (
-                      <Card key={index} className="cursor-pointer hover:shadow-md transition-shadow">
-                        <CardContent className="pt-4">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <p className="font-medium text-sm">{result.title}</p>
-                              <p className="text-xs text-gray-500 mt-1">{result.snippet}</p>
-                            </div>
-                            <Badge variant="outline" className="ml-2">
-                              {result.relevance}% match
-                            </Badge>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+              <div>
+                {totalPages > 1 && (
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem className='cursor-pointer'>
+                        <PaginationPrevious
+                          onClick={handlePreviousPage}
+                          className={cn(
+                            'border-border cursor-pointer border bg-background',
+                            queryParams.page <= 1
+                              ? 'pointer-events-none opacity-50'
+                              : ''
+                          )}
+                        />
+                      </PaginationItem>
+                      {getPageNumbers.map((page, index) => (
+                        <PaginationItem
+                          key={index}
+                          className={cn(
+                            'cursor-pointer',
+                            typeof page !== 'number' && 'pointer-events-none opacity-60'
+                          )}
+                        >
+                          <PaginationLink
+                            onClick={
+                              typeof page === 'number' 
+                                ? () => handlePageChange(page as number) 
+                                : undefined
+                            }
+                            isActive={queryParams.page === page}
+                            className={cn(
+                              'bg-background',
+                              queryParams.page === page
+                                ? 'bg-accent text-accent-foreground font-semibold'
+                                : 'hover:bg-accent/60'
+                            )}
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+                      <PaginationItem className='cursor-pointer'>
+                        <PaginationNext
+                          onClick={handleNextPage}
+                          className={cn(
+                            'border-border cursor-pointer border bg-background',
+                            queryParams.page >= totalPages
+                              ? 'pointer-events-none opacity-50'
+                              : ''
+                          )}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="upload" className="space-y-6">
+            <DocumentUpload onUploadComplete={handleUploadComplete} />
           </TabsContent>
         </Tabs>
       </div>
-    </PageContainer>
+    </div>
   );
 }

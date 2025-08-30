@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "lib": ["dom", "es2020"],
+    "strict": true,
+    "noImplicitReturns": true,
+    "noImplicitAny": true
+  },
+  "imports": {
+    "@supabase/functions-js": "jsr:@supabase/functions-js@2.1.5",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.51.0",
+    "@hono/hono": "jsr:@hono/hono@4.3.11",
+    "hono": "jsr:@hono/hono@4.3.11"
+  }
+}

@@ -33,3 +33,15 @@ export interface FooterItem {
 export type MainNavItem = NavItemWithOptionalChildren;
 
 export type SidebarNavItem = NavItemWithChildren;
+
+// Re-export types from other modules
+export * from './ai-insights';
+export * from './callcaps';
+export * from './cases';
+export * from './contacts';
+export * from './data-table';
+export * from './doc-intel';
+export * from './documents';
+export * from './email';
+export * from './expenses';
+export * from './quickbooks';
