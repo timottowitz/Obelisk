@@ -1,0 +1,439 @@
+# Bennett Legal DocETL Configuration for Legal Document Processing
+# Specialized configuration for PI and Solar litigation document processing
+# Integrates with Bennett Legal's 132+ document types taxonomy
+
+default_model: gpt-4o
+max_tokens: 8000
+temperature: 0.1  # Lower temperature for consistent legal entity extraction
+
+# Document datasets - input from secure tenant storage
+datasets:
+  - name: "legal_documents"
+    type: "file"
+    path: "/tmp/docetl/input/document.pdf"
+    metadata:
+      client_type: "bennett_legal"
+      document_taxonomy: "bennett_legal_v1"
+
+# Bennett Legal Entity Types - Based on 15 field-level extraction models
+entity_types:
+  - name: "Doctor"
+    description: "Medical professionals, physicians, specialists"
+    validation_patterns: ["MD", "DO", "Dr.", "Doctor"]
+    confidence_threshold: 0.8
+  - name: "Sender" 
+    description: "Document sender, author, originating party"
+    confidence_threshold: 0.7
+  - name: "Document Date"
+    description: "Primary document date, creation date, effective date"
+    validation_patterns: ["date_format"]
+    confidence_threshold: 0.9
+  - name: "Event Date"
+    description: "Incident date, accident date, significant event dates"
+    validation_patterns: ["date_format"]
+    confidence_threshold: 0.9
+  - name: "Insurance Company"
+    description: "Insurance carriers, underwriters, claims departments"
+    confidence_threshold: 0.8
+  - name: "Policy Number"
+    description: "Insurance policy numbers, claim numbers"
+    validation_patterns: ["alphanumeric", "policy_format"]
+    confidence_threshold: 0.85
+  - name: "Plaintiff"
+    description: "Injured party, claimant in litigation"
+    confidence_threshold: 0.9
+  - name: "Defendant"
+    description: "Accused party, respondent in litigation"
+    confidence_threshold: 0.9
+  - name: "Attorney"
+    description: "Legal counsel, law firm representatives"
+    validation_patterns: ["Esq.", "Attorney", "Counsel"]
+    confidence_threshold: 0.8
+  - name: "Medical Facility"
+    description: "Hospitals, clinics, medical centers"
+    confidence_threshold: 0.8
+  - name: "Injury Type"
+    description: "Type of injury, medical condition, damages"
+    confidence_threshold: 0.7
+  - name: "Settlement Amount"
+    description: "Settlement figures, monetary damages"
+    validation_patterns: ["currency_format"]
+    confidence_threshold: 0.95
+  - name: "Case Number"
+    description: "Court case numbers, docket numbers"
+    validation_patterns: ["case_number_format"]
+    confidence_threshold: 0.9
+  - name: "Court"
+    description: "Court names, jurisdictions, venues"
+    confidence_threshold: 0.8
+  - name: "Solar Company"
+    description: "Solar installation companies, contractors"
+    confidence_threshold: 0.8
+
+# Bennett Legal Document Categories (132+ types across 15+ categories)
+document_categories:
+  medical:
+    - "Medical Records"
+    - "Physician Reports"
+    - "Hospital Records"
+    - "Diagnostic Reports"
+    - "Treatment Plans"
+    - "Medical Bills"
+    - "Prescription Records"
+    - "Therapy Notes"
+    - "Surgery Reports"
+    - "Emergency Room Records"
+  
+  legal:
+    - "Complaint"
+    - "Answer"
+    - "Motion"
+    - "Deposition"
+    - "Interrogatories"
+    - "Request for Production"
+    - "Settlement Agreement"
+    - "Court Order"
+    - "Judgment"
+    - "Subpoena"
+    - "Discovery Documents"
+  
+  insurance:
+    - "Insurance Policy"
+    - "Claims File"
+    - "Adjuster Reports"
+    - "Coverage Letters"
+    - "Denial Letters"
+    - "Settlement Offers"
+    - "Proof of Loss"
+    - "Investigation Reports"
+    - "Medical Authorization"
+    - "Property Damage Estimates"
+  
+  personal_injury:
+    - "Accident Report"
+    - "Police Report"
+    - "Witness Statements"
+    - "Photographs"
+    - "Scene Diagrams"
+    - "Expert Reports"
+    - "Life Care Plans"
+    - "Economic Loss Reports"
+    - "Surveillance Reports"
+  
+  solar_litigation:
+    - "Solar Installation Contract"
+    - "Solar Lease Agreement" 
+    - "Performance Reports"
+    - "Warranty Documents"
+    - "Inspection Reports"
+    - "Solar Panel Specifications"
+    - "Installation Photos"
+    - "Utility Bills"
+    - "Solar Production Data"
+    - "Equipment Manuals"
+  
+  employment:
+    - "Employment Contract"
+    - "Personnel Files"
+    - "Performance Reviews"
+    - "Disciplinary Actions"
+    - "Termination Letters"
+    - "Wage Statements"
+    - "Benefits Documents"
+  
+  real_estate:
+    - "Purchase Agreement"
+    - "Deed"
+    - "Title Insurance"
+    - "Mortgage Documents"
+    - "Lease Agreement"
+    - "Property Inspection"
+  
+  corporate:
+    - "Articles of Incorporation"
+    - "Bylaws"
+    - "Board Resolutions"
+    - "Stock Certificates"
+    - "Partnership Agreements"
+    - "Operating Agreements"
+  
+  financial:
+    - "Bank Statements"
+    - "Tax Returns"
+    - "Financial Statements"
+    - "Loan Documents"
+    - "Credit Reports"
+    - "Investment Statements"
+
+operations:
+  # Step 1: Document Classification and Taxonomy Assignment
+  - name: "classify_document"
+    type: "map"
+    prompt: |
+      You are a legal document classification expert for Bennett Legal, specializing in PI and Solar litigation.
+      
+      Analyze this document and classify it according to Bennett Legal's taxonomy:
+      
+      1. PRIMARY CATEGORY: Determine the main category from: Medical, Legal, Insurance, Personal Injury, Solar Litigation, Employment, Real Estate, Corporate, Financial
+      
+      2. SPECIFIC DOCUMENT TYPE: Identify the specific document type within that category
+      
+      3. LITIGATION TYPE: Determine if this is related to:
+         - Personal Injury (PI) litigation
+         - Solar litigation 
+         - Other legal matter
+      
+      4. WORKFLOW ROUTING: Based on the document type and complexity, recommend routing to:
+         - Paralegal (routine processing)
+         - Lawyer (complex legal review)
+         - Specialist (expert review needed)
+      
+      5. PRIORITY LEVEL: Assign priority based on:
+         - Urgent (deadlines, court filings)
+         - High (settlement negotiations, depositions)
+         - Normal (routine correspondence)
+         - Low (informational documents)
+      
+      Return structured classification data with confidence scores.
+    output:
+      schema:
+        primary_category: "string"
+        document_type: "string" 
+        litigation_type: "string"
+        workflow_routing: "string"
+        priority_level: "string"
+        confidence_score: "number"
+        routing_reasoning: "string"
+
+  # Step 2: Extract Legal Entities Based on Bennett Legal Models
+  - name: "extract_legal_entities"
+    type: "map"
+    prompt: |
+      You are a legal entity extraction specialist for Bennett Legal. Extract entities using these 15 field-level models:
+      
+      REQUIRED ENTITIES (extract if present):
+      1. DOCTOR: Medical professionals (full names, credentials, specialties)
+      2. SENDER: Document author/sender (names, organizations, contact info)
+      3. DOCUMENT DATE: Primary document dates (creation, effective, signed)
+      4. EVENT DATE: Key event dates (accident, incident, occurrence)
+      5. INSURANCE COMPANY: Insurance carriers and departments
+      6. POLICY NUMBER: Policy numbers, claim numbers, reference numbers
+      7. PLAINTIFF: Injured parties, claimants (full legal names)
+      8. DEFENDANT: Accused parties, respondents (full legal names)
+      9. ATTORNEY: Legal counsel (names, firms, bar numbers)
+      10. MEDICAL FACILITY: Hospitals, clinics, medical centers
+      11. INJURY TYPE: Specific injuries, medical conditions, damages
+      12. SETTLEMENT AMOUNT: Monetary amounts, settlement figures
+      13. CASE NUMBER: Court case numbers, docket numbers
+      14. COURT: Court names, jurisdictions, venues
+      15. SOLAR COMPANY: Solar contractors, installation companies (for solar litigation)
+      
+      EXTRACTION REQUIREMENTS:
+      - Extract exact text as it appears
+      - Provide context snippet (50 characters before/after)
+      - Include page number and character position
+      - Assign confidence score (0.0-1.0)
+      - Flag potential duplicates
+      - Identify relationships between entities
+      
+      For each entity, determine if it's:
+      - OBJECTIVE_TRUTH: Factual, verifiable information
+      - SUBJECTIVE: Opinions, interpretations, estimates
+      - UNCERTAIN: Unclear or ambiguous information
+    output:
+      schema:
+        entities:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              label: "string"           # Entity type from 15 models
+              value: "string"           # Extracted text
+              context_snippet: "string" # Surrounding context
+              page_number: "integer"    # Source page
+              start_offset: "integer"   # Character start position  
+              end_offset: "integer"     # Character end position
+              confidence: "number"      # Confidence score 0.0-1.0
+              is_objective_truth: "boolean" # Factual vs subjective
+              entity_relationships: "array"  # Related entity IDs
+              validation_flags: "array" # Potential issues
+              bennett_model: "string"   # Which of 15 models detected this
+
+  # Step 3: Legal Document Structure Analysis
+  - name: "analyze_document_structure"
+    type: "map"
+    prompt: |
+      Analyze the legal document structure and organization:
+      
+      1. DOCUMENT SECTIONS: Identify major sections, headers, subsections
+      2. LEGAL FORMATTING: Note legal citations, references, exhibits
+      3. SIGNATURE BLOCKS: Identify signatories, dates, notarizations
+      4. ATTACHMENTS: Note referenced exhibits, attachments, schedules
+      5. LEGAL LANGUAGE: Identify key legal terms, clauses, provisions
+      6. PAGE STRUCTURE: Note headers, footers, page numbering
+      
+      For Bennett Legal workflow optimization:
+      - Identify sections requiring legal review
+      - Flag potential privilege issues
+      - Note confidentiality markings
+      - Identify deadline-related content
+    output:
+      schema:
+        document_structure:
+          type: "object"
+          properties:
+            sections: "array"
+            legal_citations: "array"
+            signature_blocks: "array"
+            attachments: "array"
+            privilege_flags: "array"
+            confidential_markings: "array"
+            deadline_content: "array"
+            total_pages: "integer"
+
+  # Step 4: Bennett Legal Workflow Automation
+  - name: "workflow_automation"
+    type: "map"
+    prompt: |
+      Based on the document classification and extracted entities, generate Bennett Legal workflow automation:
+      
+      1. CASE ASSIGNMENT: 
+         - Determine which case this document belongs to
+         - Suggest case linking based on plaintiff, defendant, case numbers
+         - Flag if new case needs to be created
+      
+      2. TASK GENERATION:
+         - Generate specific tasks based on document type
+         - Assign deadlines based on legal requirements
+         - Suggest responsible parties (paralegal vs lawyer)
+      
+      3. CALENDAR EVENTS:
+         - Extract important dates and deadlines
+         - Generate calendar reminders
+         - Flag statute of limitations concerns
+      
+      4. NOTIFICATION RULES:
+         - Determine who needs to be notified
+         - Set urgency levels for notifications
+         - Generate email alerts for critical items
+      
+      5. COMPLIANCE TRACKING:
+         - Identify regulatory requirements
+         - Track discovery obligations
+         - Monitor court-ordered deadlines
+      
+      Return actionable workflow recommendations.
+    output:
+      schema:
+        workflow_actions:
+          type: "object"
+          properties:
+            case_assignment: "object"
+            suggested_tasks: "array"
+            calendar_events: "array"
+            notifications: "array"
+            compliance_items: "array"
+            urgency_flags: "array"
+
+  # Step 5: Quality Assurance and Validation
+  - name: "quality_assurance"
+    type: "map"
+    prompt: |
+      Perform comprehensive quality assurance on all extracted data:
+      
+      1. ENTITY VALIDATION:
+         - Cross-reference entities for consistency
+         - Validate dates, amounts, and identifiers
+         - Check for missing critical information
+      
+      2. ACCURACY ASSESSMENT:
+         - Review confidence scores
+         - Flag low-confidence extractions
+         - Identify potential errors or ambiguities
+      
+      3. COMPLETENESS CHECK:
+         - Ensure all 15 Bennett Legal models were applied
+         - Verify document classification accuracy
+         - Check for overlooked information
+      
+      4. LEGAL COMPLIANCE:
+         - Review for privilege concerns
+         - Check confidentiality handling
+         - Verify proper redaction needs
+      
+      Return validation report with recommendations for human review.
+    output:
+      schema:
+        validation_report:
+          type: "object"
+          properties:
+            accuracy_score: "number"
+            completeness_score: "number"
+            validation_flags: "array"
+            review_required: "boolean"
+            critical_items: "array"
+            recommendations: "array"
+
+# Processing Pipeline with Bennett Legal Optimizations
+pipeline:
+  steps:
+    - name: "document_classification"
+      operations: ["classify_document"]
+      
+    - name: "entity_extraction"
+      operations: ["extract_legal_entities"]
+      depends_on: ["document_classification"]
+      
+    - name: "structure_analysis"
+      operations: ["analyze_document_structure"] 
+      depends_on: ["document_classification"]
+      
+    - name: "workflow_generation"
+      operations: ["workflow_automation"]
+      depends_on: ["entity_extraction", "structure_analysis"]
+      
+    - name: "quality_validation"
+      operations: ["quality_assurance"]
+      depends_on: ["workflow_generation"]
+
+# Output Configuration for Bennett Legal Integration
+output:
+  path: "/tmp/docetl/output/bennett_legal_results.json"
+  format: "json"
+  include_raw_text: false
+  include_metadata: true
+  
+  # Bennett Legal specific output formatting
+  bennett_legal_format:
+    entity_mapping: true
+    workflow_actions: true
+    confidence_reporting: true
+    validation_report: true
+    case_linking_suggestions: true
+    
+# Processing Settings Optimized for Legal Documents
+processing:
+  batch_size: 1  # Process one document at a time for accuracy
+  parallel_operations: false  # Sequential processing for legal accuracy
+  timeout_minutes: 15  # Extended timeout for complex legal documents
+  retry_attempts: 2
+  
+  # Legal-specific processing flags
+  preserve_formatting: true
+  extract_tables: true
+  process_images: true
+  ocr_quality: "high"
+  
+# Security and Compliance Settings
+security:
+  redaction_patterns:
+    - "social_security_numbers"
+    - "credit_card_numbers"
+    - "phone_numbers"  # Optional based on case needs
+  
+  privilege_detection: true
+  confidentiality_marking_detection: true
+  
+  # Bennett Legal specific security
+  client_data_protection: true
+  attorney_work_product_detection: true

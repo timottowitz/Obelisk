@@ -122,6 +122,39 @@
   }
 }
 
+@layer utilities {
+  /* Line clamp utilities for text truncation */
+  .line-clamp-1 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+  
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+  
+  /* Custom hover colors for entity highlighting */
+  .hover\:bg-yellow-150:hover {
+    background-color: rgb(254 240 138 / 0.7);
+  }
+  
+  .hover\:bg-green-150:hover {
+    background-color: rgb(187 247 208 / 0.7);
+  }
+}
+
 /* View Transition Wave Effect */
 ::view-transition-old(root),
 ::view-transition-new(root) {
@@ -155,4 +188,85 @@
 ::view-transition-new(root) {
   /* Apply the reveal animation */
   animation: reveal 0.4s ease-in-out forwards;
+}
+
+/* Doc Intel Focus Mode and Entity Highlighting Styles */
+@layer components {
+  /* Focus mode styles */
+  .focus-mode-container [data-entity-id] {
+    @apply opacity-100 transition-opacity duration-300;
+  }
+  
+  .focus-mode-text {
+    @apply relative;
+  }
+  
+  .focus-mode-text [data-entity-id]:not(.ring-2) {
+    @apply opacity-40;
+  }
+  
+  /* Entity highlight flash animation */
+  .entity-highlight-flash {
+    animation: entityFlash 1.5s ease-in-out;
+    @apply relative z-10;
+  }
+  
+  @keyframes entityFlash {
+    0% {
+      transform: scale(1);
+      box-shadow: 0 0 0 rgba(59, 130, 246, 0.5);
+    }
+    25% {
+      transform: scale(1.02);
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+    }
+    50% {
+      transform: scale(1.01);
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+    }
+    75% {
+      transform: scale(1.005);
+      box-shadow: 0 0 6px rgba(59, 130, 246, 0.2);
+    }
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 rgba(59, 130, 246, 0);
+    }
+  }
+  
+  /* Enhanced entity selection ring */
+  .entity-selection-ring {
+    @apply ring-2 ring-blue-500 ring-offset-1 relative z-20;
+  }
+  
+  /* Hover states for entity cards */
+  .entity-card {
+    @apply transition-all duration-200;
+  }
+  
+  .entity-card:hover {
+    @apply shadow-md transform translate-y-[-1px];
+  }
+  
+  .entity-card.selected {
+    @apply ring-2 ring-blue-500 bg-blue-50/50 shadow-lg;
+  }
+  
+  /* Focus mode document text */
+  .document-focus-mode {
+    @apply relative;
+  }
+  
+  .document-focus-mode:not([data-selected]) {
+    @apply opacity-30 transition-opacity duration-500;
+  }
+  
+  .document-focus-mode[data-selected="true"] {
+    @apply opacity-100;
+  }
+  
+  /* Smooth scrolling for document viewer */
+  .document-viewer {
+    scroll-behavior: smooth;
+  }
 }

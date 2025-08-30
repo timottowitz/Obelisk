@@ -13,6 +13,7 @@ interface FeatureFlags {
   enhancedTaskManagement: boolean;
   advancedAnalytics: boolean;
   betaFeatures: boolean;
+  emailIntegration: boolean;
 }
 
 /**
@@ -31,6 +32,7 @@ export function getFeatureFlags(): FeatureFlags {
     enhancedTaskManagement: getFlag('ENHANCED_TASK_MANAGEMENT', true),
     advancedAnalytics: getFlag('ADVANCED_ANALYTICS', false),
     betaFeatures: getFlag('BETA_FEATURES', false),
+    emailIntegration: getFlag('EMAIL_INTEGRATION', true),
   };
 
   return flags;

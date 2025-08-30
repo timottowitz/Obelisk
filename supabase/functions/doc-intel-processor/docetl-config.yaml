@@ -1,0 +1,139 @@
+# DocETL Configuration for Legal Document Processing
+# This configuration defines the pipeline for extracting structured information from legal documents
+
+default_model: gpt-4
+datasets:
+  - name: "legal_documents"
+    type: "file"
+    path: "/tmp/docetl/input/document.pdf"
+
+operations:
+  # Step 1: Extract raw text from PDF
+  - name: "extract_text"
+    type: "map"
+    prompt: |
+      Extract all text content from this document. Preserve the structure and formatting as much as possible.
+      Return the extracted text in a clean, readable format.
+    output:
+      schema:
+        text: "string"
+        page_count: "integer"
+
+  # Step 2: Extract legal entities (parties, dates, amounts, etc.)
+  - name: "extract_entities"
+    type: "map"
+    prompt: |
+      You are a legal document analysis expert. Extract the following entities from this legal document:
+      
+      1. PARTIES: Names of all parties involved (individuals, companies, organizations)
+      2. DATES: All important dates (contract dates, deadlines, effective dates, expiration dates)
+      3. AMOUNTS: All monetary amounts, percentages, quantities mentioned
+      4. CLAUSES: Key legal clauses and provisions (confidentiality, termination, liability, etc.)
+      5. LOCATIONS: Addresses, jurisdictions, venues mentioned
+      6. OBLIGATIONS: Key obligations and responsibilities of each party
+      7. TERMS: Important terms and conditions
+      
+      For each entity, provide:
+      - The exact text as it appears in the document
+      - The entity type (PARTY, DATE, AMOUNT, CLAUSE, LOCATION, OBLIGATION, TERM)
+      - Context snippet (surrounding text for reference)
+      - Character offset range in the document
+      - Confidence score (0.0 to 1.0)
+      
+      Return the results as a structured JSON object.
+    output:
+      schema:
+        entities:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              label: "string"  # Entity type
+              value: "string"  # Extracted text
+              context_snippet: "string"  # Surrounding context
+              start_offset: "integer"  # Character start position
+              end_offset: "integer"    # Character end position
+              confidence: "number"     # Confidence score
+              page_number: "integer"   # Page where entity appears
+
+  # Step 3: Validate and categorize extracted entities
+  - name: "validate_entities"
+    type: "map" 
+    prompt: |
+      Review the extracted entities and validate them for accuracy. 
+      For each entity:
+      1. Verify it's correctly categorized
+      2. Check if it's actually present in the source text
+      3. Assess the confidence score based on context clarity
+      4. Flag any entities that seem incorrect or ambiguous
+      
+      Return the validated entities with corrected information where needed.
+    output:
+      schema:
+        validated_entities:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              label: "string"
+              value: "string"  
+              context_snippet: "string"
+              start_offset: "integer"
+              end_offset: "integer"
+              confidence: "number"
+              page_number: "integer"
+              validation_status: "string"  # valid, corrected, flagged
+              validation_notes: "string"
+
+  # Step 4: Generate document summary and key insights
+  - name: "document_summary"
+    type: "map"
+    prompt: |
+      Generate a comprehensive summary of this legal document including:
+      
+      1. Document type and purpose
+      2. Key parties involved
+      3. Main terms and conditions
+      4. Important dates and deadlines
+      5. Financial information
+      6. Key obligations and responsibilities
+      7. Risk factors or notable clauses
+      8. Overall document structure
+      
+      Provide actionable insights that would help someone quickly understand the document's content and implications.
+    output:
+      schema:
+        summary:
+          type: "object"
+          properties:
+            document_type: "string"
+            purpose: "string"
+            key_parties: 
+              type: "array"
+              items: "string"
+            main_terms: "string"
+            important_dates: 
+              type: "array"
+              items: "string"  
+            financial_info: "string"
+            obligations: "string"
+            risk_factors: "string"
+            insights: "string"
+
+pipeline:
+  steps:
+    - name: "text_extraction"
+      operations: ["extract_text"]
+    - name: "entity_extraction" 
+      operations: ["extract_entities"]
+      depends_on: ["text_extraction"]
+    - name: "entity_validation"
+      operations: ["validate_entities"]
+      depends_on: ["entity_extraction"]
+    - name: "summarization"
+      operations: ["document_summary"]
+      depends_on: ["entity_validation"]
+
+output:
+  path: "/tmp/docetl/output/results.json"
+  format: "json"

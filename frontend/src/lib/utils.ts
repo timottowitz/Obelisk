@@ -24,3 +24,14 @@ export function formatBytes(
       : (sizes[i] ?? 'Bytes')
   }`;
 }
+
+/**
+ * Formats a status string by replacing all underscores with spaces and converting to uppercase.
+ * This handles cases like "waiting_for_review" properly, converting it to "WAITING FOR REVIEW".
+ * 
+ * @param status - The status string to format
+ * @returns The formatted status string
+ */
+export function formatStatusLabel(status: string): string {
+  return status.replaceAll('_', ' ').toUpperCase();
+}
