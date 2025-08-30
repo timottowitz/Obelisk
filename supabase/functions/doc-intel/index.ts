@@ -35,7 +35,8 @@ app.options("*", (c) => {
 // Apply validation middleware before authentication
 // Upload endpoints need special handling for file size limits
 app.use("/upload", createUploadValidationMiddleware({
-  maxRequestSize: 100 * 1024 * 1024, // 100MB for document uploads
+  maxRequestSize: 50 * 1024 * 1024, // 50MB limit matching P1 security requirements
+  maxFormDataSize: 50 * 1024 * 1024, // Consistent 50MB limit for form data
   rateLimitMaxRequests: 20, // Lower limit for uploads
   rateLimitWindow: 60 * 1000 // 1 minute
 }));
@@ -79,35 +80,53 @@ function getGcsService() {
   return new GoogleCloudStorageService({ bucketName, credentials });
 }
 
-// Helper function to validate file content against MIME type
+// Helper function to validate file content against MIME type using magic numbers
+// Enhanced for P1 security to prevent file type spoofing attacks
 function validateFileContent(fileData: Uint8Array, mimeType: string): boolean {
   try {
-    // Basic magic number validation for common file types
+    // Magic number validation for supported document types only
     const magicNumbers = {
-      'application/pdf': [0x25, 0x50, 0x44, 0x46], // %PDF
-      'image/jpeg': [0xFF, 0xD8, 0xFF], // JPEG
-      'image/png': [0x89, 0x50, 0x4E, 0x47], // PNG
-      'image/tiff': [0x49, 0x49, 0x2A, 0x00], // TIFF (little-endian)
-      'application/zip': [0x50, 0x4B, 0x03, 0x04], // ZIP (used by DOCX)
+      'application/pdf': [0x25, 0x50, 0x44, 0x46],                 // %PDF
+      'application/zip': [0x50, 0x4B, 0x03, 0x04],                 // ZIP (used by DOCX)
+      'application/msword': [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1] // DOC (OLE compound document)
     };
     
-    // Check for DOCX (which is a ZIP file)
+    // Validate PDF files
+    if (mimeType === 'application/pdf') {
+      const pdfMagic = magicNumbers['application/pdf'];
+      return pdfMagic.every((byte, index) => fileData[index] === byte);
+    }
+    
+    // Validate DOCX files (ZIP-based format)
     if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
       const zipMagic = magicNumbers['application/zip'];
       return zipMagic.every((byte, index) => fileData[index] === byte);
     }
     
-    const expectedMagic = magicNumbers[mimeType as keyof typeof magicNumbers];
-    if (!expectedMagic) {
-      // For unsupported types, allow through (text files, etc.)
+    // Validate legacy DOC files (OLE compound document)
+    if (mimeType === 'application/msword') {
+      const docMagic = magicNumbers['application/msword'];
+      return docMagic.every((byte, index) => fileData[index] === byte);
+    }
+    
+    // For text files, perform basic validation
+    if (mimeType === 'text/plain') {
+      // Check if file contains valid text characters (no null bytes in first 512 bytes)
+      const sampleSize = Math.min(512, fileData.length);
+      for (let i = 0; i < sampleSize; i++) {
+        if (fileData[i] === 0) {
+          return false; // Null bytes indicate binary content, not text
+        }
+      }
       return true;
     }
     
-    return expectedMagic.every((byte, index) => fileData[index] === byte);
+    // Only allow explicitly supported types
+    return false;
   } catch (error) {
     console.error('File validation error:', error);
-    // Allow through on validation error to prevent false positives
-    return true;
+    // Fail securely - reject on validation error for P1 security
+    return false;
   }
 }
 
@@ -155,7 +174,13 @@ async function getOrganizationInfo(supabase: any, orgId: string, userId: string)
   };
 }
 
-// POST /upload - Handle file upload
+// POST /upload - Handle file upload with P1 security validation
+// Implements BE-008: Server-side file validation (size/type) to complement FE-005
+// Security features:
+// - Server-side file size validation (50MB limit) 
+// - Server-side file type validation (PDF, DOCX, DOC, TXT only)
+// - Magic number content validation to prevent type spoofing
+// - Validation cannot be bypassed by manipulating client-side code
 app.post("/upload", async (c) => {
   try {
     const orgId = c.get("orgId");
@@ -179,34 +204,37 @@ app.post("/upload", async (c) => {
       }, 400);
     }
     
-    // Additional file validation
+    // Server-side file type validation - matches client-side rules from FE-005
+    // Only allow document types as per P1 security requirements: PDF, DOCX, DOC, TXT
     const allowedMimeTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'text/plain',
-      'image/jpeg',
-      'image/png',
-      'image/tiff'
+      'application/pdf',                                                          // PDF files
+      'application/msword',                                                       // Legacy DOC files  
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // DOCX files
+      'text/plain'                                                               // TXT files
     ];
     
     if (!allowedMimeTypes.includes(file.type)) {
       return c.json({
         success: false,
-        error: `File type '${file.type}' is not supported`,
+        error: `File type '${file.type}' is not supported. Only PDF, DOCX, DOC, and TXT files are allowed.`,
         code: "UNSUPPORTED_FILE_TYPE",
-        allowedTypes: allowedMimeTypes
+        allowedTypes: ['PDF', 'DOCX', 'DOC', 'TXT'],
+        receivedType: file.type
       }, 415);
     }
     
-    // Validate file size (additional check after middleware)
+    // Server-side file size validation - 50MB limit as per P1 security requirements
+    // This provides security even if client-side validation is bypassed
     const maxFileSize = 50 * 1024 * 1024; // 50MB
     if (file.size > maxFileSize) {
       return c.json({
         success: false,
-        error: `File size ${file.size} bytes exceeds maximum allowed ${maxFileSize} bytes`,
+        error: `File size ${(file.size / (1024 * 1024)).toFixed(2)} MB exceeds maximum allowed 50 MB`,
         code: "FILE_TOO_LARGE",
-        maxSize: maxFileSize
+        maxSizeBytes: maxFileSize,
+        maxSizeMB: 50,
+        receivedSizeBytes: file.size,
+        receivedSizeMB: parseFloat((file.size / (1024 * 1024)).toFixed(2))
       }, 413);
     }
 
@@ -234,12 +262,15 @@ app.post("/upload", async (c) => {
       }, 400);
     }
     
-    // Validate file content (basic magic number check)
+    // Server-side file content validation using magic numbers - P1 security feature
+    // Prevents file type spoofing attacks where malicious files masquerade as documents
     if (!validateFileContent(fileData, file.type)) {
       return c.json({
         success: false,
-        error: "File content does not match declared MIME type",
-        code: "INVALID_FILE_CONTENT"
+        error: `File content validation failed. The file does not appear to be a valid ${file.type.split('/')[1].toUpperCase()} file.`,
+        code: "INVALID_FILE_CONTENT",
+        declaredType: file.type,
+        hint: "File may be corrupted or the file extension may not match the actual content"
       }, 400);
     }
 

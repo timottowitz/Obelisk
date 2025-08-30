@@ -8,6 +8,7 @@ import { Heading } from '@/components/ui/heading';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useDocument, useDocumentEntities, useUpdateEntityStatus, useUpdateEntity, useUpdateDocument, useDownloadDocument } from '@/hooks/useDocIntel';
 import { VerificationWorkbench, DocumentViewer, EntityEditModal } from '@/features/doc-intel/components';
 import { cn, formatStatusLabel } from '@/lib/utils';
@@ -41,6 +42,7 @@ export default function DocumentReviewClient({ id }: DocumentReviewClientProps) 
   const [searchQuery, setSearchQuery] = useState('');
   const [editingEntity, setEditingEntity] = useState<Entity | null>(null);
   const [isFinalizingReview, setIsFinalizingReview] = useState(false);
+  const [showFinalizeConfirmation, setShowFinalizeConfirmation] = useState(false);
   
   const documentQuery = useDocument(id);
   const entitiesQuery = useDocumentEntities(id);
@@ -52,8 +54,18 @@ export default function DocumentReviewClient({ id }: DocumentReviewClientProps) 
   const document = documentQuery.data;
   const entities = entitiesQuery.data?.entities || [];
 
-  // Check if all entities are reviewed (confirmed or rejected)
+  // Count pending entities
+  const pendingEntitiesCount = useMemo(() => {
+    return entities.filter(entity => entity.status === 'pending').length;
+  }, [entities]);
+
+  // Check if document can be finalized (has entities and not already complete)
   const canFinalizeReview = useMemo(() => {
+    return entities.length > 0;
+  }, [entities]);
+
+  // Check if all entities are fully reviewed
+  const allEntitiesReviewed = useMemo(() => {
     return entities.length > 0 && entities.every(entity => 
       entity.status === 'confirmed' || entity.status === 'rejected'
     );
@@ -87,10 +99,24 @@ export default function DocumentReviewClient({ id }: DocumentReviewClientProps) 
     }
   }, [updateEntity]);
 
+  const handleFinalizeClick = useCallback(() => {
+    if (!canFinalizeReview || !document) return;
+    
+    // If there are pending entities, show confirmation dialog
+    if (pendingEntitiesCount > 0) {
+      setShowFinalizeConfirmation(true);
+    } else {
+      // If all entities are reviewed, proceed directly
+      handleFinalizeReview();
+    }
+  }, [canFinalizeReview, document, pendingEntitiesCount]);
+
   const handleFinalizeReview = useCallback(async () => {
     if (!canFinalizeReview || !document) return;
     
     setIsFinalizingReview(true);
+    setShowFinalizeConfirmation(false);
+    
     try {
       await updateDocument.mutateAsync({ 
         documentId: document.id, 
@@ -202,7 +228,7 @@ export default function DocumentReviewClient({ id }: DocumentReviewClientProps) 
             </Badge>
             {canFinalizeReview && document.status !== 'complete' && (
               <Button 
-                onClick={handleFinalizeReview}
+                onClick={handleFinalizeClick}
                 disabled={isFinalizingReview}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"
                 size="sm"
@@ -255,6 +281,29 @@ export default function DocumentReviewClient({ id }: DocumentReviewClientProps) 
         onClose={() => setEditingEntity(null)}
         onSave={handleEntitySave}
       />
+      
+      {/* Finalize Confirmation Dialog */}
+      <AlertDialog open={showFinalizeConfirmation} onOpenChange={setShowFinalizeConfirmation}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Finalize Review with Pending Entities?</AlertDialogTitle>
+            <AlertDialogDescription>
+              There {pendingEntitiesCount === 1 ? 'is' : 'are'} <strong>{pendingEntitiesCount}</strong> pending {pendingEntitiesCount === 1 ? 'entity' : 'entities'} that {pendingEntitiesCount === 1 ? 'has' : 'have'} not been reviewed yet.
+              <br /><br />
+              Are you sure you want to finalize the document review? Pending entities will remain in their current state.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleFinalizeReview}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              Yes, Finalize Review
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

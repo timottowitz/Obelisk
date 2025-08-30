@@ -303,7 +303,7 @@ app.post("/doc-intel-processor/jobs", async (c) => {
       return c.json({ error: "Document not found" }, 404);
     }
 
-    // Create job
+    // Create job with tenant_id
     const { data: job, error: jobError } = await supabase
       .schema(schema)
       .from("doc_intel_job_queue")
@@ -311,6 +311,7 @@ app.post("/doc-intel-processor/jobs", async (c) => {
         job_type,
         document_id,
         user_id: userId,
+        tenant_id: orgId, // Add tenant isolation
         pipeline_config,
         input_data,
         priority,
@@ -365,34 +366,28 @@ app.post("/doc-intel-processor/process", async (c) => {
       auth: { persistSession: false },
     });
 
-    // Parse request body for optional job types filter
+    // Parse request body for optional job types and tenant filters
     const body = await c.req.json().catch(() => ({}));
-    const { job_types = null } = body;
+    const { job_types = null, tenant_id = null } = body;
 
-    // Claim next job from any tenant schema
-    const job = await claimNextJob(supabase, WORKER_ID, job_types);
+    // Claim next job with tenant filtering
+    const job = await claimNextJob(supabase, WORKER_ID, tenant_id, job_types);
     
     if (!job) {
       return c.json({ message: "No jobs available" }, 204);
     }
 
-    // Get the schema for this job's organization
+    // Get the schema for this job's organization using tenant_id
     const { data: org, error: orgError } = await supabase
       .schema("private")
       .from("organizations")
       .select("schema_name")
-      .eq("id", (await supabase
-        .schema("private")
-        .from("users")
-        .select("organization_members!inner(organization_id)")
-        .eq("id", job.user_id)
-        .single()
-      ).data?.organization_members?.organization_id)
+      .eq("id", job.tenant_id)
       .single();
 
     if (orgError || !org) {
       console.error("Error getting organization for job:", orgError);
-      return c.json({ error: "Could not determine organization" }, 500);
+      return c.json({ error: "Could not determine organization for tenant" }, 500);
     }
 
     const schema = org.schema_name.toLowerCase();
@@ -542,19 +537,37 @@ async function getOrganizationSchema(supabase: any, orgId: string, userId: strin
   }
 }
 
-// Helper function to claim next job across all tenant schemas
-async function claimNextJob(supabase: any, workerId: string, jobTypes: string[] | null): Promise<DocETLJob | null> {
+// Helper function to claim next job with tenant filtering
+async function claimNextJob(supabase: any, workerId: string, tenantId: string | null, jobTypes: string[] | null): Promise<DocETLJob | null> {
   try {
-    // Get all active organizations to check their job queues
-    const { data: orgs, error: orgsError } = await supabase
-      .schema("private")
-      .from("organizations")
-      .select("id, schema_name")
-      .eq("is_active", true);
+    // Get organizations to check - filter by tenantId if provided
+    let orgs;
+    if (tenantId) {
+      const { data: orgData, error: orgsError } = await supabase
+        .schema("private")
+        .from("organizations")
+        .select("id, schema_name")
+        .eq("id", tenantId)
+        .eq("is_active", true)
+        .single();
 
-    if (orgsError || !orgs || orgs.length === 0) {
-      console.log("No active organizations found");
-      return null;
+      if (orgsError || !orgData) {
+        console.log(`No active organization found for tenant ${tenantId}`);
+        return null;
+      }
+      orgs = [orgData];
+    } else {
+      const { data: orgData, error: orgsError } = await supabase
+        .schema("private")
+        .from("organizations")
+        .select("id, schema_name")
+        .eq("is_active", true);
+
+      if (orgsError || !orgData || orgData.length === 0) {
+        console.log("No active organizations found");
+        return null;
+      }
+      orgs = orgData;
     }
 
     // Try to claim a job from each organization's schema
@@ -562,8 +575,10 @@ async function claimNextJob(supabase: any, workerId: string, jobTypes: string[] 
       const schema = org.schema_name.toLowerCase();
       
       try {
+        // Use updated function signature with tenant_id parameter
         const { data: jobs, error: jobError } = await supabase.rpc("claim_next_doc_intel_job", {
           p_worker_id: workerId,
+          p_tenant_id: org.id,
           p_job_types: jobTypes
         });
 
@@ -588,7 +603,7 @@ async function claimNextJob(supabase: any, workerId: string, jobTypes: string[] 
             continue;
           }
 
-          console.log(`Claimed job ${job.job_id} from schema ${schema}`);
+          console.log(`Claimed job ${job.job_id} from schema ${schema} for tenant ${org.id}`);
           return fullJob;
         }
       } catch (schemaError) {

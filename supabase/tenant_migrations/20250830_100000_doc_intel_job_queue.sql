@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS doc_intel_job_queue (
     job_type TEXT NOT NULL CHECK (job_type IN ('extract', 'transform', 'pipeline')),
     document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES private.users(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL, -- Add tenant isolation
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'cancelled')),
     
     -- Job configuration
@@ -33,8 +34,10 @@ CREATE TABLE IF NOT EXISTS doc_intel_job_queue (
     -- Error handling
     error_message TEXT,
     error_details JSONB,
+    last_error JSONB, -- Enhanced error tracking for observability
     retry_count INTEGER DEFAULT 0,
     max_retries INTEGER DEFAULT 3,
+    next_retry_at TIMESTAMP WITH TIME ZONE, -- For backoff scheduling
     
     -- Timing
     started_at TIMESTAMP WITH TIME ZONE,
@@ -45,6 +48,43 @@ CREATE TABLE IF NOT EXISTS doc_intel_job_queue (
     -- Metadata
     priority INTEGER DEFAULT 0,
     metadata JSONB DEFAULT '{}'::jsonb,
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- DOC INTEL DEAD LETTER QUEUE TABLE
+-- Stores permanently failed jobs for analysis and potential manual recovery
+CREATE TABLE IF NOT EXISTS doc_intel_job_dlq (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    original_job_id UUID NOT NULL,
+    job_type TEXT NOT NULL,
+    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES private.users(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL,
+    
+    -- Original job configuration
+    pipeline_config JSONB NOT NULL DEFAULT '{}'::jsonb,
+    input_data JSONB DEFAULT '{}'::jsonb,
+    
+    -- Failure details
+    final_error_message TEXT NOT NULL,
+    final_error_details JSONB,
+    failure_reason TEXT NOT NULL CHECK (failure_reason IN ('max_retries_exceeded', 'non_retryable_error', 'timeout', 'resource_exhaustion')),
+    total_retry_attempts INTEGER DEFAULT 0,
+    
+    -- Failure timeline
+    first_failed_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    moved_to_dlq_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Processing metadata
+    priority INTEGER DEFAULT 0,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    
+    -- Recovery status
+    recovery_status TEXT DEFAULT 'pending' CHECK (recovery_status IN ('pending', 'recovered', 'abandoned')),
+    recovery_attempts INTEGER DEFAULT 0,
+    last_recovery_attempt TIMESTAMP WITH TIME ZONE,
     
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -79,13 +119,23 @@ CREATE INDEX IF NOT EXISTS idx_doc_intel_job_queue_status ON doc_intel_job_queue
 CREATE INDEX IF NOT EXISTS idx_doc_intel_job_queue_job_type ON doc_intel_job_queue(job_type);
 CREATE INDEX IF NOT EXISTS idx_doc_intel_job_queue_document_id ON doc_intel_job_queue(document_id);
 CREATE INDEX IF NOT EXISTS idx_doc_intel_job_queue_user_id ON doc_intel_job_queue(user_id);
+CREATE INDEX IF NOT EXISTS idx_doc_intel_job_queue_tenant_id ON doc_intel_job_queue(tenant_id); -- Tenant isolation
 CREATE INDEX IF NOT EXISTS idx_doc_intel_job_queue_created_at ON doc_intel_job_queue(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_doc_intel_job_queue_priority ON doc_intel_job_queue(priority DESC);
 CREATE INDEX IF NOT EXISTS idx_doc_intel_job_queue_timeout ON doc_intel_job_queue(timeout_at) WHERE status = 'processing';
+CREATE INDEX IF NOT EXISTS idx_doc_intel_job_queue_retry ON doc_intel_job_queue(next_retry_at) WHERE status = 'pending' AND next_retry_at IS NOT NULL;
 
--- Composite indexes for job processing
-CREATE INDEX IF NOT EXISTS idx_doc_intel_job_queue_pending ON doc_intel_job_queue(status, priority DESC, created_at) WHERE status = 'pending';
-CREATE INDEX IF NOT EXISTS idx_doc_intel_job_queue_processing ON doc_intel_job_queue(status, last_heartbeat) WHERE status = 'processing';
+-- Composite indexes for job processing with tenant isolation
+CREATE INDEX IF NOT EXISTS idx_doc_intel_job_queue_pending ON doc_intel_job_queue(tenant_id, status, priority DESC, created_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_doc_intel_job_queue_processing ON doc_intel_job_queue(tenant_id, status, last_heartbeat) WHERE status = 'processing';
+CREATE INDEX IF NOT EXISTS idx_doc_intel_job_queue_tenant_status ON doc_intel_job_queue(tenant_id, status, created_at DESC);
+
+-- Dead letter queue indexes
+CREATE INDEX IF NOT EXISTS idx_doc_intel_job_dlq_tenant_id ON doc_intel_job_dlq(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_doc_intel_job_dlq_original_job_id ON doc_intel_job_dlq(original_job_id);
+CREATE INDEX IF NOT EXISTS idx_doc_intel_job_dlq_failure_reason ON doc_intel_job_dlq(failure_reason);
+CREATE INDEX IF NOT EXISTS idx_doc_intel_job_dlq_recovery_status ON doc_intel_job_dlq(recovery_status);
+CREATE INDEX IF NOT EXISTS idx_doc_intel_job_dlq_created_at ON doc_intel_job_dlq(created_at DESC);
 
 -- Job logs indexes
 CREATE INDEX IF NOT EXISTS idx_doc_intel_job_logs_job_id ON doc_intel_job_logs(job_id);
@@ -179,22 +229,24 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to find and claim next pending job
+-- Function to find and claim next pending job with tenant filtering
 CREATE OR REPLACE FUNCTION claim_next_doc_intel_job(
     p_worker_id TEXT,
+    p_tenant_id UUID DEFAULT NULL,
     p_job_types TEXT[] DEFAULT NULL
 )
 RETURNS TABLE(
     job_id UUID,
     job_type TEXT,
     document_id UUID,
+    tenant_id UUID,
     pipeline_config JSONB,
     input_data JSONB
 ) AS $$
 DECLARE
     claimed_job_id UUID;
 BEGIN
-    -- Find and claim the next pending job with highest priority
+    -- Find and claim the next pending job with highest priority and tenant isolation
     UPDATE doc_intel_job_queue
     SET status = 'processing',
         started_at = CURRENT_TIMESTAMP,
@@ -203,7 +255,9 @@ BEGIN
     WHERE id = (
         SELECT id FROM doc_intel_job_queue
         WHERE status = 'pending'
+        AND (p_tenant_id IS NULL OR tenant_id = p_tenant_id)
         AND (p_job_types IS NULL OR job_type = ANY(p_job_types))
+        AND (next_retry_at IS NULL OR next_retry_at <= CURRENT_TIMESTAMP)
         ORDER BY priority DESC, created_at ASC
         LIMIT 1
         FOR UPDATE SKIP LOCKED
@@ -225,6 +279,7 @@ BEGIN
             q.id,
             q.job_type,
             q.document_id,
+            q.tenant_id,
             q.pipeline_config,
             q.input_data
         FROM doc_intel_job_queue q
@@ -255,31 +310,59 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to mark job as failed
+-- Function to mark job as failed with retry backoff and DLQ handling
 CREATE OR REPLACE FUNCTION fail_doc_intel_job(
     p_job_id UUID,
     p_error_message TEXT,
     p_error_details JSONB DEFAULT NULL,
-    p_should_retry BOOLEAN DEFAULT FALSE
+    p_should_retry BOOLEAN DEFAULT FALSE,
+    p_is_retryable_error BOOLEAN DEFAULT TRUE
 )
 RETURNS VOID AS $$
 DECLARE
     current_retry_count INTEGER;
     max_retry_count INTEGER;
+    job_record RECORD;
+    backoff_seconds INTEGER;
+    next_retry TIMESTAMP WITH TIME ZONE;
+    failure_reason TEXT;
 BEGIN
-    -- Get current retry info
-    SELECT retry_count, max_retries INTO current_retry_count, max_retry_count
+    -- Get current job info
+    SELECT * INTO job_record
     FROM doc_intel_job_queue
     WHERE id = p_job_id;
     
+    IF job_record IS NULL THEN
+        RAISE EXCEPTION 'Job not found: %', p_job_id;
+    END IF;
+    
+    current_retry_count := job_record.retry_count;
+    max_retry_count := job_record.max_retries;
+    
+    -- Update last_error for observability
+    UPDATE doc_intel_job_queue
+    SET last_error = jsonb_build_object(
+        'message', p_error_message,
+        'details', p_error_details,
+        'timestamp', CURRENT_TIMESTAMP,
+        'retry_attempt', current_retry_count + 1,
+        'is_retryable', p_is_retryable_error
+    )
+    WHERE id = p_job_id;
+    
     -- Determine if we should retry
-    IF p_should_retry AND current_retry_count < max_retry_count THEN
-        -- Increment retry count and set back to pending
+    IF p_should_retry AND p_is_retryable_error AND current_retry_count < max_retry_count THEN
+        -- Calculate exponential backoff: 2^retry_count * 60 seconds, max 1 hour
+        backoff_seconds := LEAST(POWER(2, current_retry_count + 1) * 60, 3600);
+        next_retry := CURRENT_TIMESTAMP + (backoff_seconds || ' seconds')::INTERVAL;
+        
+        -- Increment retry count and set back to pending with backoff
         UPDATE doc_intel_job_queue
         SET status = 'pending',
             retry_count = retry_count + 1,
             error_message = p_error_message,
             error_details = p_error_details,
+            next_retry_at = next_retry,
             started_at = NULL,
             last_heartbeat = NULL,
             timeout_at = NULL
@@ -287,10 +370,58 @@ BEGIN
         
         -- Create retry log
         PERFORM create_doc_intel_job_log(p_job_id, 'warning', 
-            format('Job failed, retrying (%s/%s): %s', current_retry_count + 1, max_retry_count, p_error_message),
-            p_error_details);
+            format('Job failed, retrying (%s/%s) in %s seconds: %s', 
+                   current_retry_count + 1, max_retry_count, backoff_seconds, p_error_message),
+            jsonb_build_object(
+                'error_details', p_error_details,
+                'retry_attempt', current_retry_count + 1,
+                'backoff_seconds', backoff_seconds,
+                'next_retry_at', next_retry
+            ));
     ELSE
-        -- Mark as permanently failed
+        -- Determine failure reason for DLQ
+        IF NOT p_is_retryable_error THEN
+            failure_reason := 'non_retryable_error';
+        ELSIF current_retry_count >= max_retry_count THEN
+            failure_reason := 'max_retries_exceeded';
+        ELSE
+            failure_reason := 'timeout';
+        END IF;
+        
+        -- Move to Dead Letter Queue
+        INSERT INTO doc_intel_job_dlq (
+            original_job_id,
+            job_type,
+            document_id,
+            user_id,
+            tenant_id,
+            pipeline_config,
+            input_data,
+            final_error_message,
+            final_error_details,
+            failure_reason,
+            total_retry_attempts,
+            first_failed_at,
+            priority,
+            metadata
+        ) VALUES (
+            p_job_id,
+            job_record.job_type,
+            job_record.document_id,
+            job_record.user_id,
+            job_record.tenant_id,
+            job_record.pipeline_config,
+            job_record.input_data,
+            p_error_message,
+            p_error_details,
+            failure_reason,
+            current_retry_count,
+            COALESCE(job_record.started_at, job_record.created_at),
+            job_record.priority,
+            job_record.metadata
+        );
+        
+        -- Mark original job as failed
         UPDATE doc_intel_job_queue
         SET status = 'failed',
             completed_at = CURRENT_TIMESTAMP,
@@ -300,9 +431,161 @@ BEGIN
         
         -- Create failure log
         PERFORM create_doc_intel_job_log(p_job_id, 'error', 
-            format('Job failed permanently: %s', p_error_message),
-            p_error_details);
+            format('Job failed permanently and moved to DLQ: %s (reason: %s)', p_error_message, failure_reason),
+            jsonb_build_object(
+                'error_details', p_error_details,
+                'failure_reason', failure_reason,
+                'total_retries', current_retry_count,
+                'moved_to_dlq', true
+            ));
     END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to recover job from DLQ (manual recovery)
+CREATE OR REPLACE FUNCTION recover_from_dlq(
+    p_dlq_id UUID,
+    p_reset_retries BOOLEAN DEFAULT TRUE
+)
+RETURNS UUID AS $$
+DECLARE
+    dlq_record RECORD;
+    new_job_id UUID;
+BEGIN
+    -- Get DLQ record
+    SELECT * INTO dlq_record
+    FROM doc_intel_job_dlq
+    WHERE id = p_dlq_id AND recovery_status = 'pending';
+    
+    IF dlq_record IS NULL THEN
+        RAISE EXCEPTION 'DLQ record not found or already recovered: %', p_dlq_id;
+    END IF;
+    
+    -- Create new job from DLQ data
+    INSERT INTO doc_intel_job_queue (
+        job_type,
+        document_id,
+        user_id,
+        tenant_id,
+        pipeline_config,
+        input_data,
+        status,
+        retry_count,
+        max_retries,
+        priority,
+        metadata
+    ) VALUES (
+        dlq_record.job_type,
+        dlq_record.document_id,
+        dlq_record.user_id,
+        dlq_record.tenant_id,
+        dlq_record.pipeline_config,
+        dlq_record.input_data,
+        'pending',
+        CASE WHEN p_reset_retries THEN 0 ELSE dlq_record.total_retry_attempts END,
+        3, -- Reset max retries
+        dlq_record.priority,
+        dlq_record.metadata
+    ) RETURNING id INTO new_job_id;
+    
+    -- Update DLQ record
+    UPDATE doc_intel_job_dlq
+    SET recovery_status = 'recovered',
+        recovery_attempts = recovery_attempts + 1,
+        last_recovery_attempt = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = p_dlq_id;
+    
+    -- Log recovery
+    PERFORM create_doc_intel_job_log(new_job_id, 'info', 
+        format('Job recovered from DLQ: %s', p_dlq_id),
+        jsonb_build_object('dlq_id', p_dlq_id, 'reset_retries', p_reset_retries));
+    
+    RETURN new_job_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get DLQ statistics
+CREATE OR REPLACE FUNCTION get_dlq_stats(p_tenant_id UUID DEFAULT NULL)
+RETURNS TABLE(
+    tenant_id UUID,
+    total_failed_jobs BIGINT,
+    max_retries_exceeded BIGINT,
+    non_retryable_errors BIGINT,
+    timeouts BIGINT,
+    pending_recovery BIGINT,
+    recovered_jobs BIGINT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        d.tenant_id,
+        COUNT(*)::BIGINT as total_failed_jobs,
+        COUNT(*) FILTER (WHERE failure_reason = 'max_retries_exceeded')::BIGINT,
+        COUNT(*) FILTER (WHERE failure_reason = 'non_retryable_error')::BIGINT,
+        COUNT(*) FILTER (WHERE failure_reason = 'timeout')::BIGINT,
+        COUNT(*) FILTER (WHERE recovery_status = 'pending')::BIGINT,
+        COUNT(*) FILTER (WHERE recovery_status = 'recovered')::BIGINT
+    FROM doc_intel_job_dlq d
+    WHERE (p_tenant_id IS NULL OR d.tenant_id = p_tenant_id)
+    GROUP BY d.tenant_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to validate tenant isolation (test function)
+CREATE OR REPLACE FUNCTION test_tenant_isolation()
+RETURNS TABLE(
+    test_name TEXT,
+    status TEXT,
+    details TEXT
+) AS $$
+DECLARE
+    tenant1_id UUID := gen_random_uuid();
+    tenant2_id UUID := gen_random_uuid();
+    job1_id UUID;
+    job2_id UUID;
+    claimed_job RECORD;
+BEGIN
+    -- Test 1: Create jobs for different tenants
+    INSERT INTO doc_intel_job_queue (job_type, document_id, user_id, tenant_id, pipeline_config)
+    VALUES ('extract', gen_random_uuid(), gen_random_uuid(), tenant1_id, '{}'::jsonb)
+    RETURNING id INTO job1_id;
+    
+    INSERT INTO doc_intel_job_queue (job_type, document_id, user_id, tenant_id, pipeline_config)
+    VALUES ('extract', gen_random_uuid(), gen_random_uuid(), tenant2_id, '{}'::jsonb)
+    RETURNING id INTO job2_id;
+    
+    RETURN QUERY VALUES ('job_creation', 'PASS', format('Created jobs for tenant1: %s, tenant2: %s', job1_id, job2_id));
+    
+    -- Test 2: Claim job with tenant filtering
+    SELECT * INTO claimed_job FROM claim_next_doc_intel_job('test-worker', tenant1_id, NULL) LIMIT 1;
+    
+    IF claimed_job.tenant_id = tenant1_id THEN
+        RETURN QUERY VALUES ('tenant_filtering', 'PASS', format('Correctly claimed job from tenant1: %s', claimed_job.job_id));
+    ELSE
+        RETURN QUERY VALUES ('tenant_filtering', 'FAIL', format('Wrong tenant job claimed: %s', claimed_job.tenant_id));
+    END IF;
+    
+    -- Test 3: Test retry with backoff
+    PERFORM fail_doc_intel_job(job2_id, 'Test error', '{"test": true}'::jsonb, TRUE, TRUE);
+    
+    -- Check if job is in pending state with next_retry_at set
+    IF EXISTS (
+        SELECT 1 FROM doc_intel_job_queue 
+        WHERE id = job2_id 
+        AND status = 'pending' 
+        AND next_retry_at IS NOT NULL
+        AND last_error IS NOT NULL
+    ) THEN
+        RETURN QUERY VALUES ('retry_backoff', 'PASS', 'Job correctly scheduled for retry with backoff');
+    ELSE
+        RETURN QUERY VALUES ('retry_backoff', 'FAIL', 'Retry backoff not properly implemented');
+    END IF;
+    
+    -- Cleanup test data
+    DELETE FROM doc_intel_job_queue WHERE id IN (job1_id, job2_id);
+    
+    RETURN QUERY VALUES ('cleanup', 'PASS', 'Test data cleaned up');
 END;
 $$ LANGUAGE plpgsql;
 
@@ -322,18 +605,31 @@ CREATE TRIGGER handle_doc_intel_job_status_change_trigger
     FOR EACH ROW
     EXECUTE FUNCTION handle_doc_intel_job_status_change();
 
+-- Trigger for DLQ updated_at timestamp
+CREATE TRIGGER update_doc_intel_job_dlq_updated_at
+    BEFORE UPDATE ON doc_intel_job_dlq
+    FOR EACH ROW
+    EXECUTE FUNCTION handle_doc_intel_job_updated_at();
+
 -- =============================================================================
 -- ROW LEVEL SECURITY
 -- =============================================================================
 
 -- Enable RLS on tables
 ALTER TABLE doc_intel_job_queue ENABLE ROW LEVEL SECURITY;
+ALTER TABLE doc_intel_job_dlq ENABLE ROW LEVEL SECURITY;
 ALTER TABLE doc_intel_job_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE doc_intel_job_heartbeats ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for job queue table
--- Users can only see their own jobs
+-- Users can only see their own jobs (tenant isolation handled at application level)
 CREATE POLICY doc_intel_job_queue_user_access ON doc_intel_job_queue
+    FOR ALL
+    USING (user_id = auth.uid());
+
+-- RLS Policies for DLQ table
+-- Users can only see their own failed jobs
+CREATE POLICY doc_intel_job_dlq_user_access ON doc_intel_job_dlq
     FOR ALL
     USING (user_id = auth.uid());
 
@@ -367,6 +663,7 @@ CREATE POLICY doc_intel_job_heartbeats_user_access ON doc_intel_job_heartbeats
 
 -- Grant service_role permissions for backend operations
 GRANT ALL ON doc_intel_job_queue TO service_role;
+GRANT ALL ON doc_intel_job_dlq TO service_role;
 GRANT ALL ON doc_intel_job_logs TO service_role;
 GRANT ALL ON doc_intel_job_heartbeats TO service_role;
 
@@ -375,12 +672,16 @@ GRANT EXECUTE ON FUNCTION handle_doc_intel_job_updated_at() TO service_role;
 GRANT EXECUTE ON FUNCTION handle_doc_intel_job_status_change() TO service_role;
 GRANT EXECUTE ON FUNCTION create_doc_intel_job_log(UUID, TEXT, TEXT, JSONB) TO service_role;
 GRANT EXECUTE ON FUNCTION update_doc_intel_job_heartbeat(UUID, TEXT, JSONB) TO service_role;
-GRANT EXECUTE ON FUNCTION claim_next_doc_intel_job(TEXT, TEXT[]) TO service_role;
+GRANT EXECUTE ON FUNCTION claim_next_doc_intel_job(TEXT, UUID, TEXT[]) TO service_role;
 GRANT EXECUTE ON FUNCTION complete_doc_intel_job(UUID, JSONB, TEXT) TO service_role;
-GRANT EXECUTE ON FUNCTION fail_doc_intel_job(UUID, TEXT, JSONB, BOOLEAN) TO service_role;
+GRANT EXECUTE ON FUNCTION fail_doc_intel_job(UUID, TEXT, JSONB, BOOLEAN, BOOLEAN) TO service_role;
+GRANT EXECUTE ON FUNCTION recover_from_dlq(UUID, BOOLEAN) TO service_role;
+GRANT EXECUTE ON FUNCTION get_dlq_stats(UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION test_tenant_isolation() TO service_role;
 
 -- Grant authenticated user permissions
 GRANT SELECT ON doc_intel_job_queue TO authenticated;
+GRANT SELECT ON doc_intel_job_dlq TO authenticated;
 GRANT SELECT ON doc_intel_job_logs TO authenticated;
 GRANT SELECT ON doc_intel_job_heartbeats TO authenticated;
 
@@ -396,6 +697,14 @@ BEGIN
     EXCEPTION 
         WHEN duplicate_object THEN 
             RAISE NOTICE 'Table {{schema_name}}.doc_intel_job_queue already in publication';
+    END;
+    
+    -- Add DLQ table to realtime publication
+    BEGIN
+        ALTER PUBLICATION supabase_realtime ADD TABLE {{schema_name}}.doc_intel_job_dlq;
+    EXCEPTION 
+        WHEN duplicate_object THEN 
+            RAISE NOTICE 'Table {{schema_name}}.doc_intel_job_dlq already in publication';
     END;
     
     -- Add job logs table to realtime publication

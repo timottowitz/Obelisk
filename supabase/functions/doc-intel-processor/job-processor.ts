@@ -9,6 +9,7 @@ export interface DocETLJob {
   job_type: 'extract' | 'transform' | 'pipeline';
   document_id: string;
   user_id: string;
+  tenant_id: string; // Add tenant isolation
   pipeline_config: any;
   input_data: any;
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
@@ -19,8 +20,10 @@ export interface DocETLJob {
   result_file_path?: string;
   error_message?: string;
   error_details?: any;
+  last_error?: any; // Enhanced error tracking
   retry_count: number;
   max_retries: number;
+  next_retry_at?: string; // For backoff scheduling
   metadata?: any;
 }
 
@@ -121,10 +124,11 @@ export class DocETLJobProcessor {
       // Handle error with comprehensive error handler
       const classifiedError = await this.errorHandler.handleJobError(job.id, error);
       
-      // Determine if we should retry
+      // Determine if we should retry and if error is retryable
       const shouldRetry = classifiedError.retryable && job.retry_count < job.max_retries;
+      const isRetryableError = classifiedError.retryable;
       
-      await this.failJob(job.id, classifiedError.message, classifiedError.details, shouldRetry);
+      await this.failJob(job.id, classifiedError.message, classifiedError.details, shouldRetry, isRetryableError);
       
       // Notify failure via webhook
       await this.webhookHandler.notifyJobStatusChange(job.id, 'failed', {
@@ -908,14 +912,15 @@ export class DocETLJobProcessor {
   }
 
   /**
-   * Mark job as failed
+   * Mark job as failed with enhanced retry backoff and DLQ handling
    */
-  private async failJob(jobId: string, errorMessage: string, errorDetails?: any, shouldRetry: boolean = false): Promise<void> {
+  private async failJob(jobId: string, errorMessage: string, errorDetails?: any, shouldRetry: boolean = false, isRetryableError: boolean = true): Promise<void> {
     await this.supabase.rpc('fail_doc_intel_job', {
       p_job_id: jobId,
       p_error_message: errorMessage,
       p_error_details: errorDetails,
-      p_should_retry: shouldRetry
+      p_should_retry: shouldRetry,
+      p_is_retryable_error: isRetryableError
     });
   }
 }
