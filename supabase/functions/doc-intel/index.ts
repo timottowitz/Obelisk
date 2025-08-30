@@ -7,6 +7,11 @@ import { Hono } from "jsr:@hono/hono";
 import { cors } from "jsr:@hono/hono/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
 import { extractUserAndOrgId } from "../_shared/index.ts";
+import { 
+  createUploadValidationMiddleware, 
+  createApiValidationMiddleware,
+  getRateLimitStatus 
+} from "../_shared/validation-middleware.ts";
 import { GoogleCloudStorageService } from "../_shared/google-storage.ts";
 
 const app = new Hono();
@@ -17,18 +22,33 @@ app.use(
   cors({
     origin: "*",
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization", "X-Org-Id", "X-User-Id"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Org-Id", "X-User-Id", "X-Forwarded-For", "CF-Connecting-IP"],
     credentials: true,
   })
 );
-
-// Middleware for user and org extraction
-app.use("*", extractUserAndOrgId);
 
 // Handle OPTIONS requests for all routes
 app.options("*", (c) => {
   return c.text("", 200);
 });
+
+// Apply validation middleware before authentication
+// Upload endpoints need special handling for file size limits
+app.use("/upload", createUploadValidationMiddleware({
+  maxRequestSize: 100 * 1024 * 1024, // 100MB for document uploads
+  rateLimitMaxRequests: 20, // Lower limit for uploads
+  rateLimitWindow: 60 * 1000 // 1 minute
+}));
+
+// API endpoints get standard validation
+app.use("*", createApiValidationMiddleware({
+  skipPathsForAuth: ["/health", "/status"],
+  rateLimitMaxRequests: 100,
+  rateLimitWindow: 60 * 1000
+}));
+
+// Middleware for user and org extraction (after validation)
+app.use("*", extractUserAndOrgId);
 
 // Get Supabase client
 function getSupabaseClient() {
@@ -57,6 +77,38 @@ function getGcsService() {
     throw new Error("Invalid GCS_JSON_KEY: " + (e?.message || e));
   }
   return new GoogleCloudStorageService({ bucketName, credentials });
+}
+
+// Helper function to validate file content against MIME type
+function validateFileContent(fileData: Uint8Array, mimeType: string): boolean {
+  try {
+    // Basic magic number validation for common file types
+    const magicNumbers = {
+      'application/pdf': [0x25, 0x50, 0x44, 0x46], // %PDF
+      'image/jpeg': [0xFF, 0xD8, 0xFF], // JPEG
+      'image/png': [0x89, 0x50, 0x4E, 0x47], // PNG
+      'image/tiff': [0x49, 0x49, 0x2A, 0x00], // TIFF (little-endian)
+      'application/zip': [0x50, 0x4B, 0x03, 0x04], // ZIP (used by DOCX)
+    };
+    
+    // Check for DOCX (which is a ZIP file)
+    if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      const zipMagic = magicNumbers['application/zip'];
+      return zipMagic.every((byte, index) => fileData[index] === byte);
+    }
+    
+    const expectedMagic = magicNumbers[mimeType as keyof typeof magicNumbers];
+    if (!expectedMagic) {
+      // For unsupported types, allow through (text files, etc.)
+      return true;
+    }
+    
+    return expectedMagic.every((byte, index) => fileData[index] === byte);
+  } catch (error) {
+    console.error('File validation error:', error);
+    // Allow through on validation error to prevent false positives
+    return true;
+  }
 }
 
 // Helper function to get organization info
@@ -115,20 +167,80 @@ app.post("/upload", async (c) => {
     // Get organization info
     const { user, schema } = await getOrganizationInfo(supabase, orgId, userId);
     
-    // Parse multipart form data
+    // Parse multipart form data with additional validation
     const formData = await c.req.formData();
     const file = formData.get("file") as File;
     
     if (!file || !(file instanceof File)) {
-      return c.json({ error: "No valid file provided" }, 400);
+      return c.json({ 
+        success: false,
+        error: "No valid file provided",
+        code: "INVALID_FILE"
+      }, 400);
+    }
+    
+    // Additional file validation
+    const allowedMimeTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'image/jpeg',
+      'image/png',
+      'image/tiff'
+    ];
+    
+    if (!allowedMimeTypes.includes(file.type)) {
+      return c.json({
+        success: false,
+        error: `File type '${file.type}' is not supported`,
+        code: "UNSUPPORTED_FILE_TYPE",
+        allowedTypes: allowedMimeTypes
+      }, 415);
+    }
+    
+    // Validate file size (additional check after middleware)
+    const maxFileSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxFileSize) {
+      return c.json({
+        success: false,
+        error: `File size ${file.size} bytes exceeds maximum allowed ${maxFileSize} bytes`,
+        code: "FILE_TOO_LARGE",
+        maxSize: maxFileSize
+      }, 413);
     }
 
-    // Convert file to buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const fileData = new Uint8Array(arrayBuffer);
+    // Convert file to buffer with error handling
+    let arrayBuffer: ArrayBuffer;
+    let fileData: Uint8Array;
+    
+    try {
+      arrayBuffer = await file.arrayBuffer();
+      fileData = new Uint8Array(arrayBuffer);
+    } catch (error) {
+      console.error("Error reading file data:", error);
+      return c.json({ 
+        success: false,
+        error: "Failed to read file data",
+        code: "FILE_READ_ERROR"
+      }, 400);
+    }
 
     if (!fileData?.length) {
-      return c.json({ error: "Empty or invalid file data" }, 400);
+      return c.json({ 
+        success: false,
+        error: "Empty or invalid file data",
+        code: "EMPTY_FILE"
+      }, 400);
+    }
+    
+    // Validate file content (basic magic number check)
+    if (!validateFileContent(fileData, file.type)) {
+      return c.json({
+        success: false,
+        error: "File content does not match declared MIME type",
+        code: "INVALID_FILE_CONTENT"
+      }, 400);
     }
 
     // Calculate checksum for integrity
@@ -136,18 +248,7 @@ app.post("/upload", async (c) => {
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const checksum = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
 
-    // Upload to GCS
-    const uploadResult = await gcsService.uploadFile(
-      orgId,
-      userId,
-      "doc-intel", // folder path
-      file.name,
-      fileData,
-      file.type || "application/octet-stream",
-      { checksum, uploadedBy: user.id }
-    );
-
-    // Create document record
+    // Create document record first to get doc_id for secure path
     const { data: document, error: docError } = await supabase
       .schema(schema)
       .from("documents")
@@ -155,12 +256,10 @@ app.post("/upload", async (c) => {
         filename: file.name,
         status: "uploading",
         user_id: user.id,
-        file_path: uploadResult.blobName,
         metadata: {
           originalSize: fileData.length,
           mimeType: file.type,
           checksum,
-          gcsUrl: uploadResult.blobUrl,
         }
       })
       .select()
@@ -169,6 +268,39 @@ app.post("/upload", async (c) => {
     if (docError) {
       console.error("Error creating document record:", docError);
       return c.json({ error: "Failed to create document record" }, 500);
+    }
+
+    // Upload to GCS with secure tenant path: tenant/<tenant_id>/documents/<doc_id>/*
+    const uploadResult = await gcsService.uploadFile(
+      orgId,
+      userId,
+      `documents/${document.id}`, // secure folder path with doc_id
+      file.name,
+      fileData,
+      file.type || "application/octet-stream",
+      { checksum, uploadedBy: user.id }
+    );
+
+    // Update document record with file path and metadata
+    const { data: updatedDocument, error: updateError } = await supabase
+      .schema(schema)
+      .from("documents")
+      .update({
+        file_path: uploadResult.blobName,
+        metadata: {
+          originalSize: fileData.length,
+          mimeType: file.type,
+          checksum,
+          gcsUrl: uploadResult.blobUrl,
+        }
+      })
+      .eq("id", document.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error("Error updating document record:", updateError);
+      return c.json({ error: "Failed to update document record" }, 500);
     }
 
     // Create processing job
@@ -212,16 +344,26 @@ app.post("/upload", async (c) => {
     return c.json({
       success: true,
       document: {
-        id: document.id,
-        filename: document.filename,
+        id: updatedDocument.id,
+        filename: updatedDocument.filename,
         status: "processing",
-        uploaded_at: document.uploaded_at,
-        metadata: document.metadata
-      }
-    });
+        uploaded_at: updatedDocument.uploaded_at,
+        metadata: updatedDocument.metadata
+      },
+      message: "Document uploaded and processing started successfully"
+    }, 201);
   } catch (error: any) {
     console.error("Upload error:", error);
-    return c.json({ success: false, error: error.message }, 500);
+    
+    // Security: Don't expose internal errors in production
+    const isDevelopment = Deno.env.get("ENVIRONMENT") === "development";
+    
+    return c.json({ 
+      success: false, 
+      error: isDevelopment ? error.message : "Internal server error during upload",
+      code: "UPLOAD_ERROR",
+      timestamp: new Date().toISOString()
+    }, 500);
   }
 });
 
@@ -278,7 +420,13 @@ app.get("/documents", async (c) => {
     });
   } catch (error: any) {
     console.error("Error in documents endpoint:", error);
-    return c.json({ error: error.message }, 500);
+    
+    const isDevelopment = Deno.env.get("ENVIRONMENT") === "development";
+    return c.json({ 
+      success: false,
+      error: isDevelopment ? error.message : "Failed to fetch documents",
+      code: "FETCH_DOCUMENTS_ERROR"
+    }, 500);
   }
 });
 
@@ -333,7 +481,13 @@ app.get("/documents/:id", async (c) => {
     });
   } catch (error: any) {
     console.error("Error fetching document:", error);
-    return c.json({ error: error.message }, 500);
+    
+    const isDevelopment = Deno.env.get("ENVIRONMENT") === "development";
+    return c.json({ 
+      success: false,
+      error: isDevelopment ? error.message : "Failed to fetch document",
+      code: "FETCH_DOCUMENT_ERROR"
+    }, 500);
   }
 });
 
@@ -409,7 +563,13 @@ app.get("/documents/:id/entities", async (c) => {
     });
   } catch (error: any) {
     console.error("Error fetching entities:", error);
-    return c.json({ error: error.message }, 500);
+    
+    const isDevelopment = Deno.env.get("ENVIRONMENT") === "development";
+    return c.json({ 
+      success: false,
+      error: isDevelopment ? error.message : "Failed to fetch entities",
+      code: "FETCH_ENTITIES_ERROR"
+    }, 500);
   }
 });
 
@@ -476,7 +636,71 @@ app.patch("/entities/:id", async (c) => {
     });
   } catch (error: any) {
     console.error("Error updating entity:", error);
-    return c.json({ error: error.message }, 500);
+    
+    const isDevelopment = Deno.env.get("ENVIRONMENT") === "development";
+    return c.json({ 
+      success: false,
+      error: isDevelopment ? error.message : "Failed to update entity",
+      code: "UPDATE_ENTITY_ERROR"
+    }, 500);
+  }
+});
+
+// GET /documents/:id/download - Generate signed URL for secure document access
+app.get("/documents/:id/download", async (c) => {
+  try {
+    const orgId = c.get("orgId");
+    const userId = c.get("userId");
+    const documentId = c.req.param("id");
+    
+    const supabase = getSupabaseClient();
+    const gcsService = getGcsService();
+    const { user, schema } = await getOrganizationInfo(supabase, orgId, userId);
+
+    // Verify document exists and user has access
+    const { data: document, error: docError } = await supabase
+      .schema(schema)
+      .from("documents")
+      .select("*")
+      .eq("id", documentId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (docError || !document) {
+      return c.json({ error: "Document not found or access denied" }, 404);
+    }
+
+    // Ensure document has a file path
+    if (!document.file_path) {
+      return c.json({ error: "Document file not available" }, 404);
+    }
+
+    // Generate signed URL with 1 hour expiration (max security requirement)
+    const signedUrl = await gcsService.generateSignedUrl(
+      document.file_path,
+      1 // 1 hour maximum as per security requirements
+    );
+
+    return c.json({
+      success: true,
+      signedUrl,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour from now
+      document: {
+        id: document.id,
+        filename: document.filename,
+        mimeType: document.metadata?.mimeType,
+        size: document.metadata?.originalSize
+      }
+    });
+  } catch (error: any) {
+    console.error("Error generating signed URL:", error);
+    
+    const isDevelopment = Deno.env.get("ENVIRONMENT") === "development";
+    return c.json({ 
+      success: false,
+      error: isDevelopment ? error.message : "Failed to generate download URL",
+      code: "DOWNLOAD_URL_ERROR"
+    }, 500);
   }
 });
 
@@ -537,7 +761,47 @@ app.post("/entities/:id/set-objective-truth", async (c) => {
     });
   } catch (error: any) {
     console.error("Error setting objective truth:", error);
-    return c.json({ error: error.message }, 500);
+    
+    const isDevelopment = Deno.env.get("ENVIRONMENT") === "development";
+    return c.json({ 
+      success: false,
+      error: isDevelopment ? error.message : "Failed to set objective truth",
+      code: "SET_OBJECTIVE_TRUTH_ERROR"
+    }, 500);
+  }
+});
+
+// Health check endpoint
+app.get("/health", async (c) => {
+  return c.json({
+    status: "healthy",
+    service: "doc-intel",
+    timestamp: new Date().toISOString(),
+    version: "1.0.0"
+  });
+});
+
+// Rate limit status endpoint
+app.get("/rate-limit-status", async (c) => {
+  try {
+    const clientIP = c.req.header("cf-connecting-ip") || 
+                    c.req.header("x-forwarded-for") || 
+                    c.req.header("x-real-ip") || 
+                    "unknown";
+    
+    const userId = c.get("userId") || "";
+    const rateLimitStatus = getRateLimitStatus(clientIP, userId);
+    
+    return c.json({
+      success: true,
+      rateLimit: rateLimitStatus,
+      clientIP: clientIP.substring(0, 8) + "...", // Partial IP for privacy
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: "Failed to get rate limit status"
+    }, 500);
   }
 });
 

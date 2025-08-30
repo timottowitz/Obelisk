@@ -1,14 +1,14 @@
 'use client';
 
 import { forwardRef, useState, useOptimistic } from 'react';
-import { Check, X, Edit3, Star, Scale, AlertCircle } from 'lucide-react';
+import { Check, X, Edit3, Star, Scale } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Entity, EntityStatus } from '@/types/doc-intel';
 import { useUpdateEntityStatus, useSetEntityObjectiveTruth } from '@/hooks/useDocIntel';
-import { cn } from '@/lib/utils';
+import { cn, formatStatusLabel } from '@/lib/utils';
 
 interface EntityCardProps {
   entity: Entity;
@@ -182,7 +182,7 @@ export const EntityCard = forwardRef<HTMLDivElement, EntityCardProps>(
               variant="outline"
               className={cn('text-xs', getEntityStatusColor(optimisticEntity.status))}
             >
-              {optimisticEntity.status.charAt(0).toUpperCase() + optimisticEntity.status.slice(1)}
+              {formatStatusLabel(optimisticEntity.status)}
             </Badge>
           </div>
 

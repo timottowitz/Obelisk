@@ -20,7 +20,7 @@ interface DocumentViewerProps {
 export function DocumentViewer({ document, entities, className }: DocumentViewerProps) {
   const selectedEntityId = useSelectedEntity();
   const isFocusModeActive = useFocusMode();
-  const { selectEntity, registerEntityRef } = useVerificationActions();
+  const { selectEntity } = useVerificationActions();
 
   // Handle clicking on highlighted entities in the document
   const handleDocumentTextClick = useCallback((event: React.MouseEvent) => {
@@ -30,10 +30,6 @@ export function DocumentViewer({ document, entities, className }: DocumentViewer
     }
   }, [selectEntity]);
 
-  // Register entity elements for scroll-to functionality
-  const handleEntityRef = useCallback((entityId: string, element: HTMLElement | null) => {
-    registerEntityRef(entityId, element);
-  }, [registerEntityRef]);
 
   // Auto-scroll to selected entity in document
   useEffect(() => {

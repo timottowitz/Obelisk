@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { ChevronDown, ChevronUp, Eye, FileText, Download } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatStatusLabel } from '@/lib/utils';
 import {
   Table,
   TableBody,
@@ -42,24 +42,6 @@ const getStatusColor = (status: DocumentStatus) => {
   }
 };
 
-const getStatusLabel = (status: DocumentStatus) => {
-  switch (status) {
-    case 'complete':
-      return 'Complete';
-    case 'processing':
-      return 'Processing';
-    case 'needs_review':
-      return 'Needs Review';
-    case 'in_review':
-      return 'In Review';
-    case 'uploading':
-      return 'Uploading';
-    case 'failed':
-      return 'Failed';
-    default:
-      return status;
-  }
-};
 
 const tableColumns = [
   {
@@ -186,7 +168,7 @@ export function DocumentsTable({
                       getStatusColor(document.status)
                     )}
                   >
-                    {getStatusLabel(document.status)}
+                    {formatStatusLabel(document.status)}
                   </Badge>
                 </TableCell>
 

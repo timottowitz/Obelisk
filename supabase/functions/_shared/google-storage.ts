@@ -6,7 +6,7 @@ export interface GoogleStorageConfig {
 }
 
 export interface UploadResult {
-  blobUrl: string;
+  blobUrl: string; // WARNING: For metadata only - DO NOT use for file access. Use generateSignedUrl() instead
   blobName: string;
 }
 
@@ -37,11 +37,16 @@ export class GoogleCloudStorageService {
     metadata?: Record<string, string>
   ): Promise<UploadResult> {
     const timestamp = Date.now();
-    const blobName = `storage/${tenantId}/${userId}/${folderPath}/${timestamp}_${fileName}`;
+    // Use secure path structure: tenant/<tenant_id>/<folderPath>/* 
+    // For doc-intel: tenant/<tenant_id>/documents/<doc_id>/*
+    const blobName = `tenant/${tenantId}/${folderPath}/${timestamp}_${fileName}`;
     const file = this.bucket.file(blobName);
     const options: any = {
       metadata: {
         contentType: mimeType,
+        userId: userId,
+        tenantId: tenantId,
+        uploadedAt: new Date().toISOString(),
         ...metadata,
       },
     };
@@ -105,14 +110,24 @@ export class GoogleCloudStorageService {
     await sourceFile.copy(destFile);
   }
 
+  /**
+   * Generates a secure signed URL for file access with limited time expiration.
+   * This is the ONLY secure method to provide file access.
+   * @param blobName The blob name/path in the storage bucket
+   * @param expiresInHours Hours until URL expires (max 1 hour recommended for security)
+   * @returns A time-limited signed URL
+   */
   async generateSignedUrl(
     blobName: string,
     expiresInHours: number = 1
   ): Promise<string> {
+    // Enforce security: maximum 1 hour expiration
+    const maxExpirationHours = Math.min(expiresInHours, 1);
+    
     const file = this.bucket.file(blobName);
     const options: GetSignedUrlConfig = {
       action: "read",
-      expires: Date.now() + expiresInHours * 60 * 60 * 1000,
+      expires: Date.now() + maxExpirationHours * 60 * 60 * 1000,
     };
     const [url] = await file.getSignedUrl(options);
     return url;
@@ -157,9 +172,11 @@ export class GoogleCloudStorageService {
     return await this.deleteFile(blobName);
   }
 
-  getBlobUrl(blobName: string): string {
-    return `https://storage.googleapis.com/${this.bucket.name}/${blobName}`;
-  }
+  // SECURITY: This method provides direct public access and should not be used
+  // Use generateSignedUrl() instead for secure access
+  // getBlobUrl(blobName: string): string {
+  //   return `https://storage.googleapis.com/${this.bucket.name}/${blobName}`;
+  // }
 
   async ensureBucketExists(): Promise<void> {
     const [exists] = await this.bucket.exists();

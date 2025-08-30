@@ -286,12 +286,7 @@ export default class DocIntelAPI {
   /**
    * Get entities across all documents with filtering
    */
-  static async getAllEntities(
-    options: EntityFilterOptions & {
-      limit?: number;
-      offset?: number;
-    } = {}
-  ): Promise<EntitiesResponse> {
+  static async getAllEntities(): Promise<EntitiesResponse> {
     // This would require a new endpoint on the backend that searches across all user documents
     // For now, we'll throw an error to indicate this feature needs backend implementation
     throw new Error('getAllEntities requires a new backend endpoint. Please implement GET /entities first.');

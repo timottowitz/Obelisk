@@ -175,20 +175,19 @@ export function highlightText(
 }
 
 // Enhanced highlight text with focus mode and scroll registration
-export function highlightTextWithFocus(
-  text: string, 
-  entities: Entity[], 
-  selectedEntityId?: string,
-  isFocusModeActive?: boolean,
-  onEntityRef?: (entityId: string, element: HTMLElement | null) => void
-): React.ReactElement {
-  if (!text || !entities.length) {
-    const className = `whitespace-pre-wrap text-sm leading-relaxed ${
-      isFocusModeActive && selectedEntityId ? 'opacity-30 transition-opacity duration-300' : ''
-    }`;
-    return React.createElement('div', { className }, text);
-  }
-
+export function HighlightTextWithFocus({
+  text,
+  entities,
+  selectedEntityId,
+  isFocusModeActive,
+  onEntityRef
+}: {
+  text: string;
+  entities: Entity[];
+  selectedEntityId?: string;
+  isFocusModeActive?: boolean;
+  onEntityRef?: (entityId: string, element: HTMLElement | null) => void;
+}): React.ReactElement {
   const containerRef = React.useRef<HTMLDivElement>(null);
   
   React.useEffect(() => {
@@ -213,6 +212,13 @@ export function highlightTextWithFocus(
       });
     };
   }, [text, entities, onEntityRef]);
+
+  if (!text || !entities.length) {
+    const className = `whitespace-pre-wrap text-sm leading-relaxed ${
+      isFocusModeActive && selectedEntityId ? 'opacity-30 transition-opacity duration-300' : ''
+    }`;
+    return React.createElement('div', { className }, text);
+  }
 
   // Sort entities by their position in text
   const sortedEntities = [...entities].sort((a, b) => {

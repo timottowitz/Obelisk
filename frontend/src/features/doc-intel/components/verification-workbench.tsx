@@ -13,7 +13,7 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Entity, EntityStatus } from '@/types/doc-intel';
-import { useVerificationStore, useSelectedEntity, useFocusMode, useVerificationActions } from '../stores/verification-store';
+import { useSelectedEntity, useFocusMode, useVerificationActions } from '../stores/verification-store';
 import { EntityCard } from './entity-card';
 import { useUpdateEntityStatus } from '@/hooks/useDocIntel';
 

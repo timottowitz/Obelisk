@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { Entity } from '@/types/doc-intel';
 
 interface VerificationState {
   // Selected entity for highlighting and focus

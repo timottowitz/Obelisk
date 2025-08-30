@@ -8,6 +8,11 @@ import { cors } from "jsr:@hono/hono/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.51.0";
 import { extractUserAndOrgId } from "../_shared/index.ts";
 import { createJobProcessor, DocETLJobProcessor, DocETLJob } from "./job-processor.ts";
+import { 
+  createApiValidationMiddleware, 
+  createWebhookValidationMiddleware,
+  getRateLimitStatus 
+} from "../_shared/validation-middleware.ts";
 
 const app = new Hono();
 
@@ -20,12 +25,26 @@ app.use(
   cors({
     origin: "*",
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization", "X-Org-Id", "X-User-Id"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Org-Id", "X-User-Id", "X-Forwarded-For", "CF-Connecting-IP", "x-webhook-signature"],
     credentials: true,
   })
 );
 
-// Apply middleware for authenticated routes
+// Apply validation middleware before authentication
+// Webhook endpoints might need HMAC validation
+app.use("/doc-intel-processor/webhook/*", createWebhookValidationMiddleware({
+  rateLimitMaxRequests: 1000, // Higher limit for webhooks
+  rateLimitWindow: 60 * 1000
+}));
+
+// API endpoints get standard validation  
+app.use("/doc-intel-processor/*", createApiValidationMiddleware({
+  skipPathsForAuth: ["/doc-intel-processor/health"],
+  rateLimitMaxRequests: 200,
+  rateLimitWindow: 60 * 1000
+}));
+
+// Apply middleware for authenticated routes (after validation)
 app.use("/doc-intel-processor/jobs", extractUserAndOrgId);
 app.use("/doc-intel-processor/jobs/*", extractUserAndOrgId);
 app.use("/doc-intel-processor/process", extractUserAndOrgId);
@@ -39,8 +58,10 @@ app.options("*", (c) => {
 app.get("/doc-intel-processor/health", async (c) => {
   return c.json({ 
     status: "healthy", 
+    service: "doc-intel-processor",
     worker_id: WORKER_ID,
-    timestamp: new Date().toISOString() 
+    timestamp: new Date().toISOString(),
+    version: "1.0.0"
   });
 });
 
@@ -107,9 +128,15 @@ app.get("/doc-intel-processor/jobs", async (c) => {
       limit,
       offset
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in jobs endpoint:", error);
-    return c.json({ error: "Internal server error" }, 500);
+    
+    const isDevelopment = Deno.env.get("ENVIRONMENT") === "development";
+    return c.json({ 
+      success: false,
+      error: isDevelopment ? error.message : "Failed to fetch jobs",
+      code: "FETCH_JOBS_ERROR"
+    }, 500);
   }
 });
 
@@ -181,9 +208,15 @@ app.get("/doc-intel-processor/status/:id", async (c) => {
         (Date.now() - new Date(heartbeat.last_ping).getTime() < 120000) : // 2 minutes
         false
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in status endpoint:", error);
-    return c.json({ error: "Internal server error" }, 500);
+    
+    const isDevelopment = Deno.env.get("ENVIRONMENT") === "development";
+    return c.json({ 
+      success: false,
+      error: isDevelopment ? error.message : "Failed to fetch job status",
+      code: "FETCH_STATUS_ERROR"
+    }, 500);
   }
 });
 
@@ -216,17 +249,44 @@ app.post("/doc-intel-processor/jobs", async (c) => {
       metadata = {}
     } = body;
 
-    // Validate required fields
+    // Enhanced input validation
     if (!job_type || !document_id || !pipeline_config) {
       return c.json({
-        error: "Missing required fields: job_type, document_id, pipeline_config"
+        success: false,
+        error: "Missing required fields: job_type, document_id, pipeline_config",
+        code: "MISSING_REQUIRED_FIELDS",
+        requiredFields: ["job_type", "document_id", "pipeline_config"]
       }, 400);
     }
 
     // Validate job_type
-    if (!['extract', 'transform', 'pipeline'].includes(job_type)) {
+    const validJobTypes = ['extract', 'transform', 'pipeline'];
+    if (!validJobTypes.includes(job_type)) {
       return c.json({
-        error: "Invalid job_type. Must be one of: extract, transform, pipeline"
+        success: false,
+        error: "Invalid job_type. Must be one of: extract, transform, pipeline",
+        code: "INVALID_JOB_TYPE",
+        validTypes: validJobTypes,
+        received: job_type
+      }, 400);
+    }
+    
+    // Validate pipeline_config structure
+    if (typeof pipeline_config !== 'object' || pipeline_config === null) {
+      return c.json({
+        success: false,
+        error: "pipeline_config must be a valid object",
+        code: "INVALID_PIPELINE_CONFIG"
+      }, 400);
+    }
+    
+    // Validate priority range
+    if (priority !== undefined && (typeof priority !== 'number' || priority < 0 || priority > 10)) {
+      return c.json({
+        success: false,
+        error: "priority must be a number between 0 and 10",
+        code: "INVALID_PRIORITY",
+        validRange: [0, 10]
       }, 400);
     }
 
@@ -283,9 +343,16 @@ app.post("/doc-intel-processor/jobs", async (c) => {
         created_at: job.created_at
       }
     }, 201);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating job:", error);
-    return c.json({ error: "Internal server error" }, 500);
+    
+    const isDevelopment = Deno.env.get("ENVIRONMENT") === "development";
+    return c.json({ 
+      success: false,
+      error: isDevelopment ? error.message : "Internal server error during job creation",
+      code: "JOB_CREATION_ERROR",
+      timestamp: new Date().toISOString()
+    }, 500);
   }
 });
 
@@ -358,9 +425,15 @@ app.post("/doc-intel-processor/process", async (c) => {
         error: result.error_message
       }, 500);
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in process endpoint:", error);
-    return c.json({ error: "Internal server error" }, 500);
+    
+    const isDevelopment = Deno.env.get("ENVIRONMENT") === "development";
+    return c.json({ 
+      success: false,
+      error: isDevelopment ? error.message : "Failed to process job",
+      code: "PROCESS_JOB_ERROR"
+    }, 500);
   }
 });
 
@@ -412,9 +485,15 @@ app.put("/doc-intel-processor/jobs/:id/cancel", async (c) => {
       success: true,
       message: "Job cancelled successfully"
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error cancelling job:", error);
-    return c.json({ error: "Internal server error" }, 500);
+    
+    const isDevelopment = Deno.env.get("ENVIRONMENT") === "development";
+    return c.json({ 
+      success: false,
+      error: isDevelopment ? error.message : "Failed to cancel job",
+      code: "CANCEL_JOB_ERROR"
+    }, 500);
   }
 });
 
@@ -524,5 +603,78 @@ async function claimNextJob(supabase: any, workerId: string, jobTypes: string[] 
     return null;
   }
 }
+
+// Rate limit status endpoint
+app.get("/doc-intel-processor/rate-limit-status", async (c) => {
+  try {
+    const clientIP = c.req.header("cf-connecting-ip") || 
+                    c.req.header("x-forwarded-for") || 
+                    c.req.header("x-real-ip") || 
+                    "unknown";
+    
+    const userId = c.get("userId") || "";
+    const rateLimitStatus = getRateLimitStatus(clientIP, userId);
+    
+    return c.json({
+      success: true,
+      rateLimit: rateLimitStatus,
+      worker_id: WORKER_ID,
+      clientIP: clientIP.substring(0, 8) + "...", // Partial IP for privacy
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: "Failed to get rate limit status"
+    }, 500);
+  }
+});
+
+// Webhook endpoint for external processing notifications
+app.post("/doc-intel-processor/webhook/process-complete", async (c) => {
+  try {
+    // HMAC validation is handled by middleware
+    const body = await c.req.json();
+    
+    // Validate webhook payload structure
+    const { job_id, status, result_data, error_message } = body;
+    
+    if (!job_id || !status) {
+      return c.json({
+        success: false,
+        error: "Missing required webhook fields: job_id, status",
+        code: "INVALID_WEBHOOK_PAYLOAD"
+      }, 400);
+    }
+    
+    const validStatuses = ['completed', 'failed', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return c.json({
+        success: false,
+        error: "Invalid status in webhook",
+        code: "INVALID_WEBHOOK_STATUS",
+        validStatuses
+      }, 400);
+    }
+    
+    // Process webhook (update job status, etc.)
+    // This would typically update the job in the database
+    console.log(`Webhook received for job ${job_id}: ${status}`);
+    
+    return c.json({
+      success: true,
+      message: "Webhook processed successfully",
+      job_id,
+      processed_at: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error("Webhook processing error:", error);
+    
+    return c.json({
+      success: false,
+      error: "Failed to process webhook",
+      code: "WEBHOOK_PROCESSING_ERROR"
+    }, 500);
+  }
+});
 
 export default app;

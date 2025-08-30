@@ -91,7 +91,7 @@ export function EntityEditModal({ entity, isOpen, onClose, onSave }: EntityEditM
         <DialogHeader>
           <DialogTitle>Edit Entity</DialogTitle>
           <DialogDescription>
-            Make changes to the entity information. Click save when you're done.
+            Make changes to the entity information. Click save when you&apos;re done.
           </DialogDescription>
         </DialogHeader>
         
